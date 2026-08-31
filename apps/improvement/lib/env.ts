@@ -6,17 +6,24 @@
 // claro si falta — así el "requerida desde el paso N" se aplica en código, no solo en un comentario.
 import { z } from "zod";
 
+// .env.local declara a propósito variables "aún no requeridas" como cadena vacía (§10 del
+// blueprint, convención "declarada pero no activa hasta el paso N" — ver ANTHROPIC_API_KEY más
+// abajo). z.string().optional() por sí solo NO acepta "" (solo undefined), así que cada campo
+// normaliza "" a undefined antes de validar — descubierto vía `next build` real en E1-T6, la
+// primera vez que este archivo se evaluó con un .env.local de verdad puesto delante.
+const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
+
 const schema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   // SUPABASE_SERVICE_ROLE_KEY es exclusiva de apps/admin (paso 5) — nunca se lee desde
   // apps/improvement, pero se declara aquí también para que un grep de "toda variable documentada
   // en .env.example" encuentre una fila por variable, no para usarla.
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(), // paso 11 — gateway de IA
-  RESEND_API_KEY: z.string().min(1).optional(), // paso 9 — recordatorios por email
-  CRON_SECRET: z.string().min(1).optional(), // paso 9 — valida el bearer del cron de Vercel
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  ANTHROPIC_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 11 — gateway de IA
+  RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — recordatorios por email
+  CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — bearer del cron de Vercel
+  NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 });
 
 export const env = schema.parse(process.env);

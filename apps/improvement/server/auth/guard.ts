@@ -39,6 +39,19 @@ async function getSessionUserId(): Promise<string | null> {
 }
 
 /**
+ * Guard de tenencia puro — recibe un userId ya resuelto (por requireOrgMembership() a partir de la
+ * cookie, o directo desde otro server/** que ya conoce la sesión). Separado de la resolución de
+ * cookie para poder probar el aislamiento entre orgs sin mockear el contexto de request de Next:
+ * notFound() es un throw síncrono, seguro de invocar y de capturar en un test (ver
+ * tests/objectives.test.ts).
+ */
+export async function assertMembership(userId: string, orgId: string) {
+  const row = await findMembership(userId, orgId);
+  if (!row) notFound();
+  return row;
+}
+
+/**
  * Guard de tenencia: WHEN no hay sesión, o la sesión no tiene membership en `orgId`, THE SYSTEM
  * SHALL responder 404 (nunca 403 — un 403 confirma que el org existe a alguien que no debería
  * saberlo). Retorna la fila de membership cuando sí pertenece.
@@ -47,8 +60,5 @@ export async function requireOrgMembership(orgId: string) {
   const userId = await getSessionUserId();
   if (!userId) notFound();
 
-  const row = await findMembership(userId, orgId);
-  if (!row) notFound();
-
-  return row;
+  return assertMembership(userId, orgId);
 }
