@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# allowBuilds: pnpm 11 aborta el install con ERR_PNPM_IGNORED_BUILDS si no se aprueban
+# explícitamente los scripts de postinstall de las dependencias nativas. Se aprueban con
+# `pnpm approve-builds --all` en Bootstrap (blueprint §10) y este bloque se rellena con lo que
+# ese comando escriba — no se asume vacío.
+allowBuilds: {}

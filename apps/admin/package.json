@@ -1,0 +1,28 @@
+{
+  "name": "@jotapuntoce/admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "lint": "eslint .",
+    "typecheck": "echo 'apps/admin es JavaScript, sin paso de tipos' && exit 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@jotapuntoce/db": "workspace:*",
+    "@supabase/supabase-js": "^2.112.4",
+    "resend": "^6.25.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.3",
+    "tailwindcss": "^4",
+    "vitest": "^4.1.11"
+  }
+}
