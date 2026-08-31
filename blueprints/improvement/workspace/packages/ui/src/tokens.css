@@ -1,0 +1,52 @@
+/* Fuente única de los tokens de diseño de JotaPuntoCe — movidos literalmente desde
+   jotapuntoce-admin/app/globals.css (blueprint §7, §9 paso 2). Ningún otro archivo del monorepo
+   redefine estos valores; ver workspace/.claude/rules/tokens-de-diseno.md. */
+
+:root {
+  --bg: #05060b;
+  --bg-elevated: #0a0d16;
+  --bg-card: rgba(255, 255, 255, 0.035);
+  --bg-card-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text-primary: #f4f6fb;
+  --text-secondary: #a3abc2;
+  --text-muted: #6b7386;
+
+  --accent-1: #7c5cff;
+  --accent-2: #22d3ee;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #f87171;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  --shadow-glow: 0 0 0 1px var(--border), 0 20px 60px -20px rgba(124, 92, 255, 0.35);
+}
+
+/* Presets de acento seleccionables (AccentPicker, heredado de apps/admin). El preset activo
+   sobreescribe --accent-1/--accent-2 vía una clase en <html>, gestionada por localStorage —
+   ver apps/admin/components/AccentPicker.js, reutilizado tal cual. */
+:root[data-accent="esmeralda"] {
+  --accent-1: #10b981;
+  --accent-2: #a3e635;
+}
+:root[data-accent="solar"] {
+  --accent-1: #fb923c;
+  --accent-2: #f472b6;
+}
+:root[data-accent="indigo"] {
+  --accent-1: #6366f1;
+  --accent-2: #3b82f6;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}

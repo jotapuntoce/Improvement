@@ -6,4 +6,4 @@ packages:
 # explícitamente los scripts de postinstall de las dependencias nativas. Se aprueban con
 # `pnpm approve-builds --all` en Bootstrap (blueprint §10) y este bloque se rellena con lo que
 # ese comando escriba — no se asume vacío.
-allowBuilds: { esbuild: true, unrs-resolver: true }
+allowBuilds: {}
