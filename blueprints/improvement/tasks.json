@@ -135,7 +135,7 @@
       "apps/improvement/app/[org]/objetivos/page.tsx",
       "apps/improvement/tests/objectives.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T1",
