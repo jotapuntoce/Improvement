@@ -17,6 +17,7 @@
     "@jotapuntoce/db": "workspace:*",
     "@jotapuntoce/ui": "workspace:*",
     "@supabase/supabase-js": "^2.112.4",
+    "drizzle-orm": "0.45.2",
     "resend": "^6.25.0"
   },
   "devDependencies": {

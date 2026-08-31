@@ -6,6 +6,7 @@ import path from "node:path";
 export default defineConfig({
   test: {
     environment: "node",
+    setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.test.js"],
     exclude: ["node_modules", ".next", "../../blueprints/**"],
   },
