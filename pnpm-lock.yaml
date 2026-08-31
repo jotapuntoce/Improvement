@@ -29,6 +29,9 @@ importers:
       '@jotapuntoce/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@jotapuntoce/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@supabase/supabase-js':
         specifier: ^2.112.4
         version: 2.112.4
