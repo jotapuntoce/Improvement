@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@jotapuntoce/ui/tokens.css";
+
+/* Sin clases propias todavía — cada paso posterior del build order agrega las suyas.
+   Los tokens (colores, radios, sombras) viven solo en packages/ui/src/tokens.css,
+   ver .claude/rules/tokens-de-diseno.md */

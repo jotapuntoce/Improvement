@@ -195,8 +195,8 @@ tres líneas).
 
 1. **WHEN** `pnpm build` corre desde la raíz **THE SYSTEM SHALL** construir ambas apps con exit 0.
 2. **WHEN** se busca `--accent-1:` con grep en todo el árbol de `apps/` y `packages/` (excluyendo
-   `node_modules` y `.next`) **THE SYSTEM SHALL** encontrar exactamente una definición, en
-   `packages/ui/src/tokens.css` — la fuente única del token.
+   `node_modules` y `.next`) **THE SYSTEM SHALL** encontrar la definición solo en
+   `packages/ui/src/tokens.css` — ningún otro archivo la redefine.
 3. **WHEN** `apps/improvement` arranca en modo dev y se visita `/login` **THE SYSTEM SHALL**
    renderizar con el fondo `--bg` (`#05060b`) aplicado antes del primer paint (sin flash de tema
    claro).
@@ -207,7 +207,10 @@ tres líneas).
 
 ```bash
 pnpm build
-n=$(grep -rn -- "--accent-1:" apps packages --include="*.css" | grep -v node_modules | wc -l); test "$n" = 1
+# --include ANTES del separador `--` (después, grep pierde el flag); .next/ excluido porque el
+# build bundlea los tokens ahí, que es esperado, no una redefinición de fuente
+n=$(grep -rln --include="*.css" -- "--accent-1:" apps packages | grep -v node_modules \
+  | grep -v "/\.next/" | grep -v "packages/ui/src/tokens.css" | wc -l); test "$n" = 0
 grep -n '"react": "19.2.8"' apps/improvement/package.json
 ```
 

@@ -950,9 +950,12 @@ intentar escribirlo a mano sería trabajo duplicado y una fuente más de drift.
 ```bash
 pnpm build   # expect: exit 0, ambas apps
 # ningún archivo FUERA de packages/ui/src/tokens.css define --accent-1: (los 4 presets que SÍ están
-# dentro de tokens.css — base + Esmeralda/Solar/Índigo — son intencionales, ver §7)
-n=$(grep -rln -- "--accent-1:" apps packages --include="*.css" | grep -v node_modules \
-  | grep -v "packages/ui/src/tokens.css" | wc -l)
+# dentro de tokens.css — base + Esmeralda/Solar/Índigo — son intencionales, ver §7).
+# --include va ANTES del separador `--` que protege el patrón — después de `--`, grep trata todo
+# como posicional y el flag se pierde. .next/ se excluye porque el build bundlea los tokens ahí,
+# lo cual es esperado y no una redefinición de fuente.
+n=$(grep -rln --include="*.css" -- "--accent-1:" apps packages | grep -v node_modules \
+  | grep -v "/\.next/" | grep -v "packages/ui/src/tokens.css" | wc -l)
 test "$n" = 0   # expect: exit 0 — cero archivos fuera de tokens.css lo redefinen
 grep -n '"react": "19.2.8"' apps/improvement/package.json   # expect: 1 match, sin ^ ni ~
 ```
