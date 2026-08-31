@@ -68,7 +68,7 @@
     ],
     "checkpoint": "step-03-db-schema",
     "files": ["packages/db/src/schema.ts", "packages/db/src/client.ts", "packages/db/package.json"],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T4",
