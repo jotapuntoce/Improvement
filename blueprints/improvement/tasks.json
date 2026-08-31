@@ -19,7 +19,7 @@
     ],
     "checkpoint": "step-01-migrate-admin",
     "files": ["apps/admin/app/**", "apps/admin/components/**", "apps/admin/lib/**"],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E1-T2",
