@@ -113,7 +113,7 @@
     ],
     "checkpoint": "step-05-provisioning",
     "files": ["apps/admin/lib/db.js", "apps/admin/app/prospects/actions.js", "apps/admin/tests/provisioning.test.js"],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T6",
