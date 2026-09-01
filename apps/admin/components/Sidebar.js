@@ -1,24 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getProducts, PRODUCTS_CHANGED_EVENT } from "@/lib/storage";
 import AppIcon from "./AppIcon";
 
-export default function Sidebar() {
+// orgCount llega como prop desde app/layout.js (Server Component) — ya no lee
+// localStorage/PRODUCTS_CHANGED_EVENT, esa key quedó huérfana cuando E3-T3 borró
+// components/ImprovementCatalog.js. Fuente real: total de `organization` vía Drizzle
+// (lib/orgStats.js).
+export default function Sidebar({ orgCount = 0 }) {
   const pathname = usePathname();
-  const [activeCount, setActiveCount] = useState(0);
-
-  useEffect(() => {
-    function refresh() {
-      const products = getProducts("improvement");
-      setActiveCount(products.filter((p) => p.status === "activo").length);
-    }
-    refresh();
-    window.addEventListener(PRODUCTS_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(PRODUCTS_CHANGED_EVENT, refresh);
-  }, [pathname]);
 
   const NAV_ITEMS = [
     { href: "/", label: "Dashboard", sub: "Resumen", icon: "◈" },
@@ -45,7 +36,7 @@ export default function Sidebar() {
               className={`nav-item ${active ? "nav-item-active" : ""}`}
             >
               {item.appIcon ? (
-                <AppIcon size={22} liveCount={activeCount} />
+                <AppIcon size={22} liveCount={orgCount} liveLabel="organización(es)" />
               ) : (
                 <span className="nav-icon">{item.icon}</span>
               )}

@@ -6,9 +6,11 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { powerupPartner } from "@jotapuntoce/db/schema";
 import { db } from "../../lib/db.js";
+import { requirePlatformAdmin } from "../../lib/auth.js";
 
 async function createPartner(formData) {
   "use server";
+  await requirePlatformAdmin();
   const businessName = formData.get("businessName")?.toString().trim();
   const category = formData.get("category")?.toString().trim();
   const discountDescription = formData.get("discountDescription")?.toString().trim();
@@ -38,6 +40,7 @@ async function createPartner(formData) {
 }
 
 export default async function PowerupsPage() {
+  await requirePlatformAdmin();
   const partners = await db.select().from(powerupPartner).orderBy(powerupPartner.createdAt);
 
   return (
@@ -88,6 +91,7 @@ export default async function PowerupsPage() {
           {partners.map((partner) => {
             async function toggleActive() {
               "use server";
+              await requirePlatformAdmin();
               await db
                 .update(powerupPartner)
                 .set({ isActive: !partner.isActive })

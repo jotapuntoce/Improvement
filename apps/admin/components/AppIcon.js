@@ -1,8 +1,8 @@
 // Ícono estilo "app" para representar Improvement (la empresa digital) en el panel.
 // Los detalles son dinámicos de verdad, no solo decorativos:
 // - el degradado usa el color de acento activo (cambia con el AccentPicker)
-// - el punto "en vivo" y el badge reflejan datos reales (productos activos)
-export default function AppIcon({ size = 44, liveCount, className = "" }) {
+// - el punto "en vivo" y el badge reflejan datos reales (conteo de organización vía lib/orgStats.js)
+export default function AppIcon({ size = 44, liveCount, liveLabel = "activo(s)", className = "" }) {
   const hasLive = typeof liveCount === "number" && liveCount > 0;
   const glyphSize = Math.round(size * 0.52);
 
@@ -29,7 +29,7 @@ export default function AppIcon({ size = 44, liveCount, className = "" }) {
           <polyline points="17 6 23 6 23 12" />
         </svg>
       </span>
-      {hasLive && <span className="app-icon-live-dot" title={`${liveCount} producto(s) activo(s)`} />}
+      {hasLive && <span className="app-icon-live-dot" title={`${liveCount} ${liveLabel}`} />}
       {typeof liveCount === "number" && liveCount > 0 && (
         <span className="app-icon-badge">{liveCount > 99 ? "99+" : liveCount}</span>
       )}
