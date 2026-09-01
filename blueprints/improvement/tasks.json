@@ -246,7 +246,7 @@
       "apps/improvement/app/api/ai/suggestions/route.ts",
       "apps/improvement/tests/ai-gateway.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T1",
