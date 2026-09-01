@@ -10,3 +10,5 @@ pnpm dev:admin   # http://localhost:3100
 ```
 
 Desplegado en Vercel con Root Directory = `apps/admin`.
+
+Versión de Node requerida: ver `.nvmrc` en la raíz del monorepo.

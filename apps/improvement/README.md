@@ -10,3 +10,5 @@ pnpm dev:improvement   # http://localhost:3200
 ```
 
 Desplegado en Vercel con Root Directory = `apps/improvement`.
+
+Versión de Node requerida: ver `.nvmrc` en la raíz del monorepo.
