@@ -1,150 +1,69 @@
-"use client";
+// Cuentas Improvement — reemplaza por completo el catálogo de productos sobre localStorage
+// (criterio #1: esta página ya no toca el helper de persistencia local, ni directo ni a través de
+// components/ImprovementCatalog.js). Lista de organization real con conteo de miembros y la etapa
+// actual de su Mapa de Construcción.
+import Link from "next/link";
+import { asc } from "drizzle-orm";
+import { requirePlatformAdmin } from "../../lib/auth.js";
+import { db } from "../../lib/db.js";
+import { organization, membership, orgBuildStage } from "@jotapuntoce/db/schema";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  getProducts,
-  addProduct,
-  updateProduct,
-  deleteProduct,
-  STATUS_META,
-} from "@/lib/storage";
-import ProductCard from "@/components/ProductCard";
-import ProductModal from "@/components/ProductModal";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import EmptyState from "@/components/EmptyState";
+function deriveCurrentStageName(stages) {
+  const inProgress = stages.find((s) => s.status === "en_progreso");
+  if (inProgress) return inProgress.stageName;
+  const last = stages[stages.length - 1];
+  if (last?.status === "completada") return last.stageName;
+  return null;
+}
 
-const NAMESPACE = "improvement";
+export default async function ImprovementPage() {
+  await requirePlatformAdmin();
 
-export default function ImprovementPage() {
-  const [products, setProducts] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("todas");
-  const [statusFilter, setStatusFilter] = useState("todos");
+  const [orgs, allMemberships, allStages] = await Promise.all([
+    db.select().from(organization).orderBy(asc(organization.createdAt)),
+    db.select().from(membership),
+    db.select().from(orgBuildStage).orderBy(asc(orgBuildStage.stageOrder)),
+  ]);
 
-  useEffect(() => {
-    // Hidrata el estado desde localStorage al montar — no hay forma de leerlo durante el
-    // render del servidor, así que este setState síncrono en el mount es intencional.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProducts(getProducts(NAMESPACE));
-    setLoaded(true);
-  }, []);
-
-  const categories = useMemo(() => {
-    return Array.from(new Set(products.map((p) => p.category).filter(Boolean)));
-  }, [products]);
-
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      const matchesQuery = p.name.toLowerCase().includes(query.toLowerCase());
-      const matchesCategory = categoryFilter === "todas" || p.category === categoryFilter;
-      const matchesStatus = statusFilter === "todos" || p.status === statusFilter;
-      return matchesQuery && matchesCategory && matchesStatus;
-    });
-  }, [products, query, categoryFilter, statusFilter]);
-
-  function openCreate() {
-    setEditing(null);
-    setModalOpen(true);
-  }
-
-  function openEdit(product) {
-    setEditing(product);
-    setModalOpen(true);
-  }
-
-  function handleSave(data) {
-    const next = editing
-      ? updateProduct(editing.id, data, NAMESPACE)
-      : addProduct(data, NAMESPACE);
-    setProducts(next);
-    setModalOpen(false);
-  }
-
-  function handleDelete() {
-    const next = deleteProduct(pendingDelete.id, NAMESPACE);
-    setProducts(next);
-    setPendingDelete(null);
-  }
-
-  if (!loaded) return null;
+  const rows = orgs.map((org) => {
+    const memberCount = allMemberships.filter((m) => m.orgId === org.id).length;
+    const orgStages = allStages.filter((s) => s.orgId === org.id);
+    return { ...org, memberCount, currentStage: deriveCurrentStageName(orgStages) };
+  });
 
   return (
     <div className="page-stack">
       <section className="toolbar">
-        <div className="toolbar-filters">
-          <input
-            className="input"
-            placeholder="Buscar producto..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="input"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="todas">Todas las categorías</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="todos">Todos los estados</option>
-            {Object.entries(STATUS_META).map(([key, meta]) => (
-              <option key={key} value={key}>
-                {meta.label}
-              </option>
-            ))}
-          </select>
+        <div>
+          <h2>Cuentas Improvement</h2>
+          <p className="topbar-subtitle">Organizaciones reales usando Improvement.</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openCreate}>
-          + Nuevo producto
-        </button>
+        <Link href="/prospects" className="btn btn-primary">
+          Backlog de prospectos
+        </Link>
       </section>
 
-      {products.length === 0 ? (
-        <EmptyState onCreate={openCreate} />
-      ) : filtered.length === 0 ? (
-        <p className="empty-hint">Ningún producto coincide con tu búsqueda.</p>
+      {rows.length === 0 ? (
+        <p className="empty-hint">Sin organizaciones todavía.</p>
       ) : (
         <section className="product-grid">
-          {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onEdit={() => openEdit(product)}
-              onDelete={() => setPendingDelete(product)}
-            />
+          {rows.map((org) => (
+            <Link
+              key={org.id}
+              href={`/organizations/${org.id}`}
+              className="product-card"
+              style={{ padding: "16px", textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column", gap: "8px" }}
+            >
+              <h3 style={{ margin: 0 }}>{org.name}</h3>
+              <p className="product-desc" style={{ margin: 0 }}>
+                {org.memberCount} {org.memberCount === 1 ? "miembro" : "miembros"}
+              </p>
+              <span className="category-chip" style={{ "--chip-color": "var(--accent-2)", alignSelf: "flex-start" }}>
+                {org.currentStage ?? "Sin etapa activa"}
+              </span>
+            </Link>
           ))}
         </section>
-      )}
-
-      {modalOpen && (
-        <ProductModal
-          product={editing}
-          categories={categories}
-          onClose={() => setModalOpen(false)}
-          onSave={handleSave}
-        />
-      )}
-
-      {pendingDelete && (
-        <ConfirmDialog
-          title="¿Eliminar producto?"
-          message={`"${pendingDelete.name}" se eliminará permanentemente.`}
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={handleDelete}
-        />
       )}
     </div>
   );

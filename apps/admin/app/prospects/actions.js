@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { organization, profile, membership, orgBuildStage, prospectCompany } from "@jotapuntoce/db/schema";
 import { db, supabaseAdmin } from "../../lib/db.js";
+import { requirePlatformAdmin } from "../../lib/auth.js";
 
 function slugify(name) {
   return name
@@ -17,6 +18,12 @@ function slugify(name) {
 }
 
 /**
+ * Lógica de negocio pura — sin guard adentro a propósito, para que tests/provisioning.test.js pueda
+ * invocarla directo sin pasar por un request real de Next (requirePlatformAdmin() usa cookies() de
+ * next/headers, que lanza fuera de ese contexto). El guard vive en el borde: provisionOrganizationAction,
+ * abajo — mismo patrón que assertMembership/requireOrgMembership en
+ * apps/improvement/server/objectives/mutations.ts.
+ *
  * @param {string} prospectId
  * @param {string} ownerEmail - Email del dueño de la empresa cliente. El esquema de
  *   `prospect_company` no guarda un email (§4) — Jose Carlos lo provee al momento de provisionar,
@@ -79,4 +86,47 @@ export async function provisionOrganization(prospectId, ownerEmail) {
   });
 
   return { organization: org, alreadyProvisioned: false };
+}
+
+/**
+ * Punto de entrada real como Server Action: guard en el borde + delega en provisionOrganization.
+ * Es lo que un futuro formulario de /prospects debe invocar — nunca provisionOrganization directo.
+ */
+export async function provisionOrganizationAction(prospectId, ownerEmail) {
+  await requirePlatformAdmin();
+  return provisionOrganization(prospectId, ownerEmail);
+}
+
+/**
+ * Transición manual simple del backlog: en_construcción -> live. Sin provisión adicional — eso ya
+ * pasó en provisionOrganization. Lógica pura sin guard adentro, mismo motivo que provisionOrganization.
+ * @param {string} prospectId
+ */
+export async function markProspectLive(prospectId) {
+  const [prospect] = await db
+    .select()
+    .from(prospectCompany)
+    .where(eq(prospectCompany.id, prospectId))
+    .limit(1);
+  if (!prospect) throw new Error(`prospect_company ${prospectId} no existe`);
+  if (prospect.status !== "en_construcción") {
+    throw new Error(
+      `prospect_company ${prospectId} no está en_construcción (status actual: ${prospect.status})`,
+    );
+  }
+
+  const [updated] = await db
+    .update(prospectCompany)
+    .set({ status: "live" })
+    .where(eq(prospectCompany.id, prospectId))
+    .returning();
+  if (!updated) throw new Error("update de prospect_company no devolvió fila");
+
+  return updated;
+}
+
+/** Punto de entrada real como Server Action — guard en el borde + delega en markProspectLive. */
+export async function markProspectLiveAction(prospectId) {
+  await requirePlatformAdmin();
+  return markProspectLive(prospectId);
 }
