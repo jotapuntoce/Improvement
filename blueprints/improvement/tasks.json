@@ -286,7 +286,7 @@
       "apps/improvement/server/scene/buildMap.ts",
       "apps/improvement/tests/build-map.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T3",
