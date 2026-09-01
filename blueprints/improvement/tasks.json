@@ -176,7 +176,7 @@
       "apps/admin/app/powerups/page.js",
       "apps/improvement/tests/powerups.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",
