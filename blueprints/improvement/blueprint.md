@@ -1454,15 +1454,17 @@ arranque de la app. `.github/workflows/ci.yml` (Tier 1): en cada PR corre `pnpm 
       tras pasar el pipeline de CI.
 - [ ] WHEN el health check de producción de `apps/improvement` se consulta tras un deploy THE SYSTEM
       SHALL responder 200 con `db: "up"`.
-- [ ] WHEN `apps/admin` desplegado se consulta en su raíz THE SYSTEM SHALL responder 200 — sin esto,
-      un deploy de admin que falla en runtime (aunque el build haya pasado) queda invisible.
+- [ ] WHEN `apps/admin` desplegado se consulta en `/login` (única ruta no autenticada — su raíz
+      requiere `requirePlatformAdmin()` y responde 404 sin sesión, ver E3-T6) THE SYSTEM SHALL
+      responder 200 — sin esto, un deploy de admin que falla en runtime (aunque el build haya
+      pasado) queda invisible.
 - [ ] WHEN el cron de recordatorios se dispara desde el dashboard de Vercel contra la URL de
       producción sin el header `Authorization` THE SYSTEM SHALL responder 401.
 
 **Verify**
 ```bash
 curl -sf "$PRODUCTION_URL/api/health"   # expect: exit 0, body { "ok": true, "db": "up", ... }
-test "$(curl -s -o /dev/null -w '%{http_code}' "$ADMIN_PRODUCTION_URL")" = 200
+test "$(curl -s -o /dev/null -w '%{http_code}' "$ADMIN_PRODUCTION_URL/login")" = 200
 test "$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/api/cron/reminders")" = 401
 ```
 
