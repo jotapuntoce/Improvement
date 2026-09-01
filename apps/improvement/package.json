@@ -12,32 +12,33 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
+    "@jotapuntoce/db": "workspace:*",
+    "@jotapuntoce/ui": "workspace:*",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "@tanstack/react-query": "^5.102.8",
+    "drizzle-orm": "0.45.2",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "@jotapuntoce/db": "workspace:*",
-    "@jotapuntoce/ui": "workspace:*",
-    "@supabase/supabase-js": "^2.112.4",
-    "drizzle-orm": "0.45.2",
-    "zod": "^4.5.4",
     "react-hook-form": "^7.87.0",
-    "@tanstack/react-query": "^5.102.8",
+    "resend": "^6.25.0",
     "three": "0.185.1",
-    "@react-three/fiber": "^9.7.0",
-    "@react-three/drei": "^10.7.8",
-    "@anthropic-ai/sdk": "^0.122.0",
-    "resend": "^6.25.0"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
-    "@types/node": "^24",
-    "typescript": "~6.0.3",
-    "tailwindcss": "^4",
-    "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
-    "vitest": "^4.1.11",
-    "@playwright/test": "^1.62.1"
+    "tailwindcss": "^4",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
   }
 }

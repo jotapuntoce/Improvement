@@ -31,7 +31,7 @@ function stageStyle(status: string) {
       borderColor: "var(--accent-1)",
     };
   }
-  return { ...base, background: "var(--bg-card)", color: "var(--text-muted)" };
+  return { ...base, background: "var(--bg-card)", color: "var(--text-secondary)" };
 }
 
 export default async function MapaPage({ params }: { params: Promise<{ org: string }> }) {
@@ -86,7 +86,7 @@ export default async function MapaPage({ params }: { params: Promise<{ org: stri
           </li>
         ))}
         {stages.length === 0 && (
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Sin etapas registradas todavía.</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>Sin etapas registradas todavía.</p>
         )}
       </ol>
     </main>

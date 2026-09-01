@@ -29,7 +29,7 @@ export function SceneListFallback({ graph }: { graph: SceneGraph }) {
   return (
     <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <section>
-        <h2 style={{ fontSize: "14px", color: "var(--text-muted)", margin: "0 0 8px" }}>Áreas</h2>
+        <h2 style={{ fontSize: "14px", color: "var(--text-secondary)", margin: "0 0 8px" }}>Áreas</h2>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
           {graph.zones.map((zone) => (
             <li key={zone.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
@@ -40,7 +40,7 @@ export function SceneListFallback({ graph }: { graph: SceneGraph }) {
         </ul>
       </section>
       <section>
-        <h2 style={{ fontSize: "14px", color: "var(--text-muted)", margin: "0 0 8px" }}>Equipo</h2>
+        <h2 style={{ fontSize: "14px", color: "var(--text-secondary)", margin: "0 0 8px" }}>Equipo</h2>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
           {graph.avatars.map((avatar) => (
             <li key={avatar.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
@@ -69,8 +69,11 @@ export function Scene3D({ graph }: { graph: SceneGraph }) {
     // Hidrata estado que solo existe en el navegador (soporte WebGL, prefers-reduced-motion) — no
     // hay forma de leerlo durante el render del servidor, así que este setState síncrono en el
     // mount es intencional (mismo patrón ya usado en apps/admin/app/improvement/page.js).
+    // ?fallback=1 fuerza SceneListFallback aunque haya WebGL — usado por tests/e2e/a11y.spec.ts
+    // (E3-T4): axe-core no puede auditar un <canvas> WebGL de forma significativa.
+    const forceFallback = new URLSearchParams(window.location.search).has("fallback");
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWebglSupported(detectWebgl());
+    setWebglSupported(forceFallback ? false : detectWebgl());
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setAutoRotate(shouldAutoRotate(prefersReducedMotion));
   }, []);

@@ -20,7 +20,7 @@ export default function Page() {
           fontSize: "12px",
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "var(--text-muted)",
+          color: "var(--text-secondary)",
         }}
       >
         JotaPuntoCe

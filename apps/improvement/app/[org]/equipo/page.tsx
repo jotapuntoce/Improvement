@@ -37,7 +37,7 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
           {team.map((member) => (
             <li key={member.userId} style={{ ...cardStyle, display: "flex", justifyContent: "space-between" }}>
               <span>{member.fullName ?? member.email}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
                 {member.role === "owner" ? "Dueño" : "Empleado"}
               </span>
             </li>
@@ -52,7 +52,7 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
     <main style={pageStyle}>
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Tu equipo</h1>
       <div style={cardStyle}>
-        <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "13px" }}>Tu nivel (últimos 90 días)</p>
+        <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "13px" }}>Tu nivel (últimos 90 días)</p>
         <p
           style={{
             margin: "4px 0 0",

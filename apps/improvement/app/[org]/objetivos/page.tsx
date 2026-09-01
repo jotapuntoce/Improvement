@@ -72,11 +72,11 @@ export default async function ObjetivosPage({
               <div>
                 <p style={{ fontWeight: 600, margin: 0 }}>{objective.title}</p>
                 {objective.description && (
-                  <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "4px 0 0" }}>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "4px 0 0" }}>
                     {objective.description}
                   </p>
                 )}
-                <p style={{ color: "var(--text-muted)", fontSize: "12px", margin: "6px 0 0" }}>
+                <p style={{ color: "var(--text-secondary)", fontSize: "12px", margin: "6px 0 0" }}>
                   Peso {objective.impactWeight} · {pointsForObjective(objective.impactWeight)} pts ·{" "}
                   {STATUS_LABEL[objective.status] ?? objective.status}
                 </p>
@@ -86,7 +86,7 @@ export default async function ObjetivosPage({
           );
         })}
         {data.objectives.length === 0 && (
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Sin objetivos todavía.</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>Sin objetivos todavía.</p>
         )}
       </ul>
 

@@ -7,6 +7,11 @@
 # testing
 /coverage
 
+# playwright (E3-T4 — primer spec E2E del repo)
+**/test-results/
+**/playwright-report/
+**/blob-report/
+
 # next.js
 **/.next/
 **/out/

@@ -31,7 +31,7 @@ export default async function PowerupsPage({ params }: { params: Promise<{ org: 
     >
       <div>
         <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>PowerUps</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "14px", margin: "4px 0 0" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: "4px 0 0" }}>
           Balance disponible:{" "}
           <strong style={{ color: "var(--text-primary)" }}>{balance} pts</strong>
         </p>
@@ -64,10 +64,10 @@ export default async function PowerupsPage({ params }: { params: Promise<{ org: 
             >
               <div>
                 <p style={{ fontWeight: 600, margin: 0 }}>{partner.businessName}</p>
-                <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "4px 0 0" }}>
+                <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "4px 0 0" }}>
                   {partner.discountDescription}
                 </p>
-                <p style={{ color: "var(--text-muted)", fontSize: "12px", margin: "6px 0 0" }}>
+                <p style={{ color: "var(--text-secondary)", fontSize: "12px", margin: "6px 0 0" }}>
                   {partner.category} · {partner.pointsCost} pts
                 </p>
               </div>
@@ -76,7 +76,7 @@ export default async function PowerupsPage({ params }: { params: Promise<{ org: 
           );
         })}
         {catalog.length === 0 && (
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Sin PowerUps disponibles todavía.</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>Sin PowerUps disponibles todavía.</p>
         )}
       </ul>
     </main>

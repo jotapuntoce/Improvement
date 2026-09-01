@@ -109,14 +109,14 @@ export default async function ClientesPage({
       </form>
 
       <nav style={{ display: "flex", gap: "8px", fontSize: "13px" }}>
-        <a href={`/${orgId}/clientes`} style={{ color: healthFilter ? "var(--text-muted)" : "var(--accent-2)" }}>
+        <a href={`/${orgId}/clientes`} style={{ color: healthFilter ? "var(--text-secondary)" : "var(--accent-2)" }}>
           Todos
         </a>
         {HEALTH_OPTIONS.map((h) => (
           <a
             key={h}
             href={`/${orgId}/clientes?health=${h}`}
-            style={{ color: healthFilter === h ? "var(--accent-2)" : "var(--text-muted)" }}
+            style={{ color: healthFilter === h ? "var(--accent-2)" : "var(--text-secondary)" }}
           >
             {HEALTH_LABEL[h]}
           </a>
@@ -159,7 +159,7 @@ export default async function ClientesPage({
               <div>
                 <p style={{ fontWeight: 600, margin: 0 }}>{c.name}</p>
                 {c.notes && (
-                  <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: "4px 0 0" }}>{c.notes}</p>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "4px 0 0" }}>{c.notes}</p>
                 )}
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -185,7 +185,7 @@ export default async function ClientesPage({
           );
         })}
         {data.clients.length === 0 && (
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Sin clientes todavía.</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>Sin clientes todavía.</p>
         )}
       </ul>
 

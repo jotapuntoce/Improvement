@@ -7,14 +7,16 @@
   "types": "./src/client.ts",
   "exports": {
     ".": "./src/client.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./test-fixtures": "./src/testFixtures.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "@supabase/supabase-js": "^2.112.4"
   },
   "devDependencies": {
     "drizzle-kit": "0.31.10",

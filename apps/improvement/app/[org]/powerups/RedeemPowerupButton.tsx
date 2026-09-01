@@ -27,7 +27,7 @@ export function RedeemPowerupButton({
         fontSize: "13px",
         cursor: disabled || isPending ? "default" : "pointer",
         background: disabled ? "var(--bg-card)" : "linear-gradient(135deg, var(--accent-1), var(--accent-2))",
-        color: disabled ? "var(--text-muted)" : "#05060b",
+        color: disabled ? "var(--text-secondary)" : "#05060b",
         opacity: isPending ? 0.7 : 1,
         whiteSpace: "nowrap",
       }}
