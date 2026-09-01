@@ -1,0 +1,80 @@
+name: CI
+
+# Tier 1 (blueprint §12): en cada PR corre lint+typecheck+test; en push a main además build. Las
+# pruebas de integración de este repo corren contra el proyecto Supabase real de desarrollo (sin
+# base de datos de test aislada, blueprint §13) — por eso este workflow reconstruye los mismos
+# .env.local/.env.test que usa cada app en local, a partir de GitHub Secrets, antes de correr nada.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Mismo split que en local (ver CLAUDE.md "Environment"): SUPABASE_SERVICE_ROLE_KEY solo en
+      # apps/admin y en la raíz (que la necesita packages/db/src/testFixtures.ts) — nunca en
+      # apps/improvement (Non-negotiable #3).
+      - name: Write env files from secrets
+        run: |
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DATABASE_URL_DIRECT=${{ secrets.DATABASE_URL_DIRECT }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          CRON_SECRET=${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_APP_URL=${{ vars.PRODUCTION_URL }}
+          EOF
+
+          cat > apps/improvement/.env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DATABASE_URL_DIRECT=${{ secrets.DATABASE_URL_DIRECT }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          CRON_SECRET=${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_APP_URL=${{ vars.PRODUCTION_URL }}
+          EOF
+          cp apps/improvement/.env.local apps/improvement/.env.test
+
+          cat > apps/admin/.env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DATABASE_URL_DIRECT=${{ secrets.DATABASE_URL_DIRECT }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          EOF
+          cp apps/admin/.env.local apps/admin/.env.test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        if: github.ref == 'refs/heads/main'
+        run: pnpm build
