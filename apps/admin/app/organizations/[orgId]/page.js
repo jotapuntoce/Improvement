@@ -1,6 +1,7 @@
 // Detalle de un org: CRUD de org_build_stage (Mapa de Construcción) + vista de solo lectura de
 // áreas y objetivos. Escribir aquí es lo que criterio #3 de E3-T3 espera ver reflejado de inmediato
 // en /[org]/mapa de apps/improvement — misma tabla, sin caché intermedia.
+import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -46,6 +47,11 @@ export default async function OrganizationDetailPage({ params }) {
     <div className="page-stack">
       <section className="toolbar">
         <div>
+          {/* Esta página cuelga de /improvement (la lista de organizaciones la enlaza aquí), así
+              que regresa un nivel — no hasta el Dashboard — para no perder el punto de partida. */}
+          <Link href="/improvement" className="page-back-link">
+            ← Cuentas Improvement
+          </Link>
           <h2>{org.name}</h2>
           <p className="topbar-subtitle">{org.slug}</p>
         </div>

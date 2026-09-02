@@ -199,6 +199,24 @@ body {
   margin-top: 2px;
 }
 
+/* Enlace "← Dashboard" en las páginas internas (/prospects, /improvement,
+   /organizations/[orgId], /powerups) — ninguna tenía forma de volver más que la Sidebar. */
+.page-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 8px;
+  transition: color 0.15s ease;
+}
+
+.page-back-link:hover {
+  color: var(--text-primary);
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;

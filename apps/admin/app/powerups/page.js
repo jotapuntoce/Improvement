@@ -2,6 +2,7 @@
 // mismo patrón que app/prospects/actions.js (db normal, sin service-role key: esta tabla no tiene
 // RLS que Jose Carlos necesite bypasear vía service-role, el rol de Postgres de la app ya la lee y
 // escribe completa).
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { powerupPartner } from "@jotapuntoce/db/schema";
@@ -47,6 +48,9 @@ export default async function PowerupsPage() {
     <div className="page-stack">
       <section className="toolbar">
         <div>
+          <Link href="/" className="page-back-link">
+            ← Dashboard
+          </Link>
           <h2>Catálogo de PowerUps</h2>
           <p className="topbar-subtitle">
             Desactivar un partner lo oculta del catálogo de todos los orgs sin borrar los canjes

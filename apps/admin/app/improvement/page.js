@@ -36,6 +36,9 @@ export default async function ImprovementPage() {
     <div className="page-stack">
       <section className="toolbar">
         <div>
+          <Link href="/" className="page-back-link">
+            ← Dashboard
+          </Link>
           <h2>Cuentas Improvement</h2>
           <p className="topbar-subtitle">Organizaciones reales usando Improvement.</p>
         </div>

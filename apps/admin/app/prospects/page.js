@@ -1,6 +1,7 @@
 // Backlog de prospectos: prospecto -> en_construcción -> live. Mover a en_construcción dispara
 // provisionOrganizationAction (E1-T5), idempotente. Marcar como live es solo un cambio de status —
 // la provisión real ya ocurrió en el paso anterior.
+import Link from "next/link";
 import { asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "../../lib/auth.js";
@@ -38,6 +39,9 @@ export default async function ProspectsPage() {
     <div className="page-stack">
       <section className="toolbar">
         <div>
+          <Link href="/" className="page-back-link">
+            ← Dashboard
+          </Link>
           <h2>Backlog de prospectos</h2>
           <p className="topbar-subtitle">Prospecto → en construcción → live.</p>
         </div>
