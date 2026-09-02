@@ -1124,8 +1124,10 @@ body {
 .jpc-reception-card {
   /* mismo ancho que .jpc-reception-wall (sin max-width propio) y solo las esquinas de abajo
      redondeadas — antes esta tarjeta era mas angosta que la pared de arriba y se veia un filo
-     dorado asomando a los lados, como si el diseño se hubiera quedado a la mitad. */
-  background: var(--bg-card);
+     dorado asomando a los lados, como si el diseño se hubiera quedado a la mitad. Fondo: mismo
+     tono cálido oscuro con el que termina el degradado de .jpc-reception-wall (no el navy por
+     default del panel) — para que sea una sola superficie continua, no un corte de color. */
+  background: var(--bg-reception-bot);
   border: 1px solid rgba(207, 159, 61, 0.22);
   border-top: none;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
@@ -1155,7 +1157,7 @@ body {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(207, 159, 61, 0.28);
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 14px;
