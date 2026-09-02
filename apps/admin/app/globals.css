@@ -1097,16 +1097,19 @@ body {
   margin: 0;
 }
 .jpc-reception-word {
+  /* Un poco más grande: la pared tiene ~348px de ancho de contenido (400px - padding) y a 25px
+     el wordmark apenas usaba 213px de eso — sobraba espacio de sobra. */
   font-family: var(--font-geist-sans), sans-serif;
   font-weight: 800;
-  font-size: 25px;
+  font-size: 30px;
   color: var(--sign-glow);
   letter-spacing: 0.01em;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
 }
 .jpc-reception-sub {
+  /* Crece en la misma proporción que .jpc-reception-word (25→30px ≈ ×1.2). */
   font-family: var(--font-caveat), cursive;
-  font-size: 17px;
+  font-size: 20px;
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
