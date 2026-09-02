@@ -1078,7 +1078,11 @@ body {
 .jpc-reception-wall {
   background: radial-gradient(120% 90% at 50% -12%, rgba(207, 159, 61, 0.16), transparent 62%),
     linear-gradient(180deg, var(--bg-reception-top), var(--bg-reception-bot));
+  /* Sin borde inferior: .jpc-reception-card ya tiene border-top: none, así que ese borde era
+     la única costura visible entre la pared y la tarjeta — se quita para que ambas se lean
+     como una sola superficie continua, sin línea de separación bajo "Bienvenido de vuelta". */
   border: 1px solid rgba(207, 159, 61, 0.2);
+  border-bottom: none;
   border-radius: 18px 18px 0 0;
   padding: 34px 26px 26px;
   text-align: center;
