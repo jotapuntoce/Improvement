@@ -64,21 +64,24 @@ export async function requireOrgMembership(orgId: string) {
 }
 
 /**
- * Resuelve a qué org debe entrar la sesión actual al visitar `/` (app/page.tsx) — el slug del
- * primer org al que pertenece, ordenado por `accepted_at`. `null` si no hay sesión o el usuario no
- * tiene ningún membership todavía (ambos casos: la ruta que llama esto redirige a `/login`).
+ * Resuelve a qué org debe entrar la sesión actual al visitar `/` (app/page.tsx) — el id del primer
+ * org al que pertenece, ordenado por `accepted_at`. `null` si no hay sesión o el usuario no tiene
+ * ningún membership todavía (ambos casos: la ruta que llama esto redirige a `/login`). Devuelve el
+ * `id`, no el `slug` — el segmento `[org]` de cada ruta de esta app es el uuid de organization
+ * (`app/[org]/dashboard/page.tsx` y el resto hacen `const { org: orgId } = await params`), pese al
+ * nombre de la carpeta.
  */
-export async function resolveHomeOrgSlug(): Promise<string | null> {
+export async function resolveHomeOrgId(): Promise<string | null> {
   const userId = await getSessionUserId();
   if (!userId) return null;
 
   const [row] = await db
-    .select({ slug: organization.slug })
+    .select({ id: organization.id })
     .from(membership)
     .innerJoin(organization, eq(organization.id, membership.orgId))
     .where(eq(membership.userId, userId))
     .orderBy(asc(membership.acceptedAt))
     .limit(1);
 
-  return row?.slug ?? null;
+  return row?.id ?? null;
 }
