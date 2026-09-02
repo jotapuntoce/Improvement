@@ -16,7 +16,15 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env";
+
+// Next.js solo inlinea NEXT_PUBLIC_* en el bundle del navegador cuando detecta un acceso literal
+// `process.env.NEXT_PUBLIC_X` en el código fuente — lib/env.ts hace `schema.parse(process.env)`
+// (acceso dinámico), así que ese objeto queda vacío del lado del cliente. Bug real encontrado en
+// producción: el login nunca funcionó porque siempre entraba a la rama "Supabase no está
+// configurado". Server-only (guard.ts, gateway.ts, etc.) no tiene este problema — ahí process.env
+// es el proceso Node real, sin inlining de por medio.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export function LoginForm() {
   const router = useRouter();
@@ -31,13 +39,13 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
 
-    if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       setError("Supabase no está configurado en este entorno.");
       setLoading(false);
       return;
     }
 
-    const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
