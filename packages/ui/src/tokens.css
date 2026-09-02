@@ -66,6 +66,14 @@
   --dept-valor: #ff7fbd;
   --dept-branding: #4c9b69;
   --dept-presentacion: #5e17eb;
+
+  /* Pizarrón de corcho del dashboard (apps/admin, "Proyectos activos"): tablero + notas de papel
+     prendidas con tachuela. Son los únicos colores claros del producto — viven dentro del tablero,
+     nunca como fondo de página, y el tema sigue siendo oscuro fijo. */
+  --cork: #a97c3f;
+  --paper: #efe2c4;
+  --paper-ink: #241b0d;
+  --paper-ok: #0d6b47;
 }
 
 @theme inline {

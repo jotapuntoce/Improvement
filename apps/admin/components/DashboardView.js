@@ -1,77 +1,51 @@
-// Contenido de la página / — Server Component puro. app/page.js llama requirePlatformAdmin() y
-// getOrgStats() (lib/orgStats.js) y pasa el resultado como props; este archivo, bajo components/,
-// no puede importar packages/db directo (boundary de CLAUDE.md), así que ya no hay fetch propio.
-// Reemplaza los contadores de productos sobre localStorage (jpc-admin-products-improvement-v1),
-// huérfanos desde que E3-T3 borró components/ImprovementCatalog.js.
-import Link from "next/link";
-import AppIcon from "@/components/AppIcon";
-
-function StatCard({ label, value, icon }) {
-  return (
-    <div className="stat-card">
-      <span className="stat-icon">{icon}</span>
-      <div>
-        <p className="stat-value">{value}</p>
-        <p className="stat-label">{label}</p>
-      </div>
-    </div>
-  );
-}
+// Contenido de la página / — Server Component puro. app/page.js llama requirePlatformAdmin(),
+// getOrgStats() y getActiveProjects() (lib/orgStats.js) y pasa el resultado como props; este
+// archivo, bajo components/, no puede importar packages/db directo (boundary de CLAUDE.md), así
+// que ya no hay fetch propio.
+//
+// Reemplaza el hero + stat-grid + brand-cards planos por la escena de "recepción" — misma esencia
+// que /login (edificio + recepción), diseñada e iterada en un Artifact antes de portarla aquí:
+// pared con la TV de Productos digitales + el panel de las 6 Áreas de la empresa, y abajo el
+// pizarrón de corcho con los Proyectos activos reales. El acceso al listado interno de
+// organizaciones (antes enlazado aquí) sigue disponible desde el Sidebar ("Improvement" ya apunta
+// a /improvement) — no se perdió, solo se dejó de repetir en el cuerpo del dashboard.
+import ProductsScreen from "@/components/reception/ProductsScreen";
+import AreasPanel from "@/components/reception/AreasPanel";
+import ProjectsCorkboard from "@/components/reception/ProjectsCorkboard";
 
 export default function DashboardView({
   totalOrgs = 0,
-  orgsWithMembers = 0,
   totalMembers = 0,
-  completedStages = 0,
+  activeProjects = [],
   improvementUrl,
 }) {
   return (
     <div className="page-stack">
-      <section className="hero-card">
-        <div>
-          <p className="hero-eyebrow">Bienvenido de vuelta</p>
-          <h2 className="hero-title">
-            Panel Administrativo <span className="grad-text">JotaPuntoCe</span>
-          </h2>
-          <p className="hero-copy">
-            Gestiona tus marcas y productos desde un solo lugar. Empieza por Improvement.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link href="/improvement" className="btn btn-primary">
-            Ir a Improvement →
-          </Link>
-          {improvementUrl && (
-            <a href={improvementUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-              Abrir app en vivo ↗
-            </a>
-          )}
-        </div>
-      </section>
-
-      <section className="stat-grid">
-        <StatCard label="Organizaciones" value={totalOrgs} icon="🏢" />
-        <StatCard label="Con miembros" value={orgsWithMembers} icon="⚡" />
-        <StatCard label="Miembros totales" value={totalMembers} icon="👥" />
-        <StatCard label="Etapas completadas" value={completedStages} icon="✅" />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Link href="/improvement" className="brand-card">
-          <div className="brand-card-glow" />
-          <AppIcon size={48} liveCount={orgsWithMembers} liveLabel="organización(es) con miembros" />
+      <section className="reception">
+        <div className="r-head">
           <div>
-            <h3>Improvement</h3>
-            <p>Empresa digital · catálogo y gestión de productos.</p>
+            <p className="r-eyebrow">Bienvenido de vuelta</p>
+            <h2 className="r-title">
+              Recepción <em>JotaPuntoCe</em>
+            </h2>
           </div>
-          <span className="brand-card-arrow">→</span>
-        </Link>
-        <div className="brand-card brand-card-disabled">
-          <div className="brand-card-icon">+</div>
-          <div>
-            <h3>Próxima marca</h3>
-            <p>Aquí aparecerá tu siguiente negocio.</p>
-          </div>
+          <span className="r-status">
+            <span className="r-status-dot" />
+            Sistema en vivo
+          </span>
+        </div>
+
+        <div className="r-top">
+          <ProductsScreen
+            totalOrgs={totalOrgs}
+            totalMembers={totalMembers}
+            improvementUrl={improvementUrl}
+          />
+          <AreasPanel />
+        </div>
+
+        <div className="r-bottom">
+          <ProjectsCorkboard projects={activeProjects} />
         </div>
       </section>
     </div>
