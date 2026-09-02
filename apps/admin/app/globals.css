@@ -1080,7 +1080,7 @@ body {
     linear-gradient(180deg, var(--bg-reception-top), var(--bg-reception-bot));
   border: 1px solid rgba(207, 159, 61, 0.2);
   border-radius: 18px 18px 0 0;
-  padding: 34px 26px 0;
+  padding: 34px 26px 26px;
   text-align: center;
 }
 .jpc-reception-eyebrow {
@@ -1106,21 +1106,6 @@ body {
   color: var(--text-secondary);
   margin: 2px 0 0;
 }
-.jpc-desk {
-  height: 30px;
-  margin-top: 24px;
-  background: linear-gradient(180deg, var(--desk-top), var(--desk-body));
-  border-top: 2px solid var(--gold);
-  position: relative;
-}
-.jpc-desk::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.14);
-}
-
 .jpc-reception-card {
   /* mismo ancho que .jpc-reception-wall (sin max-width propio) y solo las esquinas de abajo
      redondeadas — antes esta tarjeta era mas angosta que la pared de arriba y se veia un filo
@@ -1137,20 +1122,12 @@ body {
   flex-direction: column;
   gap: 14px;
 }
-.jpc-reception-card h2 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--desk-top), var(--gold));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 .jpc-field-label {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12.5px;
+  font-family: var(--font-caveat), cursive;
+  font-size: 18px;
   color: var(--text-secondary);
 }
 .jpc-field-input {

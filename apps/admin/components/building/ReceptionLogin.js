@@ -10,10 +10,8 @@ export default function ReceptionLogin({ signInAction, hasError, onBack }) {
         <p className="jpc-reception-eyebrow">Recepción</p>
         <p className="jpc-reception-word">JOTAPUNTOCE</p>
         <p className="jpc-reception-sub">Bienvenido de vuelta</p>
-        <div className="jpc-desk" aria-hidden="true" />
       </div>
       <form className="jpc-reception-card" action={signInAction}>
-        <h2>Panel Administrativo</h2>
         <label className="jpc-field-label">
           Email
           <input className="jpc-field-input" type="email" name="email" required />
