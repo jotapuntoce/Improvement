@@ -44,6 +44,31 @@
   --accent-2: #3b82f6;
 }
 
+/* Escena del edificio JotaPuntoCe (login de apps/admin, LoginExperience) — colores de las 6 áreas
+   creativas y de la ilustración nocturna/recepción. Fijos, no siguen el AccentPicker: son identidad
+   de marca (definidos por Jose Carlos con hex exactos), no un acento seleccionable por el usuario. */
+:root {
+  --sky-top: #050810;
+  --sky-bot: #0b1226;
+  --bg-facade: #101c33;
+  --bg-facade-2: #0c1626;
+  --bg-window-off: #0a1220;
+  --border-window: #182338;
+  --gold: #cf9f3d;
+  --sign-glow: #fff6e0;
+  --bg-reception-top: #140e09;
+  --bg-reception-bot: #26190d;
+  --desk-top: #c99a5c;
+  --desk-body: #6e4f28;
+
+  --dept-planeacion: #d72b2e;
+  --dept-soluciones: #136ecc;
+  --dept-imaginacion: #e4bb05;
+  --dept-valor: #ff7fbd;
+  --dept-branding: #4c9b69;
+  --dept-presentacion: #5e17eb;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text-primary);
