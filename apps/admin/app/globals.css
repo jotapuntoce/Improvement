@@ -1125,7 +1125,7 @@ body {
   max-width: 340px;
   margin: -16px auto 0;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(207, 159, 61, 0.22);
   border-radius: var(--radius-md);
   padding: 26px 24px 22px;
   box-shadow: 0 24px 44px -22px rgba(0, 0, 0, 0.65);
@@ -1137,7 +1137,7 @@ body {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  background: linear-gradient(135deg, var(--desk-top), var(--gold));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1152,14 +1152,14 @@ body {
 .jpc-field-input {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(207, 159, 61, 0.28);
   background: var(--bg-card);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), sans-serif;
   font-size: 14px;
 }
 .jpc-field-input:focus-visible {
-  outline: 2px solid var(--accent-2);
+  outline: 2px solid var(--gold);
   outline-offset: 1px;
 }
 .jpc-reception-submit {
@@ -1171,7 +1171,7 @@ body {
   font-size: 14px;
   color: var(--bg);
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  background: linear-gradient(135deg, var(--desk-top), var(--gold));
 }
 .jpc-reception-error {
   font-size: 13px;
