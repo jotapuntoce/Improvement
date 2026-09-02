@@ -4,9 +4,9 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership } from "@jotapuntoce/db/schema";
+import { membership, organization } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
 
 /**
@@ -26,7 +26,7 @@ export async function findMembership(userId: string, orgId: string) {
  * Resuelve el usuario autenticado a partir de la cookie de sesión de Supabase Auth. Devuelve `null`
  * si no hay sesión — nunca lanza, para que requireOrgMembership decida el 404 en un solo lugar.
  */
-async function getSessionUserId(): Promise<string | null> {
+export async function getSessionUserId(): Promise<string | null> {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("sb-access-token")?.value;
@@ -61,4 +61,24 @@ export async function requireOrgMembership(orgId: string) {
   if (!userId) notFound();
 
   return assertMembership(userId, orgId);
+}
+
+/**
+ * Resuelve a qué org debe entrar la sesión actual al visitar `/` (app/page.tsx) — el slug del
+ * primer org al que pertenece, ordenado por `accepted_at`. `null` si no hay sesión o el usuario no
+ * tiene ningún membership todavía (ambos casos: la ruta que llama esto redirige a `/login`).
+ */
+export async function resolveHomeOrgSlug(): Promise<string | null> {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+
+  const [row] = await db
+    .select({ slug: organization.slug })
+    .from(membership)
+    .innerJoin(organization, eq(organization.id, membership.orgId))
+    .where(eq(membership.userId, userId))
+    .orderBy(asc(membership.acceptedAt))
+    .limit(1);
+
+  return row?.slug ?? null;
 }
