@@ -10,5 +10,6 @@ import DashboardView from "@/components/DashboardView";
 export default async function DashboardPage() {
   await requirePlatformAdmin();
   const stats = await getOrgStats();
-  return <DashboardView {...stats} />;
+  const improvementUrl = process.env.NEXT_PUBLIC_IMPROVEMENT_URL || "https://improvement-jotapuntoces-projects.vercel.app";
+  return <DashboardView {...stats} improvementUrl={improvementUrl} />;
 }

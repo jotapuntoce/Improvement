@@ -23,6 +23,7 @@ export default function DashboardView({
   orgsWithMembers = 0,
   totalMembers = 0,
   completedStages = 0,
+  improvementUrl,
 }) {
   return (
     <div className="page-stack">
@@ -36,9 +37,16 @@ export default function DashboardView({
             Gestiona tus marcas y productos desde un solo lugar. Empieza por Improvement.
           </p>
         </div>
-        <Link href="/improvement" className="btn btn-primary">
-          Ir a Improvement →
-        </Link>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <Link href="/improvement" className="btn btn-primary">
+            Ir a Improvement →
+          </Link>
+          {improvementUrl && (
+            <a href={improvementUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+              Abrir app en vivo ↗
+            </a>
+          )}
+        </div>
       </section>
 
       <section className="stat-grid">

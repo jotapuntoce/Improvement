@@ -18,6 +18,7 @@ function deriveCurrentStageName(stages) {
 
 export default async function ImprovementPage() {
   await requirePlatformAdmin();
+  const improvementUrl = process.env.NEXT_PUBLIC_IMPROVEMENT_URL || "https://improvement-jotapuntoces-projects.vercel.app";
 
   const [orgs, allMemberships, allStages] = await Promise.all([
     db.select().from(organization).orderBy(asc(organization.createdAt)),
@@ -38,9 +39,14 @@ export default async function ImprovementPage() {
           <h2>Cuentas Improvement</h2>
           <p className="topbar-subtitle">Organizaciones reales usando Improvement.</p>
         </div>
-        <Link href="/prospects" className="btn btn-primary">
-          Backlog de prospectos
-        </Link>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <a href={improvementUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+            Abrir app en vivo ↗
+          </a>
+          <Link href="/prospects" className="btn btn-primary">
+            Backlog de prospectos
+          </Link>
+        </div>
       </section>
 
       {rows.length === 0 ? (
