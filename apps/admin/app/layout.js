@@ -37,12 +37,13 @@ export default async function RootLayout({ children }) {
   const isLoginRoute = headerList.get("x-pathname") === "/login";
 
   if (isLoginRoute) {
+    // Ni .app-shell (display:flex en fila, pensado para Sidebar+Topbar — cortaba el scroll de la
+    // tarjeta de login cuando el contenido era más alto que el viewport) ni .app-bg (los brillos
+    // morado/cian del dashboard, que no pintan nada sobre el cielo nocturno del edificio) aplican
+    // aquí. .jpc-scene ya trae su propio fondo, alto mínimo y scroll normal de página.
     return (
       <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable}`}>
-        <body className="app-shell">
-          <div className="app-bg" aria-hidden="true" />
-          {children}
-        </body>
+        <body>{children}</body>
       </html>
     );
   }
