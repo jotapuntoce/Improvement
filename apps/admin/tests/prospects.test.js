@@ -5,10 +5,18 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, supabaseAdmin } from "../lib/db.js";
-import { organization, profile, membership, prospectCompany, orgBuildStage } from "@jotapuntoce/db/schema";
+import {
+  organization,
+  profile,
+  membership,
+  prospectClient,
+  prospectCompany,
+  orgBuildStage,
+} from "@jotapuntoce/db/schema";
 import { markProspectLive, provisionOrganization } from "../app/prospects/actions.js";
 
 const createdProspectIds = [];
+const createdClientIds = [];
 const createdOrgIds = [];
 const createdProfileIds = [];
 
@@ -23,6 +31,11 @@ afterEach(async () => {
       await db.delete(prospectCompany).where(eq(prospectCompany.id, prospectId));
     }
   }
+  if (createdClientIds.length) {
+    for (const clientId of createdClientIds.splice(0)) {
+      await db.delete(prospectClient).where(eq(prospectClient.id, clientId)); // cascade: prospect_company
+    }
+  }
   if (createdProfileIds.length) {
     for (const userId of createdProfileIds.splice(0)) {
       await db.delete(profile).where(eq(profile.id, userId));
@@ -31,19 +44,35 @@ afterEach(async () => {
   }
 });
 
+// Helper: un prospectCompany siempre cuelga de un prospectClient (prospect_client_id NOT NULL) —
+// cada test que necesita un prospecto crea primero a la persona.
+async function insertProspectClient(overrides = {}) {
+  const [client] = await db
+    .insert(prospectClient)
+    .values({
+      fullName: `Cliente test ${Date.now()}`,
+      email: `owner-backlog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`,
+      whatsappPhone: "+525500000000",
+      ...overrides,
+    })
+    .returning();
+  createdClientIds.push(client.id);
+  return client;
+}
+
 describe("provisionOrganization (backlog: prospecto -> en_construcción)", () => {
   it(
     "WHEN se marca un prospecto como en_construcción desde el backlog THE SYSTEM SHALL " +
       "provisionar exactamente un organization nuevo, idempotente en una segunda llamada",
     async () => {
+      const client = await insertProspectClient();
       const [prospect] = await db
         .insert(prospectCompany)
-        .values({ name: `Prospecto backlog ${Date.now()}` })
+        .values({ prospectClientId: client.id, name: `Prospecto backlog ${Date.now()}` })
         .returning();
       createdProspectIds.push(prospect.id);
-      const ownerEmail = `owner-backlog-${Date.now()}@example.com`;
 
-      const first = await provisionOrganization(prospect.id, ownerEmail);
+      const first = await provisionOrganization(prospect.id);
       createdOrgIds.push(first.organization.id);
       const [ownerMembership] = await db
         .select()
@@ -61,7 +90,7 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
         .limit(1);
       expect(updatedProspect.status).toBe("en_construcción");
 
-      const second = await provisionOrganization(prospect.id, ownerEmail);
+      const second = await provisionOrganization(prospect.id);
       expect(second.alreadyProvisioned).toBe(true);
       expect(second.organization.id).toBe(first.organization.id);
 
@@ -72,13 +101,60 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
       expect(orgs.length).toBe(1);
     },
   );
+
+  it(
+    "WHEN un mismo prospectClient provisiona una segunda empresa THE SYSTEM SHALL reutilizar el " +
+      "usuario ya creado en vez de fallar por email duplicado (caso real: Jaime Salinas, " +
+      "Camibel + Afianza)",
+    async () => {
+      const client = await insertProspectClient();
+      const [companyA] = await db
+        .insert(prospectCompany)
+        .values({ prospectClientId: client.id, name: `Camibel test ${Date.now()}` })
+        .returning();
+      const [companyB] = await db
+        .insert(prospectCompany)
+        .values({ prospectClientId: client.id, name: `Afianza test ${Date.now()}` })
+        .returning();
+      createdProspectIds.push(companyA.id, companyB.id);
+
+      const resultA = await provisionOrganization(companyA.id);
+      createdOrgIds.push(resultA.organization.id);
+      const resultB = await provisionOrganization(companyB.id);
+      createdOrgIds.push(resultB.organization.id);
+
+      expect(resultA.organization.id).not.toBe(resultB.organization.id);
+
+      const membershipsA = await db
+        .select()
+        .from(membership)
+        .where(eq(membership.orgId, resultA.organization.id));
+      const membershipsB = await db
+        .select()
+        .from(membership)
+        .where(eq(membership.orgId, resultB.organization.id));
+      createdProfileIds.push(membershipsA[0].userId);
+
+      // Mismo userId en ambos memberships — un solo usuario real, dos organizaciones.
+      expect(membershipsB[0].userId).toBe(membershipsA[0].userId);
+
+      const profiles = await db.select().from(profile).where(eq(profile.email, client.email));
+      expect(profiles.length).toBe(1);
+    },
+    15000, // dos provisiones reales seguidas (2 llamadas a auth.admin.createUser/lookup) pasan el timeout default de 5s
+  );
 });
 
 describe("markProspectLive (backlog: en_construcción -> live)", () => {
   it("WHEN un prospecto en_construcción se marca como live THE SYSTEM SHALL cambiar su status a live", async () => {
+    const client = await insertProspectClient();
     const [prospect] = await db
       .insert(prospectCompany)
-      .values({ name: `Prospecto live ${Date.now()}`, status: "en_construcción" })
+      .values({
+        prospectClientId: client.id,
+        name: `Prospecto live ${Date.now()}`,
+        status: "en_construcción",
+      })
       .returning();
     createdProspectIds.push(prospect.id);
 
@@ -88,9 +164,10 @@ describe("markProspectLive (backlog: en_construcción -> live)", () => {
   });
 
   it("WHEN un prospecto todavía no está en_construcción THE SYSTEM SHALL rechazar marcarlo como live", async () => {
+    const client = await insertProspectClient();
     const [prospect] = await db
       .insert(prospectCompany)
-      .values({ name: `Prospecto muy pronto ${Date.now()}` }) // status default 'prospecto'
+      .values({ prospectClientId: client.id, name: `Prospecto muy pronto ${Date.now()}` }) // status default 'prospecto'
       .returning();
     createdProspectIds.push(prospect.id);
 

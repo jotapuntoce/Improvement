@@ -283,13 +283,33 @@ export const orgBuildStage = pgTable(
   ],
 );
 
+// La persona detrás de uno o más prospectCompany — Jaime Salinas es el primer caso real (dueño de
+// Camibel y Afianza, dos filas de prospect_company distintas bajo el mismo prospect_client). Igual
+// que prospectCompany: FUERA del alcance de RLS multi-tenant, solo accesible con la service-role key
+// desde apps/admin.
+export const prospectClient = pgTable("prospect_client", {
+  id: id(),
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull(),
+  whatsappPhone: text("whatsapp_phone").notNull(),
+  // Cuántas empresas dijo Jose Carlos que tiene, no un conteo derivado — se captura antes de que
+  // exista la segunda fila de prospectCompany (ej: registra "2" al agregar solo Camibel, porque ya
+  // sabe que Afianza viene después).
+  companyCount: integer("company_count").notNull().default(1),
+  createdAt: createdAt(),
+});
+
 // Backlog interno de Jose Carlos — FUERA del alcance de RLS multi-tenant (sin org_id todavía cuando
 // nace). Solo accesible con la service-role key desde apps/admin, nunca desde apps/improvement.
 export const prospectCompany = pgTable(
   "prospect_company",
   {
     id: id(),
+    prospectClientId: uuid("prospect_client_id")
+      .notNull()
+      .references(() => prospectClient.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    industry: text("industry"),
     notes: text("notes"),
     priority: integer("priority").notNull().default(0),
     status: text("status").notNull().default("prospecto"),
@@ -297,6 +317,7 @@ export const prospectCompany = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    index("idx_prospect_company_client_id").on(t.prospectClientId),
     check(
       "prospect_company_status_check",
       sql`${t.status} in ('prospecto','en_construcción','live')`,

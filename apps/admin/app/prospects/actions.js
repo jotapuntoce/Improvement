@@ -1,12 +1,24 @@
 "use server";
 
-// Server action: provisiona la organización real de un prospecto. Idempotente — si el prospecto ya
-// tiene org_id, no crea un segundo org (criterio de aceptación #2), solo devuelve el existente.
-import { randomUUID } from "node:crypto";
+// Server actions del backlog de prospectos. Modelo: prospectClient (la persona, ej. Jaime Salinas) ->
+// N prospectCompany (sus empresas, ej. Camibel, Afianza) -> cada prospectCompany se provisiona a su
+// propio organization. provisionOrganization es idempotente en dos niveles: no crea un segundo
+// organization para el mismo prospecto (como antes), y ahora tampoco crea un segundo usuario de
+// Supabase Auth para el mismo cliente — si Jaime ya tiene cuenta por Camibel, provisionar Afianza
+// reutiliza ese mismo usuario y solo agrega el membership de la org nueva.
+import { randomUUID, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { organization, profile, membership, orgBuildStage, prospectCompany } from "@jotapuntoce/db/schema";
+import {
+  organization,
+  profile,
+  membership,
+  orgBuildStage,
+  prospectClient,
+  prospectCompany,
+} from "@jotapuntoce/db/schema";
 import { db, supabaseAdmin } from "../../lib/db.js";
 import { requirePlatformAdmin } from "../../lib/auth.js";
+import { sendWhatsAppMessage } from "../../lib/whatsapp.js";
 
 function slugify(name) {
   return name
@@ -17,19 +29,121 @@ function slugify(name) {
     .replace(/(^-|-$)/g, "");
 }
 
+// 12 caracteres url-safe — nunca se guarda en la base de datos, solo vive en memoria durante esta
+// llamada y viaja al cliente por WhatsApp. No hay pantalla de "cambiar contraseña" en
+// apps/improvement todavía (fuera de alcance de este cambio) — queda documentado como límite
+// conocido, no como descuido.
+function generateTempPassword() {
+  return randomBytes(9).toString("base64url");
+}
+
 /**
- * Lógica de negocio pura — sin guard adentro a propósito, para que tests/provisioning.test.js pueda
+ * Crea el prospectClient (la persona) junto con su primera prospectCompany, en una sola transacción
+ * — en este dominio un cliente nunca existe sin al menos una empresa asociada.
+ */
+export async function createProspectClient({
+  fullName,
+  email,
+  whatsappPhone,
+  companyCount,
+  companyName,
+  industry,
+  notes,
+  priority,
+}) {
+  return db.transaction(async (tx) => {
+    const [client] = await tx
+      .insert(prospectClient)
+      .values({
+        fullName,
+        email,
+        whatsappPhone,
+        companyCount: Number.isFinite(companyCount) && companyCount > 0 ? companyCount : 1,
+      })
+      .returning();
+    if (!client) throw new Error("insert de prospect_client no devolvió fila");
+
+    const [company] = await tx
+      .insert(prospectCompany)
+      .values({
+        prospectClientId: client.id,
+        name: companyName,
+        industry: industry || null,
+        notes: notes || null,
+        priority: Number.isFinite(priority) ? priority : 0,
+      })
+      .returning();
+    if (!company) throw new Error("insert de prospect_company no devolvió fila");
+
+    return { client, company };
+  });
+}
+
+/** Punto de entrada real como Server Action — guard en el borde + parseo de FormData. */
+export async function createProspectClientAction(formData) {
+  await requirePlatformAdmin();
+
+  const fullName = formData.get("fullName")?.toString().trim();
+  const email = formData.get("email")?.toString().trim();
+  const whatsappPhone = formData.get("whatsappPhone")?.toString().trim();
+  const companyName = formData.get("companyName")?.toString().trim();
+  if (!fullName || !email || !whatsappPhone || !companyName) return;
+
+  await createProspectClient({
+    fullName,
+    email,
+    whatsappPhone,
+    companyCount: Number(formData.get("companyCount")),
+    companyName,
+    industry: formData.get("industry")?.toString().trim() || null,
+    notes: formData.get("notes")?.toString().trim() || null,
+    priority: Number(formData.get("priority")),
+  });
+}
+
+/** Agrega otra empresa (prospectCompany) a un prospectClient que ya existe — ej. Afianza para Jaime. */
+export async function addProspectCompany({ prospectClientId, name, industry, notes, priority }) {
+  const [company] = await db
+    .insert(prospectCompany)
+    .values({
+      prospectClientId,
+      name,
+      industry: industry || null,
+      notes: notes || null,
+      priority: Number.isFinite(priority) ? priority : 0,
+    })
+    .returning();
+  if (!company) throw new Error("insert de prospect_company no devolvió fila");
+  return company;
+}
+
+/** Punto de entrada real como Server Action — guard en el borde + parseo de FormData. */
+export async function addProspectCompanyAction(formData) {
+  await requirePlatformAdmin();
+
+  const prospectClientId = formData.get("prospectClientId")?.toString();
+  const name = formData.get("name")?.toString().trim();
+  if (!prospectClientId || !name) return;
+
+  await addProspectCompany({
+    prospectClientId,
+    name,
+    industry: formData.get("industry")?.toString().trim() || null,
+    notes: formData.get("notes")?.toString().trim() || null,
+    priority: Number(formData.get("priority")),
+  });
+}
+
+/**
+ * Lógica de negocio pura — sin guard adentro a propósito, para que tests/prospects.test.js pueda
  * invocarla directo sin pasar por un request real de Next (requirePlatformAdmin() usa cookies() de
  * next/headers, que lanza fuera de ese contexto). El guard vive en el borde: provisionOrganizationAction,
  * abajo — mismo patrón que assertMembership/requireOrgMembership en
  * apps/improvement/server/objectives/mutations.ts.
  *
  * @param {string} prospectId
- * @param {string} ownerEmail - Email del dueño de la empresa cliente. El esquema de
- *   `prospect_company` no guarda un email (§4) — Jose Carlos lo provee al momento de provisionar,
- *   igual que en el mundo real: solo él sabe con quién está hablando en ese prospecto.
  */
-export async function provisionOrganization(prospectId, ownerEmail) {
+export async function provisionOrganization(prospectId) {
   const [prospect] = await db
     .select()
     .from(prospectCompany)
@@ -43,20 +157,48 @@ export async function provisionOrganization(prospectId, ownerEmail) {
       .from(organization)
       .where(eq(organization.id, prospect.orgId))
       .limit(1);
-    return { organization: org, alreadyProvisioned: true };
+    return { organization: org, alreadyProvisioned: true, whatsapp: null };
   }
 
-  // auth.admin.createUser es una llamada externa a la API de Supabase Auth — no puede vivir dentro
-  // de la transacción de Postgres de abajo. Solo se alcanza una vez: el chequeo de idempotencia de
-  // arriba corta cualquier llamada repetida antes de llegar aquí.
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: ownerEmail,
-    email_confirm: true,
-  });
-  if (authError || !authData.user) {
-    throw new Error(`No se pudo crear el usuario dueño: ${authError?.message ?? "sin detalle"}`);
+  const [client] = await db
+    .select()
+    .from(prospectClient)
+    .where(eq(prospectClient.id, prospect.prospectClientId))
+    .limit(1);
+  if (!client) throw new Error(`prospect_client ${prospect.prospectClientId} no existe`);
+
+  // Idempotencia POR PERSONA REAL, no solo por prospecto: si el email de este cliente ya es un
+  // profile (porque ya provisionamos otra de sus empresas), reutiliza ese mismo usuario —
+  // auth.admin.createUser con un email que ya existe en Supabase Auth falla, y un cliente puede
+  // tener N empresas bajo el mismo login (criterio explícito de Jose Carlos: Jaime Salinas, dueño de
+  // Camibel y Afianza).
+  const [existingProfile] = await db
+    .select()
+    .from(profile)
+    .where(eq(profile.email, client.email))
+    .limit(1);
+
+  let ownerId;
+  let tempPassword = null;
+  const isNewUser = !existingProfile;
+
+  if (existingProfile) {
+    ownerId = existingProfile.id;
+  } else {
+    // auth.admin.createUser es una llamada externa a la API de Supabase Auth — no puede vivir dentro
+    // de la transacción de Postgres de abajo. Solo se alcanza una vez: el chequeo de idempotencia de
+    // arriba corta cualquier llamada repetida antes de llegar aquí.
+    tempPassword = generateTempPassword();
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: client.email,
+      password: tempPassword,
+      email_confirm: true,
+    });
+    if (authError || !authData.user) {
+      throw new Error(`No se pudo crear el usuario dueño: ${authError?.message ?? "sin detalle"}`);
+    }
+    ownerId = authData.user.id;
   }
-  const ownerId = authData.user.id;
 
   const slug = `${slugify(prospect.name)}-${randomUUID().slice(0, 8)}`;
 
@@ -64,7 +206,9 @@ export async function provisionOrganization(prospectId, ownerEmail) {
     const [newOrg] = await tx.insert(organization).values({ name: prospect.name, slug }).returning();
     if (!newOrg) throw new Error("insert de organization no devolvió fila");
 
-    await tx.insert(profile).values({ id: ownerId, email: ownerEmail });
+    if (isNewUser) {
+      await tx.insert(profile).values({ id: ownerId, email: client.email, fullName: client.fullName });
+    }
     await tx
       .insert(membership)
       .values({ userId: ownerId, orgId: newOrg.id, role: "owner", acceptedAt: new Date() });
@@ -85,16 +229,32 @@ export async function provisionOrganization(prospectId, ownerEmail) {
     return newOrg;
   });
 
-  return { organization: org, alreadyProvisioned: false };
+  // Invitación por WhatsApp: solo tiene sentido cuando se crea la cuenta por primera vez — si el
+  // cliente ya tenía acceso por otra empresa, ya sabe entrar y no le mandamos una segunda
+  // contraseña temporal que además invalidaría la primera.
+  let whatsapp = null;
+  if (isNewUser) {
+    const loginUrl = `${
+      process.env.NEXT_PUBLIC_IMPROVEMENT_URL || "https://improvement-jotapuntoces-projects.vercel.app"
+    }/login`;
+    const body =
+      `Hola ${client.fullName} 👋 Ya tienes acceso a Improvement, el panel de ${prospect.name}.\n\n` +
+      `Entra aquí: ${loginUrl}\n` +
+      `Usuario: ${client.email}\n` +
+      `Contraseña temporal: ${tempPassword}\n\n` +
+      `Te recomendamos cambiarla la primera vez que entres.`;
+    whatsapp = await sendWhatsAppMessage({ to: client.whatsappPhone, body });
+  }
+
+  return { organization: org, alreadyProvisioned: false, whatsapp };
 }
 
 /**
  * Punto de entrada real como Server Action: guard en el borde + delega en provisionOrganization.
- * Es lo que un futuro formulario de /prospects debe invocar — nunca provisionOrganization directo.
  */
-export async function provisionOrganizationAction(prospectId, ownerEmail) {
+export async function provisionOrganizationAction(prospectId) {
   await requirePlatformAdmin();
-  return provisionOrganization(prospectId, ownerEmail);
+  return provisionOrganization(prospectId);
 }
 
 /**
