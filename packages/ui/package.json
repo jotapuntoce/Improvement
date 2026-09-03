@@ -5,7 +5,8 @@
   "exports": {
     "./tokens.css": "./src/tokens.css",
     "./building.css": "./src/building.css",
-    "./building/Building.tsx": "./src/building/Building.tsx"
+    "./building/Building.tsx": "./src/building/Building.tsx",
+    "./building/Reception.tsx": "./src/building/Reception.tsx"
   },
   "peerDependencies": {
     "react": "19.2.8"
