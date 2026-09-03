@@ -265,7 +265,7 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
         className={`jpc-stage${entering ? " jpc-zoom-enter" : ""}`}
         role="button"
         tabIndex={0}
-        aria-label="Entrar a JotaPuntoCe"
+        aria-label={`Entrar a ${companyName}`}
         onClick={handleEnter}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -278,7 +278,7 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
         <svg
           viewBox="0 0 660 800"
           role="img"
-          aria-label="Edificio de JotaPuntoCe de noche, con ventanas iluminadas por área"
+          aria-label={`Edificio de ${companyName} de noche, con ventanas iluminadas por área`}
         >
           <defs>
             <linearGradient id="jpc-facadeGrad" x1="0" y1="0" x2="0" y2="1">
