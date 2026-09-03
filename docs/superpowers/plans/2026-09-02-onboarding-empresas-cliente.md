@@ -654,9 +654,13 @@ En `packages/ui/src/tokens.css`, justo después de la línea `--gold: #cf9f3d;`,
 - [ ] **Step 2: Crear `packages/ui/src/building.css`**
 
 Copiar el bloque completo `/* ===== Building / recepción (login) ===== */` de
-`apps/admin/app/globals.css` (desde el comentario en la línea 807 hasta `.jpc-back-link:hover`,
-justo antes de la línea 1090 donde termina el bloque `.jpc-*`) a un archivo nuevo
-`packages/ui/src/building.css`, con estos 5 cambios de valor (todo lo demás se copia tal cual):
+`apps/admin/app/globals.css` — desde ese comentario (línea 807) hasta e incluyendo
+`.jpc-back-link:hover { color: var(--text-secondary); }` (línea 1060) — a un archivo nuevo
+`packages/ui/src/building.css`. **No incluir** el comentario `/* ===== Reception dashboard (panel
+principal) ===== */` que empieza justo después, en la línea 1062 — es una sección completamente
+distinta (la "recepción" del dashboard principal en `ProductsScreen.js`/`AreasPanel.js`, no la de
+`/login`), fuera de alcance de este plan. Con estos 5 cambios de valor sobre lo copiado (todo lo
+demás se copia tal cual):
 
 1. `.jpc-reception-eyebrow { color: var(--gold); }` → `color: var(--building-accent);`
 2. `.jpc-reception-word { color: var(--sign-glow); }` → `color: var(--building-accent);`
