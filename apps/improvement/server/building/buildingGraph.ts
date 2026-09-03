@@ -114,11 +114,11 @@ export function buildBuildingGraph(org: BuildingOrgInput, areas: BuildingAreaInp
     companyName: org.name,
     slogan: org.slogan,
     accentColor: org.accentColor,
-    areas: areas.map((a): BuildingArea => ({
+    areas: areas.map((a) => ({
       id: a.id,
       name: a.name,
       color: a.color,
-      cells: cellsById.get(a.id) as Array<[number, number]>,
+      cells: cellsById.get(a.id) ?? [],
       silhouette: a.silhouette,
     })),
   };
