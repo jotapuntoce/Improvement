@@ -4,6 +4,15 @@
   "private": true,
   "exports": {
     "./tokens.css": "./src/tokens.css",
-    "./building.css": "./src/building.css"
+    "./building.css": "./src/building.css",
+    "./building/Building.tsx": "./src/building/Building.tsx"
+  },
+  "peerDependencies": {
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "react": "19.2.8",
+    "@types/react": "19.2.18"
   }
 }
