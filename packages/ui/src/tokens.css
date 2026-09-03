@@ -55,6 +55,10 @@
   --bg-window-off: #0a1220;
   --border-window: #182338;
   --gold: #cf9f3d;
+  /* Tono ambiental del edificio/recepción (packages/ui/src/building.css) — default = --gold.
+     Una organización con accent_color propio lo sobreescribe como CSS custom property inline en
+     el wrapper .jpc-scene (ver BuildingExperience.tsx), nunca aquí — este es solo el default. */
+  --building-accent: var(--gold);
   --sign-glow: #fff6e0;
   --bg-reception-top: #140e09;
   --bg-reception-bot: #26190d;
