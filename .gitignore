@@ -43,3 +43,7 @@ yarn-error.log*
 
 # turbo
 .turbo
+
+# superpowers:subagent-driven-development — ledger, briefs, reports, review packages por plan
+# (scratch de ejecución, nunca parte del código; ver .superpowers/sdd/<plan>/progress.md)
+.superpowers/
