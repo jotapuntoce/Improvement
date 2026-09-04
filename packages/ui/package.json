@@ -7,7 +7,8 @@
     "./building.css": "./src/building.css",
     "./building/Building.tsx": "./src/building/Building.tsx",
     "./building/Reception.tsx": "./src/building/Reception.tsx",
-    "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx"
+    "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx",
+    "./building/AvatarIcon.tsx": "./src/building/AvatarIcon.tsx"
   },
   "peerDependencies": {
     "react": "^19.2.0"
