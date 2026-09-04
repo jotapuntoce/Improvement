@@ -74,12 +74,15 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
 
       const first = await provisionOrganization(prospect.id);
       createdOrgIds.push(first.organization.id);
-      const [ownerMembership] = await db
+      // Por client.email, no "el primer membership que regrese la query" — desde que
+      // provisionOrganization también agrega a cada platform admin existente (ver describe de abajo),
+      // un org puede tener más de un membership y el orden no está garantizado.
+      const [clientProfile] = await db
         .select()
-        .from(membership)
-        .where(eq(membership.orgId, first.organization.id))
+        .from(profile)
+        .where(eq(profile.email, client.email))
         .limit(1);
-      createdProfileIds.push(ownerMembership.userId);
+      createdProfileIds.push(clientProfile.id);
 
       expect(first.alreadyProvisioned).toBe(false);
 
@@ -126,6 +129,16 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
 
       expect(resultA.organization.id).not.toBe(resultB.organization.id);
 
+      // Por client.email, no "membershipsA[0]" — un org puede tener más de un membership ahora que
+      // provisionOrganization también agrega a cada platform admin existente, así que el índice 0 ya
+      // no identifica de forma confiable al cliente.
+      const [clientProfile] = await db
+        .select()
+        .from(profile)
+        .where(eq(profile.email, client.email))
+        .limit(1);
+      createdProfileIds.push(clientProfile.id);
+
       const membershipsA = await db
         .select()
         .from(membership)
@@ -134,15 +147,57 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
         .select()
         .from(membership)
         .where(eq(membership.orgId, resultB.organization.id));
-      createdProfileIds.push(membershipsA[0].userId);
 
-      // Mismo userId en ambos memberships — un solo usuario real, dos organizaciones.
-      expect(membershipsB[0].userId).toBe(membershipsA[0].userId);
+      // El cliente (identificado por su propio userId) tiene membership real en ambas
+      // organizaciones — mismo usuario, dos empresas.
+      expect(membershipsA.some((m) => m.userId === clientProfile.id)).toBe(true);
+      expect(membershipsB.some((m) => m.userId === clientProfile.id)).toBe(true);
 
       const profiles = await db.select().from(profile).where(eq(profile.email, client.email));
       expect(profiles.length).toBe(1);
     },
     15000, // dos provisiones reales seguidas (2 llamadas a auth.admin.createUser/lookup) pasan el timeout default de 5s
+  );
+
+  it(
+    "WHEN se provisiona una organización nueva THE SYSTEM SHALL agregar membership(role='owner') " +
+      "a todo profile con is_platform_admin=true que ya existía, además del dueño real (caso real: " +
+      "Jose Carlos tiene que poder entrar a cada organización de cliente con su propia sesión)",
+    async () => {
+      const platformAdminsBefore = await db
+        .select()
+        .from(profile)
+        .where(eq(profile.isPlatformAdmin, true));
+
+      const client = await insertProspectClient();
+      const [prospect] = await db
+        .insert(prospectCompany)
+        .values({ prospectClientId: client.id, name: `Prospecto platform-admin ${Date.now()}` })
+        .returning();
+      createdProspectIds.push(prospect.id);
+
+      const result = await provisionOrganization(prospect.id);
+      createdOrgIds.push(result.organization.id);
+
+      const [clientProfile] = await db
+        .select()
+        .from(profile)
+        .where(eq(profile.email, client.email))
+        .limit(1);
+      createdProfileIds.push(clientProfile.id);
+
+      const memberships = await db
+        .select()
+        .from(membership)
+        .where(eq(membership.orgId, result.organization.id));
+
+      expect(memberships.some((m) => m.userId === clientProfile.id && m.role === "owner")).toBe(true);
+      for (const admin of platformAdminsBefore) {
+        const adminMembership = memberships.find((m) => m.userId === admin.id);
+        expect(adminMembership).toBeDefined();
+        expect(adminMembership.role).toBe("owner");
+      }
+    },
   );
 });
 

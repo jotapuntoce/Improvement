@@ -212,6 +212,22 @@ export async function provisionOrganization(prospectId) {
     await tx
       .insert(membership)
       .values({ userId: ownerId, orgId: newOrg.id, role: "owner", acceptedAt: new Date() });
+
+    // Cualquier platform admin (Jose Carlos, o quien más lo sea después) entra a cada organización
+    // nueva con su propia sesión real de apps/improvement — no solo la vista de solo lectura del
+    // Mapa de Construcción en admin. Por rol (is_platform_admin), nunca por correo/id literal, para
+    // que aplique a cualquier admin de la plataforma sin tocar este código.
+    const platformAdmins = await tx
+      .select({ id: profile.id })
+      .from(profile)
+      .where(eq(profile.isPlatformAdmin, true));
+    for (const admin of platformAdmins) {
+      if (admin.id === ownerId) continue; // ya quedó como dueño arriba, no duplicar el membership
+      await tx
+        .insert(membership)
+        .values({ userId: admin.id, orgId: newOrg.id, role: "owner", acceptedAt: new Date() });
+    }
+
     // Primera etapa del Mapa de Construcción — Jose Carlos agrega las siguientes a mano desde
     // apps/admin conforme avanza (paso 14, backlog de prospectos y detalle de organización).
     await tx.insert(orgBuildStage).values({
