@@ -198,6 +198,7 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
         expect(adminMembership.role).toBe("owner");
       }
     },
+    10000, // una provisión real (llamada a auth.admin.createUser/lookup vía provisionOrganization) pasa el timeout default de 5s
   );
 });
 
