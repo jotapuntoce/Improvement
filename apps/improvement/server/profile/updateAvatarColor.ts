@@ -1,34 +1,14 @@
 "use server";
 
 // Server Action — un usuario solo puede cambiar SU PROPIO avatar_color, nunca el de otro (ni
-// siquiera un platform admin puede cambiar el de un cliente). updateAvatarColor (el export público,
-// llamado desde el cliente) SIEMPRE resuelve el userId desde la sesión real vía getSessionUserId()
-// — nunca acepta un userId externo. setAvatarColorForUser es la lógica de negocio pura, sin ese
-// guard, para poder probarla sin mockear cookies() (mismo patrón que provisionOrganization en
-// apps/admin/app/prospects/actions.js).
-import { eq } from "drizzle-orm";
-import { db } from "@jotapuntoce/db";
-import { profile } from "@jotapuntoce/db/schema";
+// siquiera un platform admin puede cambiar el de un cliente). Este es el ÚNICO export de este
+// archivo "use server" a propósito: en un módulo "use server" cualquier export es candidato a
+// quedar expuesto como endpoint público de Next si algo llegara a importarlo desde un "use client",
+// así que la lógica sin guard (setAvatarColorForUser, que acepta un userId explícito) vive en un
+// archivo plano aparte — ver setAvatarColorForUser.ts. updateAvatarColor SIEMPRE resuelve el userId
+// desde la sesión real vía getSessionUserId() antes de delegar — nunca acepta un userId externo.
 import { getSessionUserId } from "../auth/guard.ts";
-
-const VALID_PRESETS = ["aurora", "esmeralda", "solar", "indigo"] as const;
-type AvatarColorPreset = (typeof VALID_PRESETS)[number];
-
-function isValidPreset(value: string): value is AvatarColorPreset {
-  return (VALID_PRESETS as readonly string[]).includes(value);
-}
-
-export async function setAvatarColorForUser(
-  userId: string,
-  preset: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!isValidPreset(preset)) {
-    return { ok: false, error: `Preset inválido: ${preset}` };
-  }
-
-  await db.update(profile).set({ avatarColor: preset }).where(eq(profile.id, userId));
-  return { ok: true };
-}
+import { setAvatarColorForUser } from "./setAvatarColorForUser.ts";
 
 export async function updateAvatarColor(preset: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const userId = await getSessionUserId();

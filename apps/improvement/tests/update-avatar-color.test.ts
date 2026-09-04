@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { profile } from "@jotapuntoce/db/schema";
-import { setAvatarColorForUser } from "../server/profile/updateAvatarColor.ts";
+import { setAvatarColorForUser } from "../server/profile/setAvatarColorForUser.ts";
 
 const createdProfileIds: string[] = [];
 
@@ -39,4 +39,18 @@ describe("setAvatarColorForUser", () => {
     const [row] = await db.select().from(profile).where(eq(profile.id, userId)).limit(1);
     expect(row!.avatarColor).toBeNull();
   });
+
+  it(
+    "WHEN se actualiza el avatar_color de un usuario THE SYSTEM SHALL dejar intacta la fila de " +
+      "cualquier otro usuario — el guard de pertenencia más importante del cambio",
+    async () => {
+      const userIdA = await insertTestProfile();
+      const userIdB = await insertTestProfile();
+
+      await setAvatarColorForUser(userIdA, "esmeralda");
+
+      const [rowB] = await db.select().from(profile).where(eq(profile.id, userIdB)).limit(1);
+      expect(rowB!.avatarColor).toBeNull();
+    },
+  );
 });

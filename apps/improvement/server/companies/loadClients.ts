@@ -2,7 +2,7 @@
 // directo. La conexión de Drizzle de esta app (DATABASE_URL, pooled) no lleva auth.uid() por
 // request, así que la política RLS de membership ("users read their own memberships") no bloquea
 // esta consulta cross-usuario a nivel de base de datos — la única capa de seguridad real aquí es
-// requirePlatformAdminSession() en el caller (app/empresas/page.tsx), no RLS. Ver
+// isPlatformAdmin(userId) en el caller (app/empresas/page.tsx), no RLS. Ver
 // docs/superpowers/specs/2026-09-04-panel-clientes-platform-admin-design.md.
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
