@@ -47,3 +47,7 @@ yarn-error.log*
 # superpowers:subagent-driven-development — ledger, briefs, reports, review packages por plan
 # (scratch de ejecución, nunca parte del código; ver .superpowers/sdd/<plan>/progress.md)
 .superpowers/
+
+# superpowers:using-git-worktrees — worktrees aislados para ejecutar un plan (git worktree add
+# manual, fallback porque EnterWorktree no resuelve el repo en este entorno)
+.worktrees/
