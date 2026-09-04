@@ -47,6 +47,11 @@ export const profile = pgTable("profile", {
   email: text("email").notNull(),
   fullName: text("full_name"),
   isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+  // Uno de los 4 presets de acento ya existentes en packages/ui/src/tokens.css:
+  // "aurora" | "esmeralda" | "solar" | "indigo". null = usa "aurora" (el degradado default) al
+  // renderizar. Elegido por el propio usuario — ver server/profile/updateAvatarColor.ts
+  // (apps/improvement) — nunca editado por otra persona, ni siquiera un platform admin.
+  avatarColor: text("avatar_color"),
   createdAt: createdAt(),
 });
 

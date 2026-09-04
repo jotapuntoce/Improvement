@@ -1,0 +1,1 @@
+ALTER TABLE "profile" ADD COLUMN "avatar_color" text;
