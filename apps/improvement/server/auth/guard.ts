@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization } from "@jotapuntoce/db/schema";
+import { membership, organization, profile } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
 
 /**
@@ -61,4 +61,39 @@ export async function requireOrgMembership(orgId: string) {
   if (!userId) notFound();
 
   return assertMembership(userId, orgId);
+}
+
+async function fetchIsPlatformAdmin(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isPlatformAdmin: profile.isPlatformAdmin })
+    .from(profile)
+    .where(eq(profile.id, userId))
+    .limit(1);
+  return row?.isPlatformAdmin ?? false;
+}
+
+/**
+ * WHEN userId corresponde a un profile con is_platform_admin=true THE SYSTEM SHALL devolver true
+ * (criterio #1); WHEN no existe ese profile, o existe con is_platform_admin=false, THE SYSTEM
+ * SHALL devolver false, nunca lanzar (criterio #2) — usado para decidir qué renderizar en
+ * /empresas, no para bloquear acceso (eso es requirePlatformAdminSession, abajo).
+ */
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
+  return fetchIsPlatformAdmin(userId);
+}
+
+/**
+ * Guard de tenencia para rutas exclusivas de platform admin dentro de apps/improvement (ej.
+ * /empresas/clientes/[clientUserId]) — mismo criterio 404-nunca-403 que requireOrgMembership: WHEN
+ * no hay sesión, o la sesión no es platform admin, THE SYSTEM SHALL responder 404. Devuelve el
+ * userId cuando sí lo es.
+ */
+export async function requirePlatformAdminSession(): Promise<string> {
+  const userId = await getSessionUserId();
+  if (!userId) notFound();
+
+  const admin = await fetchIsPlatformAdmin(userId);
+  if (!admin) notFound();
+
+  return userId;
 }

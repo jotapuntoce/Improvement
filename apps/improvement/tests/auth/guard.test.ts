@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, profile, membership, objective, employeePointsLedger } from "@jotapuntoce/db/schema";
-import { findMembership } from "../../server/auth/guard.ts";
+import { findMembership, isPlatformAdmin } from "../../server/auth/guard.ts";
 
 async function makeOrg(nameSuffix: string) {
   const [org] = await db
@@ -117,4 +117,26 @@ describe("RLS — employee_points_ledger", () => {
       expect(rowsAsOwner.length).toBe(0);
     },
   );
+});
+
+describe("isPlatformAdmin", () => {
+  it("WHEN el profile tiene is_platform_admin=true THE SYSTEM SHALL devolver true", async () => {
+    const userId = crypto.randomUUID();
+    await db.insert(profile).values({ id: userId, email: `${userId}@example.com`, isPlatformAdmin: true });
+    createdProfileIds.push(userId);
+
+    expect(await isPlatformAdmin(userId)).toBe(true);
+  });
+
+  it("WHEN el profile tiene is_platform_admin=false THE SYSTEM SHALL devolver false", async () => {
+    const userId = crypto.randomUUID();
+    await makeProfile(userId, `${userId}@example.com`); // isPlatformAdmin default false
+    createdProfileIds.push(userId);
+
+    expect(await isPlatformAdmin(userId)).toBe(false);
+  });
+
+  it("WHEN el profile no existe THE SYSTEM SHALL devolver false, nunca lanzar", async () => {
+    expect(await isPlatformAdmin(crypto.randomUUID())).toBe(false);
+  });
 });
