@@ -34,7 +34,9 @@ export interface ClientSummary {
  * adminUserId THE SYSTEM SHALL excluirla del resultado (criterio #1) — no pertenece a ningún
  * cliente. WHEN dos organizaciones comparten el mismo owner real THE SYSTEM SHALL agruparlas bajo
  * un solo ClientSummary (criterio #2). WHEN una organización tiene más de un owner no-admin THE
- * SYSTEM SHALL usar el más antiguo por acceptedAt, determinista (criterio #3).
+ * SYSTEM SHALL usar el más antiguo por acceptedAt, determinista (criterio #3). WHEN el nombre
+ * completo del cliente no existe THE SYSTEM SHALL usar su email como nombre, determinista
+ * (criterio #4).
  */
 export function buildClientList(
   adminUserId: string,
