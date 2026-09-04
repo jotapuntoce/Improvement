@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { resolveHomeOrgId } from "@/server/auth/guard.ts";
+import { getSessionUserId } from "@/server/auth/guard.ts";
 
-// `/` nunca es una página en sí — es solo el punto de entrada que reparte: con sesión y membership,
-// al dashboard de ese org; sin ninguna de las dos, a /login. Reemplaza el placeholder estático del
-// scaffold original (paso 2), que nunca se conectó a auth real.
+// `/` nunca es una página en sí — reparte: con sesión, al panel de empresas (/empresas, que a su
+// vez lleva al edificio de la que elija y de ahí a su dashboard real); sin sesión, a /login.
 export default async function Page() {
-  const orgId = await resolveHomeOrgId();
-  redirect(orgId ? `/${orgId}/dashboard` : "/login");
+  const userId = await getSessionUserId();
+  redirect(userId ? "/empresas" : "/login");
 }
