@@ -17,6 +17,15 @@
   --accent-1: #7c5cff;
   --accent-2: #22d3ee;
 
+  --preset-aurora-1: #7c5cff;
+  --preset-aurora-2: #22d3ee;
+  --preset-esmeralda-1: #10b981;
+  --preset-esmeralda-2: #a3e635;
+  --preset-solar-1: #fb923c;
+  --preset-solar-2: #f472b6;
+  --preset-indigo-1: #6366f1;
+  --preset-indigo-2: #3b82f6;
+
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #f87171;
