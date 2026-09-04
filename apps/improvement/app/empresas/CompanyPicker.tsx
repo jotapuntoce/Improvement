@@ -35,10 +35,13 @@ export function CompanyPicker({ companies }: { companies: CompanySummary[] }) {
 
   if (!introDone) {
     const current = companies[introIndex];
-    // noUncheckedIndexedAccess (tsconfig.json raíz): introIndex siempre es < companies.length
-    // mientras introDone es false (el effect pone introDone en true antes de superar el límite),
-    // pero TS no lo sabe desde un acceso por índice — guard-then-narrow, mismo patrón que
-    // server/reminders/deliver.ts.
+    // Guard real, no solo type-narrowing: cuando el timer dispara el último setIntroIndex(i => i+1)
+    // (introIndex llega a companies.length), React renderiza con ese introIndex nuevo pero con
+    // introDone todavía en false — el effect que lo pone en true corre después del commit, no
+    // durante este render. En ese frame transitorio companies[introIndex] es undefined de verdad
+    // (no una imposibilidad que TS no puede probar): sin este guard, current.name explotaría con
+    // un TypeError síncrono en cada carga normal de la página (sin prefers-reduced-motion), no en
+    // un caso límite. guard-then-narrow, mismo patrón que server/reminders/deliver.ts.
     if (!current) return null;
     return (
       <div className="empresas-intro" role="status">
