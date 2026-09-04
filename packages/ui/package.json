@@ -3,6 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./building.css": "./src/building.css",
+    "./building/Building.tsx": "./src/building/Building.tsx",
+    "./building/Reception.tsx": "./src/building/Reception.tsx",
+    "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "react": "19.2.8",
+    "@types/react": "19.2.18"
   }
 }

@@ -29,6 +29,13 @@
       "when": 1788393057270,
       "tag": "0003_normal_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788450016644,
+      "tag": "0004_panoramic_pretty_boy",
+      "breakpoints": true
     }
   ]
 }

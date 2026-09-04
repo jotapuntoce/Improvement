@@ -1,0 +1,389 @@
+/* ===== Building / recepción (login) ===== */
+/* app/login/page.js -> components/building/LoginExperience.js, que monta
+   packages/ui/src/building/Building.tsx y packages/ui/src/building/Reception.tsx. Escena nocturna
+   del edificio (áreas configurables por organización, cada una un científico loco trabajando) que
+   hace zoom hacia la puerta y da paso a una recepción con el login real. Ver
+   packages/ui/src/tokens.css para los colores nuevos que usa (--dept-*, --sky-*, --bg-facade*,
+   --gold, --building-accent, --bg-reception*, --desk-*). */
+.jpc-scene {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 48px 20px 40px;
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-bot) 70%);
+  color: var(--text-primary);
+}
+
+.jpc-stage-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.jpc-stage {
+  position: relative;
+  width: min(92vw, 620px);
+  cursor: pointer;
+  border-radius: 12px;
+  transform-origin: 50% 86.25%; /* centro real de la puerta, ver packages/ui/src/building/Building.tsx */
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.75s ease 0.1s;
+}
+.jpc-stage:hover {
+  filter: brightness(1.08);
+}
+.jpc-stage:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 8px;
+}
+.jpc-stage.jpc-zoom-enter {
+  transform: scale(2.7);
+  opacity: 0;
+}
+.jpc-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.jpc-ground-glow {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 120%;
+  height: 22%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--building-accent) 16%, transparent), transparent 70%);
+  filter: blur(2px);
+  pointer-events: none;
+}
+.jpc-enter-hint {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.jpc-sign-word {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.jpc-sign-tagline {
+  font-family: var(--font-caveat), cursive;
+  font-weight: 600;
+}
+
+/* ventanas apagadas la mayor parte del ciclo — cada una enciende en SU turno, no todas juntas;
+   ~2.4s encendida por turno, suficiente para ver el gesto del científico completo (loops de
+   1.3–1.8s) antes de apagar. Duration/delay exactos se calculan en
+   packages/ui/src/building/Building.tsx. */
+.jpc-window-turn {
+  opacity: 0.16;
+  animation-name: jpc-window-turn;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes jpc-window-turn {
+  0% { opacity: 0.16; }
+  1% { opacity: 1; }
+  6.7% { opacity: 1; }
+  7.7% { opacity: 0.16; }
+  100% { opacity: 0.16; }
+}
+
+.jpc-gesture-tilt {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: jpc-gesture-tilt 1.5s ease-in-out infinite;
+}
+@keyframes jpc-gesture-tilt {
+  0%, 100% { transform: rotate(-9deg); }
+  50% { transform: rotate(11deg); }
+}
+.jpc-gesture-pulse {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: jpc-gesture-pulse 1.3s ease-in-out infinite;
+}
+@keyframes jpc-gesture-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+.jpc-gesture-float {
+  animation: jpc-gesture-float 1.8s ease-in-out infinite;
+}
+@keyframes jpc-gesture-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jpc-stage { transition: none; }
+  .jpc-window-turn, .jpc-gesture-tilt, .jpc-gesture-pulse, .jpc-gesture-float {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---- recepción ---- */
+.jpc-reception {
+  width: min(92vw, 400px);
+  animation: jpc-reception-in 0.6s ease both;
+}
+@keyframes jpc-reception-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jpc-reception { animation: none; }
+}
+
+.jpc-reception-wall {
+  background: radial-gradient(120% 90% at 50% -12%, color-mix(in srgb, var(--building-accent) 16%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--bg-reception-top), var(--bg-reception-bot));
+  /* Sin borde inferior: .jpc-reception-card ya tiene border-top: none, así que ese borde era
+     la única costura visible entre la pared y la tarjeta — se quita para que ambas se lean
+     como una sola superficie continua, sin línea de separación bajo "Bienvenido de vuelta". */
+  border: 1px solid color-mix(in srgb, var(--building-accent) 20%, transparent);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  padding: 34px 26px 26px;
+  text-align: center;
+}
+.jpc-reception-eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--building-accent);
+  margin: 0;
+}
+.jpc-reception-word {
+  /* Un poco más grande: la pared tiene ~348px de ancho de contenido (400px - padding) y a 25px
+     el wordmark apenas usaba 213px de eso — sobraba espacio de sobra. */
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  color: var(--sign-glow);
+  letter-spacing: 0.01em;
+  margin: 10px 0 0;
+}
+.jpc-reception-sub {
+  /* Crece en la misma proporción que .jpc-reception-word (25→30px ≈ ×1.2). */
+  font-family: var(--font-caveat), cursive;
+  font-size: 20px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+.jpc-reception-card {
+  /* mismo ancho que .jpc-reception-wall (sin max-width propio) y solo las esquinas de abajo
+     redondeadas — antes esta tarjeta era mas angosta que la pared de arriba y se veia un filo
+     dorado asomando a los lados, como si el diseño se hubiera quedado a la mitad. Fondo: mismo
+     tono cálido oscuro con el que termina el degradado de .jpc-reception-wall (no el navy por
+     default del panel) — para que sea una sola superficie continua, no un corte de color. */
+  background: var(--bg-reception-bot);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 22%, transparent);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 26px 24px 22px;
+  box-shadow: 0 24px 44px -22px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.jpc-field-label {
+  /* Mismo tratamiento que .jpc-reception-eyebrow ("RECEPCIÓN"): geist-mono, mayúsculas,
+     letter-spacing amplio, dorado — no Caveat, para que el label lea como rótulo de recepción,
+     no como la firma manuscrita de "Bienvenido de vuelta". */
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--building-accent);
+}
+.jpc-field-input {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 28%, transparent);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 14px;
+}
+.jpc-field-input:focus-visible {
+  outline: 2px solid var(--building-accent);
+  outline-offset: 1px;
+}
+.jpc-reception-submit {
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg);
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--desk-top), var(--building-accent));
+}
+.jpc-reception-error {
+  font-size: 13px;
+  color: var(--danger);
+  margin: 0;
+}
+.jpc-back-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.jpc-back-link:hover {
+  color: var(--text-secondary);
+}
+
+/* Reception.tsx (packages/ui) acepta cualquier children — cuando es un <form> (caso de
+   apps/admin, login real), display:contents lo "aplana" para que sus campos hereden el
+   flex/gap de .jpc-reception-card directo, igual que antes de generalizar el componente. */
+.jpc-reception-card > form {
+  display: contents;
+}
+
+/* ===== Panel de empresas (/empresas, apps/improvement) ===== */
+.empresas-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-bot) 70%);
+  padding: 40px 20px;
+}
+
+.empresas-intro {
+  text-align: center;
+  animation: empresas-intro-fade 0.5s ease both;
+}
+@keyframes empresas-intro-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.empresas-intro-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.empresas-intro-company {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--sign-glow);
+  margin: 0;
+}
+.empresas-intro-stage {
+  font-size: 15px;
+  color: var(--building-accent);
+  margin: 8px 0 0;
+}
+
+.empresas-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+  max-width: 720px;
+}
+.empresas-tile {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.empresas-tile:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 6px;
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empresas-intro { animation: none; }
+}
+
+/* ===== AppIconLarge (packages/ui/src/building/AppIconLarge.tsx) ===== */
+.app-icon-large-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.app-icon-large {
+  position: relative;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  overflow: hidden;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.empresas-tile:hover .app-icon-large,
+.empresas-tile:focus-visible .app-icon-large {
+  transform: scale(1.04);
+  filter: brightness(1.08);
+}
+.app-icon-large-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.app-icon-large-shine {
+  position: absolute;
+  top: -30%;
+  left: -10%;
+  width: 60%;
+  height: 160%;
+  background: rgba(255, 255, 255, 0.14);
+  transform: rotate(20deg);
+}
+.app-icon-large-glyph {
+  position: relative;
+  z-index: 1;
+}
+.app-icon-large-badge {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--building-accent);
+}
+.app-icon-large-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-icon-large { transition: none; }
+}

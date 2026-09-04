@@ -100,6 +100,7 @@ describe("provisionOrganization (backlog: prospecto -> en_construcción)", () =>
         .where(eq(organization.id, first.organization.id));
       expect(orgs.length).toBe(1);
     },
+    10000, // una provisión real (llamada a auth.admin.createUser/lookup vía provisionOrganization) pasa el timeout default de 5s
   );
 
   it(

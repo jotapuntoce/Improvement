@@ -77,6 +77,8 @@ test.beforeEach(async ({ context, baseURL }) => {
 
 const ROUTES: { label: string; path: () => string }[] = [
   { label: "/login", path: () => "/login" },
+  { label: "/empresas", path: () => "/empresas" },
+  { label: "/empresas/[orgId]", path: () => `/empresas/${orgId}` },
   // ?fallback=1 fuerza SceneListFallback — axe-core no puede auditar un <canvas> WebGL de forma
   // significativa (ver apps/improvement/app/[org]/dashboard/Scene3D.tsx).
   { label: "/[org]/dashboard", path: () => `/${orgId}/dashboard?fallback=1` },

@@ -30,6 +30,12 @@ export const organization = pgTable("organization", {
   id: id(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  // Tagline bajo el letrero del edificio (ej. "Eficiencia con Propósito" para JotaPuntoCe). null =
+  // el edificio no muestra segunda línea. Ver Building.tsx (packages/ui).
+  slogan: text("slogan"),
+  // Hex, tono ambiental del edificio/recepción de esta organización (reemplaza --gold ahí). null =
+  // usa el tono neutro por default de packages/ui/src/tokens.css.
+  accentColor: text("accent_color"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -1,11 +1,12 @@
 "use client";
 
-// Fachada nocturna de JotaPuntoCe — puerto real (React/JSX) del prototipo validado en Claude
-// Artifacts. Seis áreas creativas, cada una con 3 ventanas que encienden una por una (nunca todas
-// juntas) siguiendo el orden real del circuito punteado, y un científico loco silueteado por
-// ventana con su propio gesto de "trabajando". Clic o Enter/Espacio dispara el zoom hacia la
-// puerta; LoginExperience.js decide cuándo desmontar esto y montar ReceptionLogin.
-import { useEffect, useRef, useState } from "react";
+// Fachada nocturna de un edificio corporativo genérico — puerto real (React/JSX) del prototipo
+// validado en Claude Artifacts. Áreas configurables por organización, cada una con sus ventanas
+// que encienden una por una (nunca todas juntas) siguiendo el orden real del circuito punteado, y
+// un científico loco silueteado por ventana con su propio gesto de "trabajando". Clic o
+// Enter/Espacio dispara el zoom hacia la puerta; el componente que la monta decide cuándo
+// desmontar esto y montar Reception.
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const COLS = 9;
 const ROWS = 8;
@@ -27,40 +28,36 @@ const DOOR_GAP = 4;
 const DOOR_CX = BX0 + (BX1 - BX0) / 2;
 const DOOR_Y = BY1 - DOOR_H;
 
-// 3 ventanas por área, repartidas en todo el ancho del edificio (antes las columnas 6-8 quedaban
-// vacías — Jose Carlos pidió más presencia en las esquinas superior e inferior derecha).
-const ZONES = [
-  { key: "imag", color: "var(--dept-imaginacion)", cells: [[0, 1], [0, 6], [1, 8]] },
-  { key: "plan", color: "var(--dept-planeacion)", cells: [[0, 4], [1, 3], [2, 7]] },
-  { key: "sol", color: "var(--dept-soluciones)", cells: [[2, 8], [3, 5], [6, 8]] },
-  { key: "valor", color: "var(--dept-valor)", cells: [[3, 1], [3, 7], [4, 4]] },
-  { key: "brand", color: "var(--dept-branding)", cells: [[4, 8], [5, 6], [6, 2]] },
-  { key: "pres", color: "var(--dept-presentacion)", cells: [[5, 3], [6, 1], [7, 7]] },
-];
+export type SilhouetteKind = "plan" | "sol" | "imag" | "valor" | "brand" | "pres" | "generica";
 
-const TOTAL_LIT = ZONES.reduce((n, z) => n + z.cells.length, 0);
-// 2.6s entre turno y turno, encendida ~2.4s de eso (ver @keyframes jpc-window-turn en
-// globals.css) — suficiente para que el gesto del científico (loops de 1.3-1.8s) se vea completo
-// al menos una vez antes de apagar.
-const STAGGER = 2.6;
-const CYCLE = TOTAL_LIT * STAGGER;
-
-const CELL_META = {};
-let seq = 0;
-for (const zone of ZONES) {
-  for (const [row, col] of zone.cells) {
-    CELL_META[`${row},${col}`] = { zone, seq: seq++ };
-  }
+export interface BuildingArea {
+  id: string;
+  name: string;
+  color: string;
+  cells: [number, number][];
+  silhouette?: SilhouetteKind;
 }
 
-function cellCenter(row, col) {
+export interface BuildingProps {
+  companyName: string;
+  slogan?: string;
+  areas: BuildingArea[];
+  onEnter: () => void;
+}
+
+// 2.6s entre turno y turno, encendida ~2.4s de eso (ver @keyframes jpc-window-turn en
+// packages/ui/src/building.css) — suficiente para que el gesto de la silueta (loops de 1.3-1.8s)
+// se vea completo al menos una vez antes de apagar. Fijo, no varía por organización.
+const STAGGER = 2.6;
+
+function cellCenter(row: number, col: number) {
   return { x: GX + col * CELL + WIN / 2, y: GY + row * CELL + WIN / 2 };
 }
 
 // PRNG determinista (mulberry32) — las mismas "estrellas" y el mismo parpadeo ambiente de ventanas
 // apagadas en cada render, servidor o cliente. Math.random() aquí produciría un mismatch de
 // hidratación (el server y el primer render del cliente verían valores distintos).
-function mulberry32(seed) {
+function mulberry32(seed: number) {
   let a = seed;
   return function random() {
     a |= 0;
@@ -85,50 +82,24 @@ function buildStars() {
 }
 const STARS = buildStars();
 
-function buildAmbientWindows() {
+function buildAmbientWindows(cellMeta: Record<string, unknown>) {
   const rand = mulberry32(72340919);
-  const cells = [];
+  const cells: { row: number; col: number }[] = [];
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
-      if (CELL_META[`${row},${col}`]) continue;
+      if (cellMeta[`${row},${col}`]) continue;
       if (rand() < 0.14) cells.push({ row, col });
     }
   }
   return cells;
 }
-const AMBIENT_WINDOWS = buildAmbientWindows();
-
-// centroides del circuito punteado que conecta las 6 áreas en el orden real del proceso creativo
-const CIRCUIT_POINTS = ZONES.map((zone) => {
-  const sum = zone.cells.reduce(
-    (acc, [row, col]) => {
-      const c = cellCenter(row, col);
-      return { x: acc.x + c.x, y: acc.y + c.y };
-    },
-    { x: 0, y: 0 },
-  );
-  return { x: sum.x / zone.cells.length, y: sum.y / zone.cells.length };
-});
-
-function circuitPath() {
-  let d = `M ${CIRCUIT_POINTS[0].x.toFixed(1)} ${CIRCUIT_POINTS[0].y.toFixed(1)}`;
-  for (let p = 1; p < CIRCUIT_POINTS.length; p++) {
-    const prev = CIRCUIT_POINTS[p - 1];
-    const cur = CIRCUIT_POINTS[p];
-    const midX = (prev.x + cur.x) / 2;
-    d += ` L ${midX.toFixed(1)} ${prev.y.toFixed(1)}`;
-    d += ` L ${midX.toFixed(1)} ${cur.y.toFixed(1)}`;
-    d += ` L ${cur.x.toFixed(1)} ${cur.y.toFixed(1)}`;
-  }
-  return d;
-}
 
 /**
- * Seis científicos locos, 0 0 24 24, silueta 100% sólida (#04060d — "tienen que estar
- * completamente de color negro porque es la sombra"). Pelo alborotado compartido (zigzag relleno,
- * no trazos delgados que se vean grises a escala de ventana), bata + piernas, un instrumento por
- * rol. Las clases jpc-gesture-* son la parte de la sombra que se mueve mientras la ventana está
- * encendida.
+ * Científicos locos, uno por rol de área (0 0 24 24), silueta 100% sólida (#04060d — "tienen que
+ * estar completamente de color negro porque es la sombra"). Pelo alborotado compartido (zigzag
+ * relleno, no trazos delgados que se vean grises a escala de ventana), bata + piernas, un
+ * instrumento por rol. Las clases jpc-gesture-* son la parte de la sombra que se mueve mientras la
+ * ventana está encendida.
  */
 function ScientistDefs() {
   return (
@@ -200,18 +171,67 @@ function ScientistDefs() {
         <path d="M9.6 13 L6.4 10.4 L5.4 11.8 L9 14.6 Z" />
         <rect className="jpc-gesture-float" x="20.4" y="4" width="3.2" height="6" rx=".6" transform="rotate(12 22 7)" />
       </symbol>
+
+      <symbol id="jpc-ic-generica" viewBox="0 0 24 24" fill="#04060d">
+        <path d="M6.4 5.6 L7.4 1 L9 4.8 L10.4 0.4 L12 5 L13.6 0.4 L15 4.8 L16.6 1 L17.6 5.6 Z" />
+        <circle cx="12" cy="7.6" r="3.2" />
+        <path d="M8 22 L8.3 17 C8.3 12.6 9.6 11.4 12 11.4 C14.4 11.4 15.7 12.6 15.7 17 L16 22 L13.2 22 L12.9 17.4 L11.1 17.4 L10.8 22 Z" />
+        <rect className="jpc-gesture-pulse" x="6.6" y="13.6" width="1.6" height="5.6" rx=".8" transform="rotate(-6 7.4 16.4)" />
+        <rect className="jpc-gesture-pulse" style={{ animationDelay: ".4s" }} x="15.8" y="13.6" width="1.6" height="5.6" rx=".8" transform="rotate(6 16.6 16.4)" />
+      </symbol>
     </defs>
   );
 }
 
-export default function JotaPuntoCeBuilding({ onEnter }) {
+export function Building({ companyName, slogan, areas, onEnter }: BuildingProps) {
   const [entering, setEntering] = useState(false);
-  const [tagX, setTagX] = useState(null);
-  const wordRef = useRef(null);
+  const [tagX, setTagX] = useState<number | null>(null);
+  const wordRef = useRef<SVGTextElement>(null);
 
-  // Alinea la última letra del tagline con el final de la "E" de JOTAPUNTOCE midiendo el ancho
-  // real ya con la tipografía cargada — antes de eso getBBox() reflejaría la fuente de reserva y
-  // descuadraría todo (mismo bug ya resuelto en el prototipo de Artifacts).
+  const { cellMeta, cycle, circuitPoints, circuitD, ambientWindows } = useMemo(() => {
+    const totalLit = areas.reduce((n, a) => n + a.cells.length, 0);
+    const meta: Record<string, { area: BuildingArea; seq: number }> = {};
+    let seq = 0;
+    for (const a of areas) {
+      for (const [row, col] of a.cells) {
+        meta[`${row},${col}`] = { area: a, seq: seq++ };
+      }
+    }
+
+    const points = areas.map((a) => {
+      const sum = a.cells.reduce(
+        (acc, [row, col]) => {
+          const c = cellCenter(row, col);
+          return { x: acc.x + c.x, y: acc.y + c.y };
+        },
+        { x: 0, y: 0 },
+      );
+      return { x: sum.x / a.cells.length, y: sum.y / a.cells.length };
+    });
+
+    // Non-null assertions: `p` siempre recorre [1, points.length), así que `p - 1` y `p` siempre
+    // caen dentro del arreglo — noUncheckedIndexedAccess no puede probarlo por sí solo (mismo
+    // patrón ya usado en distributeCells más abajo en este mismo módulo hermano, buildingGraph.ts).
+    let d = points.length ? `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}` : "";
+    for (let p = 1; p < points.length; p++) {
+      const prev = points[p - 1]!;
+      const cur = points[p]!;
+      const midX = (prev.x + cur.x) / 2;
+      d += ` L ${midX.toFixed(1)} ${prev.y.toFixed(1)} L ${midX.toFixed(1)} ${cur.y.toFixed(1)} L ${cur.x.toFixed(1)} ${cur.y.toFixed(1)}`;
+    }
+
+    return {
+      cellMeta: meta,
+      cycle: totalLit * STAGGER,
+      circuitPoints: points,
+      circuitD: d,
+      ambientWindows: buildAmbientWindows(meta),
+    };
+  }, [areas]);
+
+  // Alinea la última letra del tagline con el final del nombre de la empresa en el rótulo
+  // midiendo el ancho real ya con la tipografía cargada — antes de eso getBBox() reflejaría la
+  // fuente de reserva y descuadraría todo (mismo bug ya resuelto en el prototipo de Artifacts).
   useEffect(() => {
     let cancelled = false;
     function measure() {
@@ -249,7 +269,7 @@ export default function JotaPuntoCeBuilding({ onEnter }) {
         className={`jpc-stage${entering ? " jpc-zoom-enter" : ""}`}
         role="button"
         tabIndex={0}
-        aria-label="Entrar a JotaPuntoCe"
+        aria-label={`Entrar a ${companyName}`}
         onClick={handleEnter}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -262,7 +282,7 @@ export default function JotaPuntoCeBuilding({ onEnter }) {
         <svg
           viewBox="0 0 660 800"
           role="img"
-          aria-label="Edificio de JotaPuntoCe de noche, con ventanas iluminadas por área"
+          aria-label={`Edificio de ${companyName} de noche, con ventanas iluminadas por área`}
         >
           <defs>
             <linearGradient id="jpc-facadeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -292,7 +312,7 @@ export default function JotaPuntoCeBuilding({ onEnter }) {
             height={BY1 - BY0}
             rx="6"
             fill="url(#jpc-facadeGrad)"
-            stroke="var(--gold)"
+            stroke="var(--building-accent)"
             strokeWidth="2"
           />
           <rect
@@ -302,28 +322,28 @@ export default function JotaPuntoCeBuilding({ onEnter }) {
             height="16"
             rx="3"
             fill="var(--bg-facade-2)"
-            stroke="var(--gold)"
+            stroke="var(--building-accent)"
             strokeWidth="1.5"
           />
 
           <text x={signCX} y={wordY} textAnchor="middle" className="jpc-sign-word" fill="var(--sign-glow)" fontSize="38" filter="url(#jpc-softGlow)" ref={wordRef}>
-            JOTAPUNTOCE
+            {companyName}
           </text>
           <rect x={signCX - 30} y={wordY + 12} width="60" height="2.4" rx="1.2" fill="var(--accent-2)" />
-          {tagX !== null && (
+          {tagX !== null && slogan && (
             <text x={tagX} y={wordY + 30} textAnchor="end" className="jpc-sign-tagline" fill="var(--gold)" fontSize="15">
-              Eficiencia con Propósito
+              {slogan}
             </text>
           )}
 
           <g>
             {Array.from({ length: ROWS }).map((_, row) =>
               Array.from({ length: COLS }).map((_, col) => {
-                const meta = CELL_META[`${row},${col}`];
+                const meta = cellMeta[`${row},${col}`];
                 const c = cellCenter(row, col);
                 const wx = c.x - WIN / 2;
                 const wy = c.y - WIN / 2;
-                const isAmbient = !meta && AMBIENT_WINDOWS.some((a) => a.row === row && a.col === col);
+                const isAmbient = !meta && ambientWindows.some((a) => a.row === row && a.col === col);
 
                 if (!meta) {
                   return (
@@ -346,27 +366,29 @@ export default function JotaPuntoCeBuilding({ onEnter }) {
                   <g
                     key={`${row},${col}`}
                     className="jpc-window-turn"
-                    style={{ animationDelay: `${meta.seq * STAGGER}s`, animationDuration: `${CYCLE}s` }}
+                    style={{ animationDelay: `${meta.seq * STAGGER}s`, animationDuration: `${cycle}s` }}
                   >
-                    <rect x={wx} y={wy} width={WIN} height={WIN} rx="3" fill={meta.zone.color} stroke="var(--border-window)" strokeWidth="1" filter="url(#jpc-softGlow)" />
-                    <use href={`#jpc-ic-${meta.zone.key}`} x={wx + WIN * 0.14} y={wy + WIN * 0.1} width={WIN * 0.72} height={WIN * 0.82} />
+                    <rect x={wx} y={wy} width={WIN} height={WIN} rx="3" fill={meta.area.color} stroke="var(--border-window)" strokeWidth="1" filter="url(#jpc-softGlow)" />
+                    <use href={`#jpc-ic-${meta.area.silhouette ?? "generica"}`} x={wx + WIN * 0.14} y={wy + WIN * 0.1} width={WIN * 0.72} height={WIN * 0.82} />
                   </g>
                 );
               }),
             )}
           </g>
 
-          <path d={circuitPath()} fill="none" stroke="var(--gold)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
-          {CIRCUIT_POINTS.map((pt, i) => (
-            <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={ZONES[i].color} />
+          <path d={circuitD} fill="none" stroke="var(--building-accent)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
+          {circuitPoints.map((pt, i) => (
+            // circuitPoints se deriva de areas.map(...) arriba, así que circuitPoints.length ===
+            // areas.length siempre — areas[i]! es seguro por construcción.
+            <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={areas[i]!.color} />
           ))}
 
           {[-1, 1].map((side) => {
             const dx = DOOR_CX + (side * DOOR_GAP) / 2 + (side < 0 ? -DOOR_W : 0);
             return (
               <g key={side}>
-                <rect x={dx} y={DOOR_Y} width={DOOR_W} height={DOOR_H} rx="2" fill="var(--bg-facade-2)" stroke="var(--gold)" strokeWidth="1.4" />
-                <circle cx={side < 0 ? dx + DOOR_W - 7 : dx + 7} cy={DOOR_Y + DOOR_H / 2} r="1.6" fill="var(--gold)" />
+                <rect x={dx} y={DOOR_Y} width={DOOR_W} height={DOOR_H} rx="2" fill="var(--bg-facade-2)" stroke="var(--building-accent)" strokeWidth="1.4" />
+                <circle cx={side < 0 ? dx + DOOR_W - 7 : dx + 7} cy={DOOR_Y + DOOR_H / 2} r="1.6" fill="var(--building-accent)" />
               </g>
             );
           })}
