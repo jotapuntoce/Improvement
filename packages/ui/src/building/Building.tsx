@@ -208,10 +208,13 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
       return { x: sum.x / a.cells.length, y: sum.y / a.cells.length };
     });
 
-    let d = points.length ? `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}` : "";
+    // Non-null assertions: `p` siempre recorre [1, points.length), así que `p - 1` y `p` siempre
+    // caen dentro del arreglo — noUncheckedIndexedAccess no puede probarlo por sí solo (mismo
+    // patrón ya usado en distributeCells más abajo en este mismo módulo hermano, buildingGraph.ts).
+    let d = points.length ? `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}` : "";
     for (let p = 1; p < points.length; p++) {
-      const prev = points[p - 1];
-      const cur = points[p];
+      const prev = points[p - 1]!;
+      const cur = points[p]!;
       const midX = (prev.x + cur.x) / 2;
       d += ` L ${midX.toFixed(1)} ${prev.y.toFixed(1)} L ${midX.toFixed(1)} ${cur.y.toFixed(1)} L ${cur.x.toFixed(1)} ${cur.y.toFixed(1)}`;
     }
@@ -374,7 +377,9 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
 
           <path d={circuitD} fill="none" stroke="var(--gold)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
           {circuitPoints.map((pt, i) => (
-            <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={areas[i].color} />
+            // circuitPoints se deriva de areas.map(...) arriba, así que circuitPoints.length ===
+            // areas.length siempre — areas[i]! es seguro por construcción.
+            <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={areas[i]!.color} />
           ))}
 
           {[-1, 1].map((side) => {
