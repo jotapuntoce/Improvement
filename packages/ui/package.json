@@ -10,7 +10,7 @@
     "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx"
   },
   "peerDependencies": {
-    "react": "19.2.8"
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "typescript": "~6.0.3",

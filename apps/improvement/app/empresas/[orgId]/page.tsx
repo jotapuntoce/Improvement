@@ -4,8 +4,8 @@ import { BuildingExperience } from "./BuildingExperience.tsx";
 
 export default async function EmpresaBuildingPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
-  await requireOrgMembership(orgId);
-  const graph = await loadBuilding(orgId);
+  const memberRow = await requireOrgMembership(orgId);
+  const graph = await loadBuilding(memberRow.userId, orgId);
 
   return <BuildingExperience orgId={orgId} graph={graph} />;
 }

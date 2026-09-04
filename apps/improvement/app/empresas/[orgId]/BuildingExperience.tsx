@@ -29,12 +29,19 @@ export function BuildingExperience({ orgId, graph }: { orgId: string; graph: Bui
           </button>
         </Reception>
       ) : (
-        <Building
-          companyName={graph.companyName}
-          slogan={graph.slogan ?? undefined}
-          areas={graph.areas}
-          onEnter={() => setEntered(true)}
-        />
+        <>
+          {graph.areas.length === 0 && (
+            <p style={{ color: "var(--text-muted)", textAlign: "center" }}>
+              Tu empresa digital todavía no tiene áreas configuradas.
+            </p>
+          )}
+          <Building
+            companyName={graph.companyName}
+            slogan={graph.slogan ?? undefined}
+            areas={graph.areas}
+            onEnter={() => setEntered(true)}
+          />
+        </>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
 "use client";
 
-// Fachada nocturna de JotaPuntoCe — puerto real (React/JSX) del prototipo validado en Claude
-// Artifacts. Seis áreas creativas, cada una con 3 ventanas que encienden una por una (nunca todas
-// juntas) siguiendo el orden real del circuito punteado, y un científico loco silueteado por
-// ventana con su propio gesto de "trabajando". Clic o Enter/Espacio dispara el zoom hacia la
-// puerta; LoginExperience.js decide cuándo desmontar esto y montar ReceptionLogin.
+// Fachada nocturna de un edificio corporativo genérico — puerto real (React/JSX) del prototipo
+// validado en Claude Artifacts. Áreas configurables por organización, cada una con sus ventanas
+// que encienden una por una (nunca todas juntas) siguiendo el orden real del circuito punteado, y
+// un científico loco silueteado por ventana con su propio gesto de "trabajando". Clic o
+// Enter/Espacio dispara el zoom hacia la puerta; el componente que la monta decide cuándo
+// desmontar esto y montar Reception.
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const COLS = 9;
@@ -94,11 +95,11 @@ function buildAmbientWindows(cellMeta: Record<string, unknown>) {
 }
 
 /**
- * Seis científicos locos, 0 0 24 24, silueta 100% sólida (#04060d — "tienen que estar
- * completamente de color negro porque es la sombra"). Pelo alborotado compartido (zigzag relleno,
- * no trazos delgados que se vean grises a escala de ventana), bata + piernas, un instrumento por
- * rol. Las clases jpc-gesture-* son la parte de la sombra que se mueve mientras la ventana está
- * encendida.
+ * Científicos locos, uno por rol de área (0 0 24 24), silueta 100% sólida (#04060d — "tienen que
+ * estar completamente de color negro porque es la sombra"). Pelo alborotado compartido (zigzag
+ * relleno, no trazos delgados que se vean grises a escala de ventana), bata + piernas, un
+ * instrumento por rol. Las clases jpc-gesture-* son la parte de la sombra que se mueve mientras la
+ * ventana está encendida.
  */
 function ScientistDefs() {
   return (
@@ -228,9 +229,9 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
     };
   }, [areas]);
 
-  // Alinea la última letra del tagline con el final de la "E" de JOTAPUNTOCE midiendo el ancho
-  // real ya con la tipografía cargada — antes de eso getBBox() reflejaría la fuente de reserva y
-  // descuadraría todo (mismo bug ya resuelto en el prototipo de Artifacts).
+  // Alinea la última letra del tagline con el final del nombre de la empresa en el rótulo
+  // midiendo el ancho real ya con la tipografía cargada — antes de eso getBBox() reflejaría la
+  // fuente de reserva y descuadraría todo (mismo bug ya resuelto en el prototipo de Artifacts).
   useEffect(() => {
     let cancelled = false;
     function measure() {
@@ -321,7 +322,7 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
             height="16"
             rx="3"
             fill="var(--bg-facade-2)"
-            stroke="var(--gold)"
+            stroke="var(--building-accent)"
             strokeWidth="1.5"
           />
 
@@ -375,7 +376,7 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
             )}
           </g>
 
-          <path d={circuitD} fill="none" stroke="var(--gold)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
+          <path d={circuitD} fill="none" stroke="var(--building-accent)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
           {circuitPoints.map((pt, i) => (
             // circuitPoints se deriva de areas.map(...) arriba, así que circuitPoints.length ===
             // areas.length siempre — areas[i]! es seguro por construcción.
