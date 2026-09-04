@@ -391,34 +391,45 @@ export async function requirePlatformAdminSession(): Promise<string> {
 
 - [ ] **Step 4: Agregar los tests**
 
-En `apps/improvement/tests/auth/guard.test.ts`, agregar (sin tocar nada existente en el archivo):
+`apps/improvement/tests/auth/guard.test.ts` ya define, arriba en el archivo, un helper
+`makeProfile(id, email)` (`db.insert(profile).values({ id, email }).returning()`) y un array
+`createdProfileIds` que su `afterEach` limpia con `db.delete(profile)` — el archivo NUNCA usa
+Supabase Auth real ni `supabaseAdmin` para fixtures, solo filas de `profile` insertadas directo con
+`crypto.randomUUID()`. Seguir exactamente ese mismo patrón aquí — `makeProfile` no acepta
+`isPlatformAdmin` como parámetro, así que ese campo se setea con un segundo `db.update` después de
+crear la fila, o insertando la fila directo con `db.insert(profile)` en vez de `makeProfile`. En
+`apps/improvement/tests/auth/guard.test.ts`, agregar (sin tocar nada existente en el archivo):
 
 ```ts
 import { isPlatformAdmin } from "../../server/auth/guard.ts";
 
 describe("isPlatformAdmin", () => {
   it("WHEN el profile tiene is_platform_admin=true THE SYSTEM SHALL devolver true", async () => {
-    // Reutiliza el mismo profile de platform admin real que ya usan los otros tests de este
-    // archivo para el caso is_platform_admin=true (ver setup existente arriba) — no crear uno
-    // nuevo, solo llamar isPlatformAdmin con ese mismo userId.
+    const userId = crypto.randomUUID();
+    await db.insert(profile).values({ id: userId, email: `${userId}@example.com`, isPlatformAdmin: true });
+    createdProfileIds.push(userId);
+
+    expect(await isPlatformAdmin(userId)).toBe(true);
   });
 
-  it("WHEN el profile tiene is_platform_admin=false o no existe THE SYSTEM SHALL devolver false", async () => {
-    expect(await isPlatformAdmin("00000000-0000-0000-0000-000000000000")).toBe(false);
+  it("WHEN el profile tiene is_platform_admin=false THE SYSTEM SHALL devolver false", async () => {
+    const userId = crypto.randomUUID();
+    await makeProfile(userId, `${userId}@example.com`); // isPlatformAdmin default false
+    createdProfileIds.push(userId);
+
+    expect(await isPlatformAdmin(userId)).toBe(false);
+  });
+
+  it("WHEN el profile no existe THE SYSTEM SHALL devolver false, nunca lanzar", async () => {
+    expect(await isPlatformAdmin(crypto.randomUUID())).toBe(false);
   });
 });
 ```
 
-**Nota para quien implemente:** el primer test de arriba necesita el userId real de un platform
-admin — leer el resto de `guard.test.ts` primero para ver cómo los tests existentes obtienen o
-crean ese dato (ya hay al menos un test en este archivo que ejercita el flag
-`is_platform_admin=true`), y reutilizar exactamente esa misma fuente de dato, no inventar un
-profile nuevo ni hardcodear un email real de este entorno.
-
 - [ ] **Step 5: Correr los tests**
 
 Run: `pnpm --filter @jotapuntoce/improvement exec vitest run tests/auth/guard.test.ts`
-Expected: PASS, todos los tests (existentes + los 2 nuevos).
+Expected: PASS, todos los tests (existentes + los 3 nuevos).
 
 - [ ] **Step 6: Lint + typecheck**
 
@@ -675,7 +686,11 @@ const PRESET_TOKENS: Record<AvatarColorPreset, [string, string]> = {
 
 export interface AvatarIconProps {
   name: string;
-  avatarColor?: AvatarColorPreset;
+  // string | null, no AvatarColorPreset: viene directo de profile.avatarColor (columna de texto
+  // sin restricción a nivel de tipo — ver ClientSummary.avatarColor en clientList.ts, Task 2). Este
+  // componente valida internamente cuáles son los 4 valores reales; cualquier otro (incluido null,
+  // el estado "todavía no personalizado", o un valor inesperado) cae al degradado Aurora.
+  avatarColor?: string | null;
   size?: number;
 }
 
@@ -692,8 +707,12 @@ function initialsFor(name: string): string {
   return (words[0]!.charAt(0) + words[words.length - 1]!.charAt(0)).toUpperCase();
 }
 
-export function AvatarIcon({ name, avatarColor = "aurora", size = 96 }: AvatarIconProps) {
-  const [c1, c2] = PRESET_TOKENS[avatarColor];
+function isAvatarColorPreset(value: string): value is AvatarColorPreset {
+  return value in PRESET_TOKENS;
+}
+
+export function AvatarIcon({ name, avatarColor, size = 96 }: AvatarIconProps) {
+  const [c1, c2] = avatarColor && isAvatarColorPreset(avatarColor) ? PRESET_TOKENS[avatarColor] : PRESET_TOKENS.aurora;
   const initialsFontSize = Math.round(size * 0.36);
 
   return (
@@ -764,10 +783,17 @@ inalcanzable en un test fuera de un request real de Next, mismo problema ya resu
 usa `cookies()`, no el wrapper). Aquí el mismo patrón: `setAvatarColorForUser(userId, preset)` es la
 lógica de negocio pura, testeable sin sesión real — Step 3 la exporta desde el mismo archivo.
 
+**No usar Supabase Auth ni `supabaseAdmin` para el fixture de usuario** — ese export no existe en
+`@jotapuntoce/db` (es exclusivo de `apps/admin/lib/db.js`, con la service-role key, que
+`apps/improvement` nunca importa — ver `CLAUDE.md`, Non-negotiable #3). El patrón real y ya
+establecido en este mismo directorio de tests (`apps/improvement/tests/auth/guard.test.ts`,
+función `makeProfile`) es insertar la fila de `profile` directo con `crypto.randomUUID()`, sin
+ninguna llamada a Supabase Auth:
+
 ```ts
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { db, supabaseAdmin } from "@jotapuntoce/db";
+import { db } from "@jotapuntoce/db";
 import { profile } from "@jotapuntoce/db/schema";
 import { setAvatarColorForUser } from "../server/profile/updateAvatarColor.ts";
 
@@ -776,17 +802,14 @@ const createdProfileIds: string[] = [];
 afterEach(async () => {
   for (const userId of createdProfileIds.splice(0)) {
     await db.delete(profile).where(eq(profile.id, userId));
-    await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
   }
 });
 
 async function insertTestProfile() {
-  const email = `test-avatar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({ email, password: "TestPass!123", email_confirm: true });
-  if (error || !data.user) throw new Error(`No se pudo crear el usuario de prueba: ${error?.message}`);
-  await db.insert(profile).values({ id: data.user.id, email, fullName: "Test User" });
-  createdProfileIds.push(data.user.id);
-  return data.user.id;
+  const userId = crypto.randomUUID();
+  await db.insert(profile).values({ id: userId, email: `${userId}@example.com`, fullName: "Test User" });
+  createdProfileIds.push(userId);
+  return userId;
 }
 
 describe("setAvatarColorForUser", () => {
@@ -1008,7 +1031,7 @@ export function ClientPicker({ clients }: { clients: ClientSummary[] }) {
           className="empresas-tile"
           onClick={() => router.push(`/empresas/clientes/${c.clientUserId}`)}
         >
-          <AvatarIcon name={c.name} avatarColor={c.avatarColor ?? undefined} />
+          <AvatarIcon name={c.name} avatarColor={c.avatarColor} />
         </button>
       ))}
     </div>
@@ -1171,9 +1194,14 @@ Confirmar:
 
 - [ ] **Step 3: Verificación visual — flujo de un cliente normal**
 
-Con una cuenta que NO sea platform admin (ej. reutilizar el patrón de datos sintéticos de
-verificaciones anteriores: crear un usuario + org + membership de prueba, iniciar sesión,
-verificar, limpiar después):
+Con una cuenta que NO sea platform admin: usar `createTestAuthUser(email, password)` y
+`signInTestUser(email, password)` de `@jotapuntoce/db/test-fixtures` (ya existen, ver
+`packages/db/src/testFixtures.ts` — mismo helper que usa `tests/e2e/a11y.spec.ts` para sesiones
+reales de prueba) para crear el usuario y obtener un `access_token` real; crear una `organization` +
+`membership(role='owner')` de prueba directo con `db.insert(...)`; setear la cookie `sb-access-token`
+en el Browser tool con ese token (`getSessionUserId()` la lee tal cual, ver
+`server/auth/guard.ts`); navegar a `/empresas`. Al terminar, limpiar con `deleteTestAuthUser(userId)`
+y borrando las filas de `organization`/`membership`/`profile` insertadas.
 - `/empresas` sigue mostrando el `CompanyPicker` de siempre — sin el panel de Clientes, sin cambio
   de comportamiento respecto a antes de este plan.
 - "Personalizar mi ícono" también está disponible aquí, y afecta solo su propio `avatar_color`.
