@@ -142,8 +142,12 @@ export async function resolveSection(
   section: SectionSlug,
 ): Promise<{ membership: Awaited<ReturnType<typeof assertMembership>>; scope: Scope }> {
   const row = await assertMembership(userId, orgId);
-  if (row.role === "owner") return { membership: row, scope: "empresa" };
-  if (!row.permissionTypeId) return { membership: row, scope: "ninguno" };
+  // Dueño, o miembro sin tipo asignado: scopeFor ya resuelve ambos casos con grants=null (owner
+  // siempre "empresa", sin tipo siempre "ninguno") — se evita la consulta a permission_type, pero
+  // el valor lo decide scopeFor, nunca un literal repetido aquí.
+  if (row.role === "owner" || !row.permissionTypeId) {
+    return { membership: row, scope: scopeFor(row.role, null, section) };
+  }
 
   const [type] = await db
     .select({ grants: permissionType.grants })

@@ -216,4 +216,17 @@ describe("resolveSection", () => {
     const { scope } = await resolveSection(ownerId, org.id, "clientes");
     expect(scope).toBe("empresa");
   });
+
+  it("WHEN el miembro no tiene tipo de permiso asignado THE SYSTEM SHALL devolver `ninguno`", async () => {
+    const org = await newOrg("Test Org Resolve Sin Tipo");
+    const employeeId = crypto.randomUUID();
+    await db.insert(profile).values({ id: employeeId, email: `${employeeId}@example.com` });
+    createdProfileIds.push(employeeId);
+    await db
+      .insert(membership)
+      .values({ userId: employeeId, orgId: org.id, role: "employee", acceptedAt: new Date() });
+
+    const { scope } = await resolveSection(employeeId, org.id, "objetivos");
+    expect(scope).toBe("ninguno");
+  });
 });
