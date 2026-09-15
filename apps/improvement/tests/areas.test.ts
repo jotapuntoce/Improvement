@@ -85,6 +85,55 @@ describe("removeArea", () => {
       expect(result.ok).toBe(false);
     },
   );
+
+  it(
+    "WHEN el dueño de OTRA empresa manda el id de un área ocupada THE SYSTEM SHALL responder " +
+      "NOT_FOUND, no la validación de \"todavía tiene objetivos\" — lo contrario le confirmaría a un " +
+      "dueño que un área ajena existe y está ocupada",
+    async () => {
+      const a = await orgConDueno("Test Org Areas Cross A");
+      const b = await orgConDueno("Test Org Areas Cross B");
+
+      const creada = await createArea(b.ownerId, b.org.id, "Obra B", "#22d3ee");
+      if (!creada.ok) throw new Error("createArea falló");
+
+      await db.insert(objective).values({
+        orgId: b.org.id,
+        areaId: creada.data,
+        title: "Objetivo de B",
+        impactWeight: 50,
+        dueDate: new Date(),
+      });
+
+      const result = await removeArea(a.ownerId, a.org.id, creada.data);
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("NOT_FOUND");
+
+      const [row] = await db.select().from(area).where(sql`${area.id} = ${creada.data}`);
+      expect(row).toBeDefined();
+    },
+  );
+
+  it(
+    "WHEN el área todavía tiene una persona asignada THE SYSTEM SHALL negarse a borrarla — un " +
+      "empleado con alcance `area` sin área deja de ver su propio trabajo",
+    async () => {
+      const { org, ownerId, employeeId } = await orgConDueno("Test Org Areas Con Gente");
+      const created = await createArea(ownerId, org.id, "Soporte", "#10b981");
+      if (!created.ok) throw new Error("createArea falló");
+
+      await db
+        .update(membership)
+        .set({ areaId: created.data })
+        .where(sql`${membership.userId} = ${employeeId} AND ${membership.orgId} = ${org.id}`);
+
+      const result = await removeArea(ownerId, org.id, created.data);
+      expect(result.ok).toBe(false);
+
+      const [row] = await db.select().from(area).where(sql`${area.id} = ${created.data}`);
+      expect(row).toBeDefined();
+    },
+  );
 });
 
 describe("renameArea", () => {

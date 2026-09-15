@@ -66,12 +66,21 @@ export async function removeArea(userId: string, orgId: string, areaId: string):
     return fail("Solo el dueño define las áreas.", "FORBIDDEN");
   }
 
-  const [objetivos] = await db.select({ value: count() }).from(objective).where(eq(objective.areaId, areaId));
+  // orgId en ambos where y no solo areaId: sin él, un areaId de otra empresa cuenta filas reales de
+  // esa otra empresa y la respuesta ("todavía tiene objetivos") le confirma a un dueño que un área
+  // ajena existe y está ocupada — mismo criterio que ya aplicaba el delete de abajo.
+  const [objetivos] = await db
+    .select({ value: count() })
+    .from(objective)
+    .where(and(eq(objective.areaId, areaId), eq(objective.orgId, orgId)));
   if ((objetivos?.value ?? 0) > 0) {
     return fail("Esa área todavía tiene objetivos. Muévelos antes de borrarla.");
   }
 
-  const [gente] = await db.select({ value: count() }).from(membership).where(eq(membership.areaId, areaId));
+  const [gente] = await db
+    .select({ value: count() })
+    .from(membership)
+    .where(and(eq(membership.areaId, areaId), eq(membership.orgId, orgId)));
   if ((gente?.value ?? 0) > 0) {
     return fail("Esa área todavía tiene gente. Cámbialos de área antes de borrarla.");
   }
