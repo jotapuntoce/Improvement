@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, membership, objective, organization, permissionType, profile } from "@jotapuntoce/db/schema";
+import { grantsSchema, scopeFor } from "../server/permissions/sections.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -126,5 +127,41 @@ describe("RLS — objective por tipo de permiso", () => {
 
     const rows = await asUser(ownerId, `select title from objective where org_id = '${org.id}'`);
     expect(rows.length).toBe(2);
+  });
+});
+
+describe("scopeFor", () => {
+  it("WHEN el miembro es dueño THE SYSTEM SHALL darle `empresa` en toda sección, aun sin tipo", () => {
+    expect(scopeFor("owner", null, "objetivos")).toBe("empresa");
+    expect(scopeFor("owner", { objetivos: "ninguno" }, "objetivos")).toBe("empresa");
+  });
+
+  it("WHEN el miembro no tiene tipo THE SYSTEM SHALL devolver `ninguno`", () => {
+    expect(scopeFor("employee", null, "objetivos")).toBe("ninguno");
+  });
+
+  it("WHEN el mapa no menciona la sección THE SYSTEM SHALL devolver `ninguno`, no `empresa`", () => {
+    expect(scopeFor("employee", { objetivos: "empresa" }, "clientes")).toBe("ninguno");
+  });
+
+  it("WHEN el mapa concede un alcance THE SYSTEM SHALL devolverlo tal cual", () => {
+    expect(scopeFor("employee", { objetivos: "area" }, "objetivos")).toBe("area");
+  });
+});
+
+describe("grantsSchema", () => {
+  it(
+    "WHEN se guarda un alcance que esa sección no sabe filtrar THE SYSTEM SHALL rechazarlo al " +
+      "guardar — `clientes` no tiene área ni responsable de quien colgarse",
+    () => {
+      expect(grantsSchema.safeParse({ clientes: "propio" }).success).toBe(false);
+      expect(grantsSchema.safeParse({ objetivos: "propio" }).success).toBe(true);
+    },
+  );
+
+  it("WHEN el mapa trae una sección que no existe THE SYSTEM SHALL ignorarla, no lanzar", () => {
+    const parsed = grantsSchema.safeParse({ inventada: "empresa", objetivos: "area" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.objetivos).toBe("area");
   });
 });
