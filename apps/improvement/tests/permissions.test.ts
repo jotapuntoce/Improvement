@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, membership, objective, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { grantsSchema, scopeFor } from "../server/permissions/sections.ts";
+import { resolveSection } from "../server/auth/guard.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -163,5 +164,56 @@ describe("grantsSchema", () => {
     const parsed = grantsSchema.safeParse({ inventada: "empresa", objetivos: "area" });
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data.objetivos).toBe("area");
+  });
+});
+
+describe("resolveSection", () => {
+  it(
+    "WHEN el miembro tiene un tipo con alcance `area` THE SYSTEM SHALL devolver ese alcance junto " +
+      "con su membresía — el loader nunca adivina el alcance, se lo dan",
+    async () => {
+      const org = await newOrg("Test Org Resolve");
+      const [areaSuya] = await db
+        .insert(area)
+        .values({ orgId: org.id, name: "Postventa", color: "#10b981" })
+        .returning();
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Postventa", grants: { objetivos: "area", clientes: "ninguno" } })
+        .returning();
+      if (!areaSuya || !tipo) throw new Error("insert no devolvió fila");
+
+      const employeeId = crypto.randomUUID();
+      await db.insert(profile).values({ id: employeeId, email: `${employeeId}@example.com` });
+      createdProfileIds.push(employeeId);
+      await db.insert(membership).values({
+        userId: employeeId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        areaId: areaSuya.id,
+        acceptedAt: new Date(),
+      });
+
+      const objetivos = await resolveSection(employeeId, org.id, "objetivos");
+      expect(objetivos.scope).toBe("area");
+      expect(objetivos.membership.areaId).toBe(areaSuya.id);
+
+      const clientes = await resolveSection(employeeId, org.id, "clientes");
+      expect(clientes.scope).toBe("ninguno");
+    },
+  );
+
+  it("WHEN el miembro es dueño THE SYSTEM SHALL devolver `empresa` sin consultar ningún tipo", async () => {
+    const org = await newOrg("Test Org Resolve Dueno");
+    const ownerId = crypto.randomUUID();
+    await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+    createdProfileIds.push(ownerId);
+    await db
+      .insert(membership)
+      .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+    const { scope } = await resolveSection(ownerId, org.id, "clientes");
+    expect(scope).toBe("empresa");
   });
 });
