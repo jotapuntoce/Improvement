@@ -91,6 +91,11 @@ export default async function PermisosPage({ params }: { params: Promise<{ org: 
             aria-label={`Nombre del tipo ${tipo.name}`}
             className="config-input"
           />
+          <p className="config-hint">
+            {tipo.assignedCount === 0
+              ? "Nadie tiene este tipo asignado."
+              : `Asignado a ${tipo.assignedCount} persona${tipo.assignedCount === 1 ? "" : "s"}.`}
+          </p>
           <div className="permiso-grid">
             {SECTIONS.map((section) => (
               <label key={section.slug} className="permiso-field">
@@ -109,12 +114,18 @@ export default async function PermisosPage({ params }: { params: Promise<{ org: 
               </label>
             ))}
           </div>
+          {tipo.assignedCount > 0 && (
+            <p className="invite-error">
+              Si lo borras, {tipo.assignedCount} persona{tipo.assignedCount === 1 ? "" : "s"} se
+              queda{tipo.assignedCount === 1 ? "" : "n"} sin ver nada hasta que le asignes otro tipo.
+            </p>
+          )}
           <div className="permiso-actions">
             <button type="submit" className="panel-cta">
               Guardar
             </button>
             <button type="submit" formAction={borrar} className="panel-btn-ghost config-btn--danger">
-              Borrar
+              {tipo.assignedCount > 0 ? `Borrar (afecta a ${tipo.assignedCount})` : "Borrar"}
             </button>
           </div>
         </form>
