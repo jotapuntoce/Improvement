@@ -262,6 +262,60 @@ describe("acceptInvitation", () => {
       expect(perfiles.length).toBe(0);
     },
   );
+
+  it(
+    "WHEN quien acepta YA es miembro de esta empresa THE SYSTEM SHALL rechazar con ALREADY_MEMBER " +
+      "sin tocar su membresía ni consumir el enlace — nada impide hoy invitar de nuevo a un correo " +
+      "que ya está adentro, y cambiarle el puesto o el tipo de permiso con lo que teclee en un " +
+      "formulario es decisión del dueño, no de un enlace",
+    async () => {
+      const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Ya Miembro");
+
+      const [tipoNuevo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Supervisor", grants: { objetivos: "area" } })
+        .returning();
+      if (!tipoNuevo) throw new Error("insert de permission_type no devolvió fila");
+
+      const miembroId = crypto.randomUUID();
+      await db.insert(profile).values({ id: miembroId, email: "yamiembro@example.com" });
+      createdProfileIds.push(miembroId);
+      await db.insert(membership).values({
+        userId: miembroId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        jobTitle: "Puesto original",
+        responsibilities: "Responsabilidades originales",
+        acceptedAt: new Date(),
+      });
+
+      const emitida = await createInvitation(ownerId, org.id, "yamiembro@example.com", tipoNuevo.id);
+      if (!emitida.ok) throw new Error("createInvitation falló");
+
+      const result = await acceptInvitation(
+        emitida.data.token,
+        { id: miembroId, email: "yamiembro@example.com" },
+        { ...formValido, jobTitle: "Puesto nuevo del formulario" },
+      );
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("ALREADY_MEMBER");
+
+      const [row] = await db
+        .select()
+        .from(membership)
+        .where(and(eq(membership.userId, miembroId), eq(membership.orgId, org.id)));
+      expect(row?.permissionTypeId).toBe(tipo.id);
+      expect(row?.jobTitle).toBe("Puesto original");
+      expect(row?.areaId).toBeNull();
+
+      const [inv] = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.tokenHash, hashToken(emitida.data.token)));
+      expect(inv?.acceptedAt).toBeNull();
+    },
+  );
 });
 
 describe("findOpenInvitation", () => {

@@ -122,6 +122,21 @@ export async function acceptInvitation(
     if (!areaPropia) return fail("Esa área no es de esta empresa.", "NOT_FOUND");
   }
 
+  // Nada impide hoy que el dueño invite otra vez a un correo que ya está adentro (createInvitation
+  // no lo comprueba). Sin este chequeo, el insert de membership de abajo chocaría en silencio contra
+  // uq_membership_user_org (.onConflictDoNothing(), sin .returning()) y la persona creería que su
+  // puesto, área y tipo de permiso quedaron como dice el formulario — siguen siendo los viejos.
+  // Rechazamos explícito en vez de sobrescribir: cambiarle el acceso a un empleado que ya está dentro
+  // es decisión del dueño, con su propia pantalla, no algo que un enlace resuelva solo.
+  const [yaMiembro] = await db
+    .select({ userId: membership.userId })
+    .from(membership)
+    .where(and(eq(membership.userId, sessionUser.id), eq(membership.orgId, inv.orgId)))
+    .limit(1);
+  if (yaMiembro) {
+    return fail("Ya eres parte de esta empresa. Entra desde /login.", "ALREADY_MEMBER");
+  }
+
   try {
     return await db.transaction(async (tx) => {
       // El reclamo del enlace va PRIMERO: si dos personas abren el mismo enlace a la vez, la carrera
