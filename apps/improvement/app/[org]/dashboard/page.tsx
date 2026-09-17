@@ -6,15 +6,17 @@
 // la navegación.
 import { isPlatformAdmin, requireOrgMembership } from "@/server/auth/guard";
 import { loadDashboardScene } from "@/server/scene/loadDashboardScene";
+import { loadVisibleSections } from "@/server/permissions/loadSections";
 import { DashboardNav } from "./DashboardNav.tsx";
 import { SceneList } from "./SceneList.tsx";
 
 export default async function DashboardPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
   const memberRow = await requireOrgMembership(orgId);
-  const [graph, admin] = await Promise.all([
+  const [graph, admin, sections] = await Promise.all([
     loadDashboardScene(memberRow.userId, orgId),
     isPlatformAdmin(memberRow.userId),
+    loadVisibleSections(memberRow.userId, orgId),
   ]);
 
   return (
@@ -33,7 +35,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
       }}
     >
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Tu empresa</h1>
-      <DashboardNav orgId={orgId} showPlanos={admin} />
+      <DashboardNav orgId={orgId} sections={sections} showPlanos={admin} />
       <SceneList graph={graph} />
     </main>
   );

@@ -14,8 +14,9 @@ import {
   updateMyFullName,
   updateMyOwnerLabel,
 } from "@/server/profile/mutations.ts";
-import { updateCompanyIndustry } from "@/server/companies/mutations.ts";
+import { setSectionLabels, updateCompanyIndustry } from "@/server/companies/mutations.ts";
 import { loadCompanies } from "@/server/companies/loadCompanies.ts";
+import { SECTIONS } from "@/server/permissions/sections.ts";
 import { listMyPayments, formatMoney } from "@/server/billing/payments.ts";
 import { uploadAvatar } from "@/server/storage/avatar.ts";
 import { loadOrgKpis, type KpiCard } from "@/server/kpis/loadKpis.ts";
@@ -148,6 +149,24 @@ async function borrarArea(formData: FormData) {
   const areaId = formData.get("areaId")?.toString();
   if (!orgId || !areaId) return;
   await removeArea(id, orgId, areaId);
+  revalidatePath("/empresas/configuracion");
+}
+
+async function guardarSecciones(formData: FormData) {
+  "use server";
+  const id = await getSessionUserId();
+  if (!id) return;
+  const orgId = formData.get("orgId")?.toString();
+  if (!orgId) return;
+
+  const labels: Record<string, { label?: string; hidden?: boolean }> = {};
+  for (const section of SECTIONS) {
+    labels[section.slug] = {
+      label: formData.get(`label-${section.slug}`)?.toString() ?? "",
+      hidden: formData.get(`hidden-${section.slug}`) === "on",
+    };
+  }
+  await setSectionLabels(id, orgId, labels);
   revalidatePath("/empresas/configuracion");
 }
 
@@ -385,6 +404,39 @@ export default async function ConfiguracionPage() {
                 ))}
               </select>
               <button type="submit" className="panel-cta">Agregar área</button>
+            </form>
+          </section>,
+          <section key={`${c.orgId}-secciones`} className="config-card">
+            <h2 className="config-card-title">Cómo se llama todo en {c.name}</h2>
+            <p className="config-hint">
+              Ponle a cada sección el nombre que usas de verdad, y apaga las que no ocupes.
+            </p>
+            <form action={guardarSecciones} className="permiso-grid">
+              <input type="hidden" name="orgId" value={c.orgId} />
+              {SECTIONS.map((section) => {
+                const override = ((c.sectionLabels ?? {}) as Record<string, { label?: string; hidden?: boolean }>)[
+                  section.slug
+                ] ?? {};
+                return (
+                  <label key={section.slug} className="permiso-field">
+                    <span>{section.label}</span>
+                    <input
+                      name={`label-${section.slug}`}
+                      defaultValue={override.label ?? section.label}
+                      className="config-input"
+                    />
+                    <label className="config-hint">
+                      <input
+                        type="checkbox"
+                        name={`hidden-${section.slug}`}
+                        defaultChecked={override.hidden === true}
+                      />{" "}
+                      No la uso
+                    </label>
+                  </label>
+                );
+              })}
+              <button type="submit" className="panel-cta">Guardar nombres</button>
             </form>
           </section>,
         ];

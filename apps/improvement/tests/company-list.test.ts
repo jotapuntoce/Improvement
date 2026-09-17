@@ -24,8 +24,8 @@ describe("deriveStageLabel", () => {
 describe("buildCompanyList", () => {
   it("WHEN hay 2 organizaciones con etapas propias THE SYSTEM SHALL no mezclar las etapas de una con el resumen de la otra", () => {
     const orgs = [
-      { id: "org-a", name: "Camibel", industry: "servicios" },
-      { id: "org-b", name: "Afianza", industry: null },
+      { id: "org-a", name: "Camibel", industry: "servicios", sectionLabels: {} },
+      { id: "org-b", name: "Afianza", industry: null, sectionLabels: {} },
     ];
     const stagesA = [{ stageOrder: 1, stageName: "Análisis", status: "en_progreso" as const }];
     const stagesB = [{ stageOrder: 1, stageName: "Diseño", status: "completada" as const }];
@@ -39,6 +39,7 @@ describe("buildCompanyList", () => {
         orgId: "org-a",
         name: "Camibel",
         industry: "servicios",
+        sectionLabels: {},
         stageLabel: "Análisis",
         stages: stagesA,
         currentIndex: 0,
@@ -47,6 +48,7 @@ describe("buildCompanyList", () => {
         orgId: "org-b",
         name: "Afianza",
         industry: null,
+        sectionLabels: {},
         stageLabel: "Diseño",
         stages: stagesB,
         currentIndex: 0,
@@ -55,12 +57,13 @@ describe("buildCompanyList", () => {
   });
 
   it("WHEN una organización no tiene ninguna fila en stagesByOrgId THE SYSTEM SHALL devolverle 'Sin etapa activa', no lanzar", () => {
-    const orgs = [{ id: "org-a", name: "Camibel", industry: null }];
+    const orgs = [{ id: "org-a", name: "Camibel", industry: null, sectionLabels: {} }];
     expect(buildCompanyList(orgs, new Map())).toEqual([
       {
         orgId: "org-a",
         name: "Camibel",
         industry: null,
+        sectionLabels: {},
         stageLabel: "Sin etapa activa",
         stages: [],
         currentIndex: -1,

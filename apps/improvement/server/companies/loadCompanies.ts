@@ -7,7 +7,12 @@ import { buildCompanyList, type CompanySummary, type StageRow } from "./companyL
 
 export async function loadCompanies(userId: string): Promise<CompanySummary[]> {
   const orgs = await db
-    .select({ id: organization.id, name: organization.name, industry: organization.industry })
+    .select({
+      id: organization.id,
+      name: organization.name,
+      industry: organization.industry,
+      sectionLabels: organization.sectionLabels,
+    })
     .from(membership)
     .innerJoin(organization, eq(organization.id, membership.orgId))
     .where(eq(membership.userId, userId))

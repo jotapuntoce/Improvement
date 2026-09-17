@@ -1,10 +1,12 @@
 // Lo poco que el dueño puede cambiar de su propia empresa desde apps/improvement. Todo lo demás de
 // `organization` (nombre, slug, fases de construcción) lo mueve Jose Carlos desde apps/admin.
+import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization } from "@jotapuntoce/db/schema";
 import { isIndustry } from "@jotapuntoce/ui/building/industries.ts";
-import { assertMembership } from "../auth/guard.ts";
+import { assertMembership, findOwnerMembership } from "../auth/guard.ts";
+import { SECTIONS } from "../permissions/sections.ts";
 
 /**
  * El giro decide el ícono de la empresa en el panel (AppIconLarge elige su glyph con este valor),
@@ -37,4 +39,50 @@ export async function updateCompanyIndustry(userId: string, orgId: string, indus
   }
 
   return { ok: true as const, data: row };
+}
+
+const sectionLabelsInputSchema = z.record(
+  z.string(),
+  z.object({ label: z.string().optional(), hidden: z.boolean().optional() }),
+);
+
+/**
+ * Cómo llama el dueño a cada sección de SU empresa, y cuáles apaga. Solo las secciones conocidas se
+ * guardan: una llave inventada en el formulario no entra a la fila.
+ */
+export async function setSectionLabels(
+  userId: string,
+  orgId: string,
+  labels: Record<string, { label?: string; hidden?: boolean }>,
+): Promise<{ ok: true } | { ok: false; error: { code: string; message: string } }> {
+  if (!(await findOwnerMembership(userId, orgId))) {
+    return {
+      ok: false,
+      error: { code: "FORBIDDEN", message: "Solo el dueño personaliza su empresa." },
+    };
+  }
+
+  const parsed = sectionLabelsInputSchema.safeParse(labels);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: "Formato de secciones inválido." },
+    };
+  }
+
+  const limpio: Record<string, { label?: string; hidden?: boolean }> = {};
+  for (const section of SECTIONS) {
+    const entrada = parsed.data[section.slug];
+    if (!entrada) continue;
+    const nombre = entrada.label?.trim();
+    // Solo se guarda lo que cambia: un nombre igual al default no ensucia la fila.
+    if (nombre && nombre !== section.label) limpio[section.slug] = { label: nombre };
+    if (entrada.hidden) limpio[section.slug] = { ...(limpio[section.slug] ?? {}), hidden: true };
+  }
+
+  await db
+    .update(organization)
+    .set({ sectionLabels: limpio, updatedAt: new Date() })
+    .where(eq(organization.id, orgId));
+  return { ok: true };
 }

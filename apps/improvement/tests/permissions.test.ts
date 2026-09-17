@@ -15,6 +15,8 @@ import {
 } from "../server/permissions/mutations.ts";
 import { listObjectives } from "../server/objectives/mutations.ts";
 import { listTeammates } from "../server/employees/teammates.ts";
+import { loadVisibleSections } from "../server/permissions/loadSections.ts";
+import { setSectionLabels } from "../server/companies/mutations.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -721,4 +723,103 @@ describe("listTeammates con alcance", () => {
     const companeros = await listTeammates(userId, orgA.id);
     expect(companeros.some((c) => c.userId === deOtraEmpresa)).toBe(false);
   });
+});
+
+describe("loadVisibleSections", () => {
+  it(
+    "WHEN el dueño renombró una sección y apagó otra THE SYSTEM SHALL devolver el nombre suyo y " +
+      "omitir la apagada — nadie ve una puerta que no abre",
+    async () => {
+      const org = await newOrg("Test Org Secciones");
+      await db
+        .update(organization)
+        .set({ sectionLabels: { clientes: { label: "Obras" }, powerups: { hidden: true } } })
+        .where(sql`${organization.id} = ${org.id}`);
+
+      const ownerId = crypto.randomUUID();
+      await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+      createdProfileIds.push(ownerId);
+      await db
+        .insert(membership)
+        .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+      const secciones = await loadVisibleSections(ownerId, org.id);
+      const slugs = secciones.map((s) => s.slug);
+
+      expect(slugs).toContain("clientes");
+      expect(slugs).not.toContain("powerups");
+      expect(secciones.find((s) => s.slug === "clientes")?.label).toBe("Obras");
+    },
+  );
+
+  it(
+    "WHEN el empleado tiene `ninguno` en una sección THE SYSTEM SHALL omitirla del menú, aunque el " +
+      "dueño no la haya apagado",
+    async () => {
+      const org = await newOrg("Test Org Secciones Empleado");
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Solo objetivos", grants: { objetivos: "propio" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      await db.insert(profile).values({ id: userId, email: `${userId}@example.com` });
+      createdProfileIds.push(userId);
+      await db.insert(membership).values({
+        userId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        acceptedAt: new Date(),
+      });
+
+      const secciones = await loadVisibleSections(userId, org.id);
+      expect(secciones.map((s) => s.slug)).toEqual(["objetivos"]);
+    },
+  );
+});
+
+describe("setSectionLabels", () => {
+  it("WHEN quien llama no es el dueño THE SYSTEM SHALL rechazar con FORBIDDEN, sin escribir", async () => {
+    const org = await newOrg("Test Org Secciones Forbidden");
+    const employeeId = crypto.randomUUID();
+    await db.insert(profile).values({ id: employeeId, email: `${employeeId}@example.com` });
+    createdProfileIds.push(employeeId);
+    await db
+      .insert(membership)
+      .values({ userId: employeeId, orgId: org.id, role: "employee", acceptedAt: new Date() });
+
+    const result = await setSectionLabels(employeeId, org.id, { clientes: { label: "Obras" } });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error.code).toBe("FORBIDDEN");
+  });
+
+  it(
+    "WHEN el formulario trae una llave que no es una sección real THE SYSTEM SHALL ignorarla al " +
+      "guardar — una sección inventada no debe acabar en la fila",
+    async () => {
+      const org = await newOrg("Test Org Secciones Llave Inventada");
+      const ownerId = crypto.randomUUID();
+      await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+      createdProfileIds.push(ownerId);
+      await db
+        .insert(membership)
+        .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+      const result = await setSectionLabels(ownerId, org.id, {
+        inventada: { label: "No debería guardarse" },
+        clientes: { label: "Obras" },
+      });
+      expect(result.ok).toBe(true);
+
+      const [row] = await db
+        .select({ sectionLabels: organization.sectionLabels })
+        .from(organization)
+        .where(sql`${organization.id} = ${org.id}`);
+      const saved = (row?.sectionLabels ?? {}) as Record<string, unknown>;
+      expect(Object.keys(saved)).not.toContain("inventada");
+      expect(saved.clientes).toEqual({ label: "Obras" });
+    },
+  );
 });

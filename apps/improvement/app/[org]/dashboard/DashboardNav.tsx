@@ -1,35 +1,27 @@
-// Las secciones del org, desde el dashboard. Existía la ruta de cada una pero ningún botón llevaba
-// a ellas: se entraba al dashboard y el recorrido se acababa ahí, solo se llegaba escribiendo la URL.
+// Las secciones del org, desde el dashboard. La lista ya no vive aquí: la arma
+// server/permissions/loadSections.ts con el permiso de quien entra y los nombres que el dueño les
+// puso. Nadie ve una puerta que no abre.
 //
-// "Planos" no está en esta lista aunque la ruta exista: es herramienta de Jose Carlos (ver el guard
-// en [org]/planos/page.tsx), y showPlanos la muestra solo cuando la sesión es de platform admin.
-// Server Component: son enlaces, no hay estado que manejar.
+// "Planos" sigue aparte: es herramienta de Jose Carlos y no es una sección con tipo de permiso.
 import Link from "next/link";
+import type { VisibleSection } from "@/server/permissions/loadSections";
 
-interface Section {
-  slug: string;
-  label: string;
-  hint: string;
-}
-
-const CLIENT_SECTIONS: Section[] = [
-  { slug: "mapa", label: "Mapa de Construcción", hint: "En qué etapa va tu empresa digital" },
-  { slug: "objetivos", label: "Objetivos", hint: "Las metas del equipo y sus puntos" },
-  { slug: "equipo", label: "Equipo", hint: "Quién trabaja contigo" },
-  { slug: "clientes", label: "Clientes", hint: "Tu cartera y cómo va cada cuenta" },
-  { slug: "powerups", label: "PowerUps", hint: "Canjea los puntos que acumula tu equipo" },
-];
-
-const ADMIN_SECTIONS: Section[] = [
-  { slug: "planos", label: "Planos", hint: "Los proyectos como piezas conectadas" },
-];
-
-export function DashboardNav({ orgId, showPlanos }: { orgId: string; showPlanos: boolean }) {
-  const sections = showPlanos ? [...CLIENT_SECTIONS, ...ADMIN_SECTIONS] : CLIENT_SECTIONS;
+export function DashboardNav({
+  orgId,
+  sections,
+  showPlanos,
+}: {
+  orgId: string;
+  sections: VisibleSection[];
+  showPlanos: boolean;
+}) {
+  const all = showPlanos
+    ? [...sections, { slug: "planos", label: "Planos", hint: "Los proyectos como piezas conectadas" }]
+    : sections;
 
   return (
     <nav className="dash-nav" aria-label="Secciones de la empresa">
-      {sections.map((section) => (
+      {all.map((section) => (
         <Link key={section.slug} href={`/${orgId}/${section.slug}`} className="dash-nav-card">
           <span className="dash-nav-label">{section.label}</span>
           <span className="dash-nav-hint">{section.hint}</span>

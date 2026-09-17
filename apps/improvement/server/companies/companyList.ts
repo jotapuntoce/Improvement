@@ -11,12 +11,15 @@ export interface OrgRow {
   id: string;
   name: string;
   industry: string | null;
+  /** Cómo llama el dueño a cada sección y cuáles apagó — organization.section_labels tal cual. */
+  sectionLabels: unknown;
 }
 
 export interface CompanySummary {
   orgId: string;
   name: string;
   industry: string | null;
+  sectionLabels: unknown;
   stageLabel: string;
   /** Las 8 fases en orden — el tracker del panel las dibuja todas, no solo la actual. */
   stages: StageRow[];
@@ -75,6 +78,7 @@ export function buildCompanyList(orgs: OrgRow[], stagesByOrgId: Map<string, Stag
       orgId: org.id,
       name: org.name,
       industry: org.industry,
+      sectionLabels: org.sectionLabels,
       stageLabel: deriveStageLabel(stages),
       stages,
       currentIndex: deriveCurrentStageIndex(stages),
