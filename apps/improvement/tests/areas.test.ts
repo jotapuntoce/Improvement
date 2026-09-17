@@ -62,6 +62,34 @@ describe("createArea", () => {
     const { org, ownerId } = await orgConDueno("Test Org Areas Vacio");
     expect((await createArea(ownerId, org.id, "   ", "#f59e0b")).ok).toBe(false);
   });
+
+  it(
+    "WHEN el dueño crea dos áreas con el mismo nombre en la misma empresa THE SYSTEM SHALL rechazar " +
+      "la segunda con un Result tipado, no dejarla duplicarse en silencio",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Areas Duplicada");
+      const primera = await createArea(ownerId, org.id, "Ventas", "#f59e0b");
+      expect(primera.ok).toBe(true);
+
+      const result = await createArea(ownerId, org.id, "Ventas", "#22d3ee");
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("DUPLICATE_NAME");
+
+      const rows = await db.select().from(area).where(sql`${area.orgId} = ${org.id}`);
+      expect(rows.length).toBe(1);
+    },
+  );
+
+  it(
+    "WHEN el mismo nombre existe en OTRA empresa THE SYSTEM SHALL permitirlo — el nombre solo se " +
+      "cuida dentro de una misma empresa",
+    async () => {
+      const a = await orgConDueno("Test Org Areas Mismo Nombre A");
+      const b = await orgConDueno("Test Org Areas Mismo Nombre B");
+      expect((await createArea(a.ownerId, a.org.id, "Ventas", "#f59e0b")).ok).toBe(true);
+      expect((await createArea(b.ownerId, b.org.id, "Ventas", "#f59e0b")).ok).toBe(true);
+    },
+  );
 });
 
 describe("removeArea", () => {
@@ -149,4 +177,35 @@ describe("renameArea", () => {
     const [row] = await db.select().from(area).where(sql`${area.id} = ${creada.data}`);
     expect(row?.name).toBe("Obra");
   });
+
+  it(
+    "WHEN el dueño renombra un área al nombre de OTRA área de la misma empresa THE SYSTEM SHALL " +
+      "rechazarlo con DUPLICATE_NAME, sin tocar la fila",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Areas Rename Duplicado");
+      const uno = await createArea(ownerId, org.id, "Ventas", "#f59e0b");
+      const dos = await createArea(ownerId, org.id, "Soporte", "#22d3ee");
+      if (!uno.ok || !dos.ok) throw new Error("createArea falló");
+
+      const result = await renameArea(ownerId, org.id, dos.data, "Ventas");
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("DUPLICATE_NAME");
+
+      const [row] = await db.select().from(area).where(sql`${area.id} = ${dos.data}`);
+      expect(row?.name).toBe("Soporte");
+    },
+  );
+
+  it(
+    "WHEN el dueño renombra un área a SU PROPIO nombre actual THE SYSTEM SHALL permitirlo — no es un " +
+      "duplicado, es la misma fila",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Areas Rename Mismo Nombre");
+      const creada = await createArea(ownerId, org.id, "Ventas", "#f59e0b");
+      if (!creada.ok) throw new Error("createArea falló");
+
+      const result = await renameArea(ownerId, org.id, creada.data, "Ventas");
+      expect(result.ok).toBe(true);
+    },
+  );
 });

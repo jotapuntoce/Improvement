@@ -1,6 +1,6 @@
 // El dueño arma las áreas de SU empresa. Solo el dueño: el organigrama es una decisión de quien
 // dirige, y el área de cada empleado es lo que después decide qué ve (alcance `area`).
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, ne } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, membership, objective } from "@jotapuntoce/db/schema";
 import { findOwnerMembership } from "../auth/guard.ts";
@@ -15,6 +15,21 @@ function fail(message: string, code = "VALIDATION_ERROR"): Result<never> {
 // contraste del mapa y de las tarjetas (.claude/rules/tokens-de-diseno.md).
 const COLORES = ["#7c5cff", "#22d3ee", "#f59e0b", "#10b981", "#f87171"];
 
+/**
+ * WHEN ya existe un área con ese nombre en el mismo org THE SYSTEM SHALL devolver true. Pre-check y
+ * no try/catch sobre un código de Postgres como en permissions/mutations.ts: `area` no tiene un
+ * uniqueIndex(org_id, name) — nada en la base rechaza el duplicado, así que no hay excepción que
+ * atrapar. Es la misma carrera potencial que un uniqueIndex cerraría del todo, pero agregar uno es un
+ * cambio de esquema que esta tarea no pidió; este chequeo iguala el comportamiento que sí pidieron
+ * (rechazar el nombre repetido con un mensaje, no una excepción) sin tocar una migración.
+ */
+async function nameTaken(orgId: string, name: string, excludeAreaId?: string): Promise<boolean> {
+  const filters = [eq(area.orgId, orgId), eq(area.name, name)];
+  if (excludeAreaId) filters.push(ne(area.id, excludeAreaId));
+  const [row] = await db.select({ value: count() }).from(area).where(and(...filters));
+  return (row?.value ?? 0) > 0;
+}
+
 export async function createArea(
   userId: string,
   orgId: string,
@@ -27,6 +42,7 @@ export async function createArea(
 
   const nombre = name.trim();
   if (!nombre) return fail("El área necesita un nombre.");
+  if (await nameTaken(orgId, nombre)) return fail("Ya tienes un área con ese nombre.", "DUPLICATE_NAME");
   const tono = COLORES.includes(color) ? color : COLORES[0]!;
 
   const [row] = await db.insert(area).values({ orgId, name: nombre, color: tono }).returning({ id: area.id });
@@ -45,6 +61,9 @@ export async function renameArea(
 
   const nombre = name.trim();
   if (!nombre) return fail("El área necesita un nombre.");
+  if (await nameTaken(orgId, nombre, areaId)) {
+    return fail("Ya tienes un área con ese nombre.", "DUPLICATE_NAME");
+  }
 
   // orgId en el where y no solo el id: sin él, el id de un área de otra empresa sería editable por
   // quien fuera dueño de cualquier org (mismo criterio que server/kpis/mutations.ts).
