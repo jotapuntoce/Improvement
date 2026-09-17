@@ -66,13 +66,30 @@ export function AcceptForm({
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     const { data: signUp, error: signUpError } = await supabase.auth.signUp({ email, password });
 
-    if (signUpError || !signUp.session) {
-      setError("No se pudo crear tu cuenta. Puede que ya exista — entra desde /login.");
+    // CRITICAL 2 (revisión de rama): signUp() era la ÚNICA vía a tener sesión. Si signUp creaba la
+    // cuenta pero un reintento posterior la topaba con "user already registered" (p. ej. porque un
+    // primer intento con un dato inválido ya la había dado de alta en Auth, aunque accept() lo
+    // rechazara después), no había forma de recuperar la invitación — no existe ninguna ruta que
+    // acepte con sesión ya iniciada. El servidor ya está listo para esta persona (acceptInvitation
+    // hace onConflictDoUpdate sobre profile porque "la misma persona pudo haber entrado antes a otra
+    // empresa del mismo dueño"); a este mismo caso lo tapaba el cliente. Mismo patrón que
+    // /login/LoginForm.tsx: si signUp no da sesión, se intenta signInWithPassword con los mismos
+    // datos antes de rendirse.
+    let session = signUp.session;
+    if (signUpError || !session) {
+      const { data: signIn } = await supabase.auth.signInWithPassword({ email, password });
+      session = signIn.session ?? null;
+    }
+
+    if (!session) {
+      // Mensaje genérico a propósito: no delata si ese correo ya existía en Auth (podía haber sido
+      // un teléfono corto la primera vez, o una contraseña que no es la que esta persona recuerda).
+      setError("No se pudo entrar con esos datos. Revisa tu contraseña o inténtalo de nuevo.");
       setLoading(false);
       return;
     }
 
-    document.cookie = `imp-access-token=${signUp.session.access_token}; path=/; max-age=${signUp.session.expires_in}; SameSite=Lax`;
+    document.cookie = `imp-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
 
     const result = await accept({
       fullName: data.get("fullName")?.toString() ?? "",
@@ -108,7 +125,7 @@ export function AcceptForm({
       </label>
       <label className="permiso-field">
         <span>Tu teléfono</span>
-        <input name="phone" required className="config-input" />
+        <input name="phone" required minLength={7} className="config-input" />
       </label>
       {areas.length > 0 && (
         <label className="permiso-field">
