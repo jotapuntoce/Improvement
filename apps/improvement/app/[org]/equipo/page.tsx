@@ -1,8 +1,10 @@
 // Nivel de responsabilidad propio + lista de empleados (owner) — §9.6 del blueprint. El owner NUNCA
 // ve el número por persona (Pitfalls §02-producto-core): esta rama usa listTeamForOwner(), cuyo
 // shape no trae ese campo, así que no hay forma de filtrarlo mal aquí — no existe en el dato.
+import Link from "next/link";
 import { requireOrgMembership } from "@/server/auth/guard";
 import { getResponsibilityLevel, listTeamForOwner } from "@/server/employees/responsibility";
+import { listLiveInvitations } from "@/server/invitations/loadInvitations";
 
 const pageStyle = {
   minHeight: "100vh",
@@ -24,15 +26,46 @@ const cardStyle = {
   background: "var(--bg-card)",
 };
 
+// Botones de Equipo (owner): mismo look que .panel-cta/.panel-btn-ghost de globals.css, pero en
+// style={} porque esta página entera usa objetos inline (pageStyle/cardStyle) y no clases CSS — meter
+// una className aquí sería incoherente con el resto del archivo.
+const primaryLinkStyle = {
+  padding: "10px 18px",
+  borderRadius: "var(--radius-sm, 10px)",
+  fontWeight: 600,
+  fontSize: "14px",
+  textDecoration: "none",
+  background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))",
+  color: "var(--bg)",
+};
+
+const ghostLinkStyle = {
+  padding: "10px 18px",
+  borderRadius: "var(--radius-sm, 10px)",
+  border: "1px solid var(--border-strong)",
+  fontSize: "14px",
+  textDecoration: "none",
+  color: "var(--text-secondary)",
+};
+
 export default async function EquipoPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
   const memberRow = await requireOrgMembership(orgId);
 
   if (memberRow.role === "owner") {
     const team = await listTeamForOwner(orgId);
+    const invitaciones = await listLiveInvitations(orgId);
     return (
       <main style={pageStyle}>
         <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Equipo</h1>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <Link href={`/${orgId}/equipo/invitar`} style={primaryLinkStyle}>
+            Invitar a alguien
+          </Link>
+          <Link href={`/${orgId}/equipo/permisos`} style={ghostLinkStyle}>
+            Tipos de permiso
+          </Link>
+        </div>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
           {team.map((member) => (
             <li key={member.userId} style={{ ...cardStyle, display: "flex", justifyContent: "space-between" }}>
@@ -43,6 +76,19 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
             </li>
           ))}
         </ul>
+        {invitaciones.length > 0 && (
+          <section>
+            <h2 style={{ fontSize: "18px", fontWeight: 600 }}>Invitaciones sin usar</h2>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+              {invitaciones.map((inv) => (
+                <li key={inv.id} style={cardStyle}>
+                  {inv.email} · {inv.typeName ?? "sin tipo"} · vence el{" "}
+                  {new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long" }).format(inv.expiresAt)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
     );
   }

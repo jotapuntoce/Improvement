@@ -582,3 +582,23 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 }
 .permiso-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
 .permiso-actions { display: flex; gap: 10px; }
+
+/* --- Enlace de invitación (/[org]/equipo/invitar) — se muestra una sola vez. --- */
+.invite-link {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.invite-link-url {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.invite-error { color: var(--danger); font-size: 13px; }
