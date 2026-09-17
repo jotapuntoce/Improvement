@@ -7,7 +7,13 @@ import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "../../../lib/auth.js";
 import { db } from "../../../lib/db.js";
-import { organization, orgBuildStage, area, objective } from "@jotapuntoce/db/schema";
+import { organization, orgBuildStage, area, objective, payment } from "@jotapuntoce/db/schema";
+
+// T12:00:00 al construir la fecha de cobro: un <input type="date"> da "2026-03-15", y `new Date()`
+// sobre esa cadena la interpreta como UTC medianoche, que en zona horaria de México es el día
+// anterior — el dueño vería una fecha distinta a la que Jose Carlos capturó.
+const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
+const day = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" });
 
 const STAGE_STATUS_OPTIONS = ["bloqueada", "en_progreso", "completada"];
 const STAGE_STATUS_LABEL = {
@@ -30,6 +36,30 @@ export default async function OrganizationDetailPage({ params }) {
     .orderBy(asc(orgBuildStage.stageOrder));
   const areas = await db.select().from(area).where(eq(area.orgId, orgId));
   const objectives = await db.select().from(objective).where(eq(objective.orgId, orgId));
+  const payments = await db
+    .select()
+    .from(payment)
+    .where(eq(payment.orgId, orgId))
+    .orderBy(asc(payment.dueDate));
+
+  async function createPayment(formData) {
+    "use server";
+    await requirePlatformAdmin();
+    const concept = formData.get("concept")?.toString().trim();
+    const amount = Number(formData.get("amount"));
+    const dueDate = formData.get("dueDate")?.toString();
+    // El check de la tabla ya rechaza amount <= 0; validar aquí evita que un typo llegue como un
+    // error de Postgres en pantalla en vez de como un formulario que simplemente no hizo nada.
+    if (!concept || !dueDate || !Number.isFinite(amount) || amount <= 0) return;
+
+    await db.insert(payment).values({
+      orgId,
+      concept,
+      amount: amount.toFixed(2),
+      dueDate: new Date(`${dueDate}T12:00:00`),
+    });
+    revalidatePath(`/organizations/${orgId}`);
+  }
 
   async function createStage(formData) {
     "use server";
@@ -118,6 +148,81 @@ export default async function OrganizationDetailPage({ params }) {
                       </button>
                     </form>
                     <form action={removeStage}>
+                      <button type="submit" className="btn btn-danger">
+                        Eliminar
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h3 style={{ marginBottom: "10px" }}>Pagos con Improvement</h3>
+        <p className="empty-hint" style={{ marginTop: 0 }}>
+          Lo que el dueño ve en su panel, en Configuración → Tus pagos. Solo el dueño de la empresa
+          los ve; sus empleados no.
+        </p>
+
+        <form action={createPayment} className="toolbar" style={{ flexWrap: "wrap", marginBottom: "14px" }}>
+          <input className="input" name="concept" placeholder="Concepto" required style={{ flex: 1, minWidth: "160px" }} />
+          <input className="input" name="amount" type="number" min="1" step="0.01" placeholder="Monto" required />
+          <input className="input" name="dueDate" type="date" required />
+          <button type="submit" className="btn btn-primary">
+            + Agregar pago
+          </button>
+        </form>
+
+        {payments.length === 0 ? (
+          <p className="empty-hint">Sin pagos registrados.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+            {payments.map((p) => {
+              // togglePaid y no dos acciones: pagado es exactamente paid_at is not null, así que el
+              // mismo botón lo pone y lo quita — deshacer un clic equivocado no necesita más código.
+              async function togglePaid() {
+                "use server";
+                await requirePlatformAdmin();
+                await db
+                  .update(payment)
+                  .set({ paidAt: p.paidAt ? null : new Date(), updatedAt: new Date() })
+                  .where(eq(payment.id, p.id));
+                revalidatePath(`/organizations/${orgId}`);
+              }
+
+              async function removePayment() {
+                "use server";
+                await requirePlatformAdmin();
+                await db.delete(payment).where(eq(payment.id, p.id));
+                revalidatePath(`/organizations/${orgId}`);
+              }
+
+              return (
+                <li
+                  key={p.id}
+                  className="product-card"
+                  style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}
+                >
+                  <div>
+                    <p style={{ fontWeight: 600, margin: 0 }}>
+                      {p.concept} — {money.format(Number(p.amount))}
+                    </p>
+                    <p className="product-desc" style={{ margin: "4px 0 0" }}>
+                      {p.paidAt
+                        ? `Pagado el ${day.format(p.paidAt)}`
+                        : `Se cobra el ${day.format(p.dueDate)}`}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <form action={togglePaid}>
+                      <button type="submit" className="btn btn-ghost">
+                        {p.paidAt ? "Marcar pendiente" : "Marcar pagado"}
+                      </button>
+                    </form>
+                    <form action={removePayment}>
                       <button type="submit" className="btn btn-danger">
                         Eliminar
                       </button>

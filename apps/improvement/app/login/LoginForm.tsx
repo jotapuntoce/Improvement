@@ -7,7 +7,7 @@
 //
 // Nota honesta sobre el manejo de sesión en v1: @supabase/supabase-js guarda la sesión en
 // localStorage por default (client-only). Para que server/auth/guard.ts (Server Components) pueda
-// leerla, este formulario copia el access token a una cookie propia (`sb-access-token`) al iniciar
+// leerla, este formulario copia el access token a una cookie propia (`imp-access-token`) al iniciar
 // sesión. El manejo "oficial" de sesión SSR de Supabase usa el paquete @supabase/ssr, que no está en
 // las dependencias fijadas de este blueprint (§11) — este es un atajo documentado, no un descuido:
 // sin refresh automático de token todavía, aceptable para el piloto de un solo cliente. Si el
@@ -57,8 +57,13 @@ export function LoginForm() {
       return;
     }
 
-    // Cookie que server/auth/guard.ts lee del lado del servidor — ver nota arriba.
-    document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+    // Cookie que server/auth/guard.ts lee del lado del servidor — ver nota arriba. El nombre lleva
+    // prefijo propio a propósito: apps/admin escribe `sb-access-token` httpOnly desde el servidor, y
+    // las cookies ignoran el puerto, así que en localhost (admin :3100, improvement :3200 — mismo
+    // host) ambas apps se pisaban bajo un solo nombre. Peor: document.cookie no puede sobrescribir
+    // ni borrar una httpOnly, así que la sesión de admin ganaba siempre y el cliente terminaba
+    // viendo el panel de Jose Carlos. Bug real encontrado probando el flujo de cliente end-to-end.
+    document.cookie = `imp-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
 
     const returnTo = searchParams.get("returnTo") ?? "/";
     router.push(returnTo);

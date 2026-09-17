@@ -68,7 +68,7 @@ test.afterAll(async () => {
 test.beforeEach(async ({ context, baseURL }) => {
   await context.addCookies([
     {
-      name: "sb-access-token",
+      name: "imp-access-token",
       value: accessToken,
       url: baseURL ?? "http://localhost:3200",
     },

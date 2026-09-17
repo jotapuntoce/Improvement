@@ -36,6 +36,14 @@ export const organization = pgTable("organization", {
   // Hex, tono ambiental del edificio/recepción de esta organización (reemplaza --gold ahí). null =
   // usa el tono neutro por default de packages/ui/src/tokens.css.
   accentColor: text("accent_color"),
+  // Giro del negocio — uno de los ids de INDUSTRIES (packages/ui/src/building/industries.ts),
+  // validado en el borde por server/companyRequests/*.ts (apps/improvement). null o cualquier valor
+  // fuera de esa lista = AppIconLarge usa su glyph default (la cuadrícula), nunca lanza.
+  industry: text("industry"),
+  // Cómo llama el dueño a cada sección de SU empresa digital, y cuáles apagó:
+  // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
+  // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
+  sectionLabels: jsonb("section_labels").notNull().default(sql`'{}'::jsonb`),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -46,9 +54,42 @@ export const profile = pgTable("profile", {
   id: uuid("id").primaryKey(),
   email: text("email").notNull(),
   fullName: text("full_name"),
+  // Cómo se presenta el dueño en su panel: uno de los ids de OWNER_LABELS
+  // (packages/ui/src/building/ownerLabels.ts), validado en el borde. null = sin chip de etiqueta.
+  ownerLabel: text("owner_label"),
+  // Ruta DENTRO del bucket de Storage, no una URL completa: la URL pública se arma al leer, así el
+  // proyecto de Supabase puede cambiar de dominio sin reescribir filas.
+  avatarPath: text("avatar_path"),
+  // Se captura cuando el empleado acepta su invitación — el único momento en que se le pregunta.
+  phone: text("phone"),
   isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
   createdAt: createdAt(),
 });
+
+/**
+ * Un tipo de permiso con nombre, de UNA empresa. El dueño los crea con los nombres de su propio
+ * organigrama ("Jefe de obra", "Vendedor"); Improvement no trae ninguno de fábrica — los papeles de
+ * un negocio son datos del cliente, no una rama de código (.claude/rules/motor-generico.md).
+ */
+export const permissionType = pgTable(
+  "permission_type",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Mapa sección -> alcance, ej. {"objetivos":"area","clientes":"ninguno"}. Una sección AUSENTE se
+    // lee como "ninguno": el default niega, nunca concede (server/permissions/sections.ts).
+    grants: jsonb("grants").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_permission_type_org_id").on(t.orgId),
+    uniqueIndex("uq_permission_type_org_name").on(t.orgId, t.name),
+  ],
+);
 
 export const membership = pgTable(
   "membership",
@@ -62,6 +103,14 @@ export const membership = pgTable(
     role: text("role").notNull(),
     invitedBy: uuid("invited_by").references(() => profile.id),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    // El tipo de permiso vive en membership y no en profile porque la misma persona puede estar en
+    // dos empresas del mismo dueño con papeles distintos. null = no ve NADA (el default niega).
+    permissionTypeId: uuid("permission_type_id").references(() => permissionType.id, {
+      onDelete: "set null",
+    }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    jobTitle: text("job_title"),
+    responsibilities: text("responsibilities"),
   },
   (t) => [
     uniqueIndex("uq_membership_user_org").on(t.userId, t.orgId),
@@ -83,6 +132,9 @@ export const invitation = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    permissionTypeId: uuid("permission_type_id").references(() => permissionType.id, {
+      onDelete: "cascade",
+    }),
   },
   (t) => [check("invitation_role_check", sql`${t.role} in ('owner','employee')`)],
 );
@@ -289,6 +341,97 @@ export const orgBuildStage = pgTable(
   ],
 );
 
+// ─── Ensambles ────────────────────────────────────────────────────────────────
+// El plano de un proyecto visto como piezas conectadas. Modela cómo se construye aquí: primero una
+// pieza suelta, luego otra, y al final se dice dónde se engancha cada una. Por eso el orden de las
+// piezas NO se guarda como columna — se deriva del grafo de assembly_connection, que es la única
+// fuente de verdad del recorrido. Un `order` denormalizado se desincronizaría en cuanto una conexión
+// cambie.
+
+export const assembly = pgTable(
+  "assembly",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_assembly_org_id").on(t.orgId)],
+);
+
+// Una pieza del ensamble. `whatItDoes` es el texto que se abre al hacer click en el dibujo de la
+// pieza — se reescribe cuando la pieza evoluciona, y cada reescritura deja su fila en assembly_event.
+export const assemblyPiece = pgTable(
+  "assembly_piece",
+  {
+    id: id(),
+    assemblyId: uuid("assembly_id")
+      .notNull()
+      .references(() => assembly.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    whatItDoes: text("what_it_does"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_assembly_piece_assembly_id").on(t.assemblyId)],
+);
+
+// Arista dirigida from → to ("el login va antes del dashboard" = from login, to dashboard). Una
+// bifurcación no necesita tabla propia: son dos filas con el mismo from_piece_id y distinto
+// condition_label.
+export const assemblyConnection = pgTable(
+  "assembly_connection",
+  {
+    id: id(),
+    assemblyId: uuid("assembly_id")
+      .notNull()
+      .references(() => assembly.id, { onDelete: "cascade" }),
+    fromPieceId: uuid("from_piece_id")
+      .notNull()
+      .references(() => assemblyPiece.id, { onDelete: "cascade" }),
+    toPieceId: uuid("to_piece_id")
+      .notNull()
+      .references(() => assemblyPiece.id, { onDelete: "cascade" }),
+    conditionLabel: text("condition_label"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_assembly_connection_assembly_id").on(t.assemblyId),
+    index("idx_assembly_connection_from").on(t.fromPieceId),
+    uniqueIndex("uq_assembly_connection_edge").on(t.fromPieceId, t.toPieceId),
+    check("assembly_connection_no_self_loop", sql`${t.fromPieceId} <> ${t.toPieceId}`),
+  ],
+);
+
+// Append-only (sin updated_at, igual que employee_points_ledger): la historia del ensamble. Es lo que
+// permite ver cómo evolucionó el plano y lo que se lee para detectar patrones de construcción.
+export const assemblyEvent = pgTable(
+  "assembly_event",
+  {
+    id: id(),
+    assemblyId: uuid("assembly_id")
+      .notNull()
+      .references(() => assembly.id, { onDelete: "cascade" }),
+    // set null y no cascade: el evento "se eliminó la pieza X" tiene que sobrevivir a la pieza.
+    pieceId: uuid("piece_id").references(() => assemblyPiece.id, { onDelete: "set null" }),
+    actorId: uuid("actor_id").references(() => profile.id),
+    eventType: text("event_type").notNull(),
+    detail: jsonb("detail").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_assembly_event_assembly_id").on(t.assemblyId),
+    check(
+      "assembly_event_type_check",
+      sql`${t.eventType} in ('assembly_created','piece_added','piece_updated','piece_removed','connection_added','connection_removed')`,
+    ),
+  ],
+);
+
 // La persona detrás de uno o más prospectCompany — Jaime Salinas es el primer caso real (dueño de
 // Camibel y Afianza, dos filas de prospect_company distintas bajo el mismo prospect_client). Igual
 // que prospectCompany: FUERA del alcance de RLS multi-tenant, solo accesible con la service-role key
@@ -328,5 +471,113 @@ export const prospectCompany = pgTable(
       "prospect_company_status_check",
       sql`${t.status} in ('prospecto','en_construcción','live')`,
     ),
+  ],
+);
+
+// Auto-registro de empresa desde apps/improvement — distinto de prospectCompany (backlog manual de
+// Jose Carlos, admin-only, antes de que el cliente tenga cuenta). Aquí el cliente YA tiene sesión y
+// pide agregar otra empresa a su portafolio; Jose Carlos aprueba o rechaza desde apps/admin. Al
+// aprobar, se crea el organization real (y su primera org_build_stage) — mismo patrón que
+// provisionOrganization en apps/admin/app/prospects/actions.js, sin la parte de crear usuario de
+// Supabase Auth (el requester ya tiene una).
+export const companyRequest = pgTable(
+  "company_request",
+  {
+    id: id(),
+    requesterId: uuid("requester_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    companyName: text("company_name").notNull(),
+    // Uno de los ids de INDUSTRIES (packages/ui/src/building/industries.ts) — mismo campo que
+    // organization.industry, copiado ahí al aprobar.
+    industry: text("industry"),
+    status: text("status").notNull().default("pending"),
+    orgId: uuid("org_id").references(() => organization.id, { onDelete: "set null" }),
+    reviewedBy: uuid("reviewed_by").references(() => profile.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_company_request_requester_id").on(t.requesterId),
+    check(
+      "company_request_status_check",
+      sql`${t.status} in ('pending','approved','rejected')`,
+    ),
+  ],
+);
+
+// Lo que el cliente le debe a Improvement por una empresa, y cuándo se cobra. El dueño lo ve en
+// /empresas/configuracion; las filas las crea Jose Carlos desde apps/admin.
+//
+// No hay columna `status`: pagado es exactamente `paid_at is not null`. Un status aparte se
+// desincroniza en cuanto alguien escriba uno sin el otro.
+//
+// `source` y `externalRef` existen desde el día uno para que conectar un procesador de pagos (Whop u
+// otro) sea escribir un webhook que marque `paid_at`, sin migrar el esquema: 'manual' es el pago que
+// Jose Carlos registra a mano — el caso de Jaime Salinas pagando en efectivo.
+export const payment = pgTable(
+  "payment",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    concept: text("concept").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("MXN"),
+    dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    source: text("source").notNull().default("manual"),
+    externalRef: text("external_ref"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_payment_org_id").on(t.orgId),
+    index("idx_payment_org_due_date").on(t.orgId, t.dueDate),
+    check("payment_amount_positive", sql`${t.amount} > 0`),
+  ],
+);
+
+// Los indicadores que se dibujan en la tarjeta de UNA empresa, y de dónde sale el número de cada uno.
+//
+// Antes esto era un catálogo cerrado de 8 KPIs en código (packages/ui/src/building/kpis.ts) y ningún
+// cliente real cabía: Jaime Salinas mide autorización de proyectos, avance de obra, ventas y
+// postventa — nada de eso es "objetivos activos". Cada dueño mide su negocio, así que la lista vive
+// en filas, no en una rama de código (.claude/rules/motor-generico.md).
+//
+// `source` nombra el adaptador que calcula el número (apps/improvement/server/kpis/sources.ts) y
+// `config` lo parametriza: el mismo adaptador `objetivos` cuenta los abiertos de toda la empresa o
+// solo los de un área, según la fila. Por eso dos indicadores con el mismo source no son el mismo
+// indicador — cada fila trae su propia conexión.
+//
+// `manualValue` es el escape: un número que todavía no tiene de dónde salir se captura a mano y la
+// fila se repunta a un adaptador real después, sin tocar el panel ni migrar nada.
+export const orgKpi = pgTable(
+  "org_kpi",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    hint: text("hint"),
+    source: text("source").notNull(),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    manualValue: integer("manual_value"),
+    format: text("format").notNull().default("numero"),
+    // Sin unique(org_id, position): reordenar con una restricción de unicidad obliga a escribir
+    // posiciones temporales para no chocar a media pasada. El empate se rompe por created_at.
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_org_kpi_org_position").on(t.orgId, t.position),
+    check(
+      "org_kpi_source_check",
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual')`,
+    ),
+    check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],
 );

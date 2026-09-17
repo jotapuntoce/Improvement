@@ -2,10 +2,10 @@
 // (§9.6) aunque también exponga listObjectives — una lectura server-side, no un segundo archivo.
 // Cada función empieza validando tenencia con assertMembership(userId, orgId): la regla de
 // server/auth/guard.ts es que ninguna query nueva confíe solo en RLS o solo en el guard de la ruta.
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { objective, employeePointsLedger } from "@jotapuntoce/db/schema";
-import { assertMembership } from "../auth/guard.ts";
+import { assertMembership, resolveSection } from "../auth/guard.ts";
 import { pointsForObjective } from "./points.ts";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -32,20 +32,37 @@ function encodeCursor(row: ObjectiveRow): string {
 
 /**
  * WHEN un empleado del org A solicita la lista de objetivos del org B THE SYSTEM SHALL devolver 404
- * (criterio #3, vía assertMembership). WHEN se piden más de 100 objetivos por página THE SYSTEM
- * SHALL limitar la respuesta a 100 (criterio #4, vía el Math.min de abajo).
+ * (criterio #3, vía resolveSection → assertMembership). WHEN se piden más de 100 objetivos por
+ * página THE SYSTEM SHALL limitar la respuesta a 100 (criterio #4, vía el Math.min de abajo).
+ *
+ * El alcance se resuelve ADENTRO y no lo pasa el llamador: así ninguna pantalla futura puede
+ * olvidarse de filtrar. Sin RLS corriendo en runtime (packages/db/src/client.ts conecta con una
+ * connection string fija, no por-usuario) este filtro es la única capa que hay.
  */
 export async function listObjectives(
   userId: string,
   orgId: string,
   opts: { cursor?: string | null; limit?: number } = {},
 ) {
-  await assertMembership(userId, orgId);
+  const { membership: member, scope } = await resolveSection(userId, orgId, "objetivos");
+  if (scope === "ninguno") {
+    return { ok: true as const, data: { objectives: [], nextCursor: null } };
+  }
 
   const limit = Math.min(Math.max(opts.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const cursor = decodeCursor(opts.cursor);
 
   const conditions = [eq(objective.orgId, orgId)];
+
+  // Alcance `area` sin área asignada: cero, nunca todo — el caso seguro de un miembro a medio
+  // configurar es que deje de ver, no que vea de más.
+  if (scope === "area") {
+    conditions.push(member.areaId ? eq(objective.areaId, member.areaId) : sql`false`);
+  }
+  if (scope === "propio") {
+    conditions.push(eq(objective.assignedEmployeeId, userId));
+  }
+
   if (cursor) {
     const beforeCursor = or(
       lt(objective.createdAt, cursor.createdAt),

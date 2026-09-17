@@ -45,8 +45,24 @@ default Biome del track, ver blueprint §2) · Vitest · Playwright · Turborepo
 (Server Component) → `server/objectives/mutations.ts` → `@jotapuntoce/db` (`packages/db/src/client.ts`)
 → Postgres (Supabase, vía pooler). Toda mutación pasa por una Server Action en `server/**`, nunca por
 un `fetch` del cliente. Autorización: cada handler de `server/**` empieza llamando
-`requireOrgMembership(orgId)` (`apps/improvement/server/auth/guard.ts`) — RLS en Postgres es la
-segunda capa, no la única.
+`requireOrgMembership(orgId)` (`apps/improvement/server/auth/guard.ts`).
+
+**Dos puertas, no dos cerraduras.** RLS no es "la segunda capa" del camino de la app: en ese camino
+**no aplica en absoluto**. `packages/db/src/client.ts` abre la conexión con una connection string
+fija y el rol dueño de las tablas, así que ninguna política corre sobre nada que pase por `db`. Pero
+existe un segundo camino: `NEXT_PUBLIC_SUPABASE_ANON_KEY` viaja al navegador y todo empleado con
+sesión tiene un JWT `authenticated` propio, así que desde la consola del navegador puede pegarle
+directo a PostgREST (`https://<ref>.supabase.co/rest/v1/objective?select=*`) sin tocar Next. Ahí el
+guard no existe.
+
+| Camino | Quién conecta | Única autorización |
+|---|---|---|
+| App (Server Component → `server/**` → `db`) | rol dueño, RLS no aplica | el guard en código |
+| PostgREST directo (anon key + JWT del usuario) | rol `authenticated`, RLS sí aplica | la política RLS |
+
+Ninguna respalda a la otra. Por eso van las dos: no porque se cubran entre sí, sino porque cada una
+cierra una puerta que la otra deja abierta. Un loader nuevo sin guard fuga por la primera; una tabla
+nueva sin política fuga por la segunda.
 
 **`apps/admin` usa la service-role key** de Supabase (bypasea RLS) porque Jose Carlos opera sobre
 todas las organizaciones a la vez — esa clave solo se importa en `apps/admin/lib/db.js` y en server
@@ -89,8 +105,10 @@ código. Detalle completo: `.claude/rules/motor-generico.md`.
 5. **Valida en el borde.** Toda Server Action y ruta API parsea su input con `zod` antes de tocar
    lógica de negocio.
 6. **Errores como resultados tipados**, no strings lanzados: `{ ok: true, data } | { ok: false, error }`.
-7. **RLS + `requireOrgMembership()` siempre juntos.** Ninguna query nueva confía solo en uno de los
-   dos.
+7. **RLS + `requireOrgMembership()` siempre juntos — pero NO porque se respalden.** Son dos
+   cerraduras en dos puertas distintas (ver §Architecture, "Dos puertas, no dos cerraduras"). Una
+   query nueva sin guard fuga de verdad; una tabla nueva sin política fuga de verdad. Nunca
+   razones "se me pasó el guard, pero RLS lo atrapa" — no lo atrapa.
 8. **Sin dependencia nueva sin una razón en el mensaje del commit.** Revisa primero si Node o una
    dependencia existente ya lo resuelve (ver §11 del blueprint — `dotenv` y `tsx` se evitaron así).
 

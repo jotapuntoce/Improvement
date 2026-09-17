@@ -56,7 +56,7 @@ export function CompanyPicker({ companies }: { companies: CompanySummary[] }) {
     <div className="empresas-grid">
       {companies.map((c) => (
         <button key={c.orgId} type="button" className="empresas-tile" onClick={() => router.push(`/empresas/${c.orgId}`)}>
-          <AppIconLarge label={c.name} stageLabel={c.stageLabel} />
+          <AppIconLarge label={c.name} stageLabel={c.stageLabel} industry={c.industry} />
         </button>
       ))}
     </div>

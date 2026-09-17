@@ -51,3 +51,8 @@ yarn-error.log*
 # superpowers:using-git-worktrees — worktrees aislados para ejecutar un plan (git worktree add
 # manual, fallback porque EnterWorktree no resuelve el repo en este entorno)
 .worktrees/
+
+# Directorio de trabajo de las sesiones de Claude Code (772 MB de caché, no es código del proyecto).
+# Sin esta línea, un `git add -A` distraído commitea el caché entero. Anclado a la raíz (/):
+# git en Windows ignora mayúsculas y sin la barra el patrón también tapaba apps/improvement/.
+/Improvement/
