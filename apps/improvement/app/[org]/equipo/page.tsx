@@ -51,7 +51,7 @@ const ghostLinkStyle = {
 
 export default async function EquipoPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
-  const { membership: memberRow, scope } = await requireSection(orgId, "equipo");
+  const { membership: memberRow } = await requireSection(orgId, "equipo");
 
   if (memberRow.role === "owner") {
     const team = await listTeamForOwner(orgId);
@@ -95,7 +95,7 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
   }
 
   const level = await getResponsibilityLevel(memberRow.userId, memberRow.userId, orgId);
-  const companeros = await listTeammates(orgId, scope === "area" ? memberRow.areaId : null);
+  const companeros = await listTeammates(memberRow.userId, orgId);
   return (
     <main style={pageStyle}>
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Tu equipo</h1>

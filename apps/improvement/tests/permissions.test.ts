@@ -14,6 +14,7 @@ import {
   updatePermissionType,
 } from "../server/permissions/mutations.ts";
 import { listObjectives } from "../server/objectives/mutations.ts";
+import { listTeammates } from "../server/employees/teammates.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -551,4 +552,173 @@ describe("listObjectives con alcance", () => {
       expect(data.objectives.map((o) => o.title)).toEqual(["De su área"]);
     },
   );
+});
+
+describe("listTeammates con alcance", () => {
+  it(
+    "WHEN el empleado tiene alcance `area` pero NO tiene área asignada THE SYSTEM SHALL devolver " +
+      "cero compañeros, no toda la empresa — borrar un área deja a la gente en este estado (Tarea 4, " +
+      "onDelete: set null), y no debe convertirse en una fuga",
+    async () => {
+      const org = await newOrg("Test Org Equipo Sin Area");
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "A medias", grants: { equipo: "area" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      const otro = crypto.randomUUID();
+      await db.insert(profile).values([
+        { id: userId, email: `${userId}@example.com` },
+        { id: otro, email: `${otro}@example.com` },
+      ]);
+      createdProfileIds.push(userId, otro);
+      await db.insert(membership).values([
+        { userId, orgId: org.id, role: "employee", permissionTypeId: tipo.id, acceptedAt: new Date() },
+        { userId: otro, orgId: org.id, role: "employee", permissionTypeId: tipo.id, acceptedAt: new Date() },
+      ]);
+
+      const companeros = await listTeammates(userId, org.id);
+      expect(companeros.length).toBe(0);
+    },
+  );
+
+  it("WHEN el empleado tiene alcance `empresa` THE SYSTEM SHALL devolverle a todos los de la empresa", async () => {
+    const org = await newOrg("Test Org Equipo Empresa");
+    const [tipo] = await db
+      .insert(permissionType)
+      .values({ orgId: org.id, name: "Gerente", grants: { equipo: "empresa" } })
+      .returning();
+    if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+    const [areaA] = await db.insert(area).values({ orgId: org.id, name: "A", color: "#f59e0b" }).returning();
+    const [areaB] = await db.insert(area).values({ orgId: org.id, name: "B", color: "#22d3ee" }).returning();
+    if (!areaA || !areaB) throw new Error("insert de area no devolvió fila");
+
+    const userId = crypto.randomUUID();
+    const deA = crypto.randomUUID();
+    const deB = crypto.randomUUID();
+    await db.insert(profile).values([
+      { id: userId, email: `${userId}@example.com` },
+      { id: deA, email: `${deA}@example.com` },
+      { id: deB, email: `${deB}@example.com` },
+    ]);
+    createdProfileIds.push(userId, deA, deB);
+    await db.insert(membership).values([
+      { userId, orgId: org.id, role: "employee", permissionTypeId: tipo.id, areaId: areaA.id, acceptedAt: new Date() },
+      { userId: deA, orgId: org.id, role: "employee", areaId: areaA.id, acceptedAt: new Date() },
+      { userId: deB, orgId: org.id, role: "employee", areaId: areaB.id, acceptedAt: new Date() },
+    ]);
+
+    const companeros = await listTeammates(userId, org.id);
+    expect(companeros.map((c) => c.userId).sort()).toEqual([userId, deA, deB].sort());
+  });
+
+  it(
+    "WHEN el empleado tiene alcance `area` CON área asignada THE SYSTEM SHALL devolverle solo a los " +
+      "de su área y no a alguien de otra área de la misma empresa",
+    async () => {
+      const org = await newOrg("Test Org Equipo Area Con Area");
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Jefe de área", grants: { equipo: "area" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const [areaSuya] = await db.insert(area).values({ orgId: org.id, name: "Suya", color: "#f59e0b" }).returning();
+      const [areaAjena] = await db.insert(area).values({ orgId: org.id, name: "Ajena", color: "#22d3ee" }).returning();
+      if (!areaSuya || !areaAjena) throw new Error("insert de area no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      const companero = crypto.randomUUID();
+      const ajeno = crypto.randomUUID();
+      await db.insert(profile).values([
+        { id: userId, email: `${userId}@example.com` },
+        { id: companero, email: `${companero}@example.com` },
+        { id: ajeno, email: `${ajeno}@example.com` },
+      ]);
+      createdProfileIds.push(userId, companero, ajeno);
+      await db.insert(membership).values([
+        { userId, orgId: org.id, role: "employee", permissionTypeId: tipo.id, areaId: areaSuya.id, acceptedAt: new Date() },
+        { userId: companero, orgId: org.id, role: "employee", areaId: areaSuya.id, acceptedAt: new Date() },
+        { userId: ajeno, orgId: org.id, role: "employee", areaId: areaAjena.id, acceptedAt: new Date() },
+      ]);
+
+      const companeros = await listTeammates(userId, org.id);
+      expect(companeros.map((c) => c.userId).sort()).toEqual([userId, companero].sort());
+      expect(companeros.some((c) => c.userId === ajeno)).toBe(false);
+    },
+  );
+
+  it("WHEN la sección `equipo` está en alcance `ninguno` THE SYSTEM SHALL devolver cero, no lanzar", async () => {
+    const org = await newOrg("Test Org Equipo Ninguno");
+    const userId = crypto.randomUUID();
+    const otro = crypto.randomUUID();
+    await db.insert(profile).values([
+      { id: userId, email: `${userId}@example.com` },
+      { id: otro, email: `${otro}@example.com` },
+    ]);
+    createdProfileIds.push(userId, otro);
+    await db.insert(membership).values([
+      { userId, orgId: org.id, role: "employee", acceptedAt: new Date() },
+      { userId: otro, orgId: org.id, role: "employee", acceptedAt: new Date() },
+    ]);
+
+    const companeros = await listTeammates(userId, org.id);
+    expect(companeros.length).toBe(0);
+  });
+
+  it("WHEN se listan compañeros THE SYSTEM SHALL nunca traer responsibility_level en ninguna forma", async () => {
+    const org = await newOrg("Test Org Equipo Sin Responsibility");
+    const [tipo] = await db
+      .insert(permissionType)
+      .values({ orgId: org.id, name: "Gerente", grants: { equipo: "empresa" } })
+      .returning();
+    if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+    const userId = crypto.randomUUID();
+    const otro = crypto.randomUUID();
+    await db.insert(profile).values([
+      { id: userId, email: `${userId}@example.com` },
+      { id: otro, email: `${otro}@example.com` },
+    ]);
+    createdProfileIds.push(userId, otro);
+    await db.insert(membership).values([
+      { userId, orgId: org.id, role: "employee", permissionTypeId: tipo.id, acceptedAt: new Date() },
+      { userId: otro, orgId: org.id, role: "employee", acceptedAt: new Date() },
+    ]);
+
+    const companeros = await listTeammates(userId, org.id);
+    expect(companeros.length).toBeGreaterThan(0);
+    for (const c of companeros) {
+      expect(Object.keys(c)).not.toContain("responsibilityLevel");
+      expect(Object.keys(c)).not.toContain("responsibility_level");
+    }
+  });
+
+  it("WHEN hay otra empresa THE SYSTEM SHALL nunca mezclar su gente en la respuesta", async () => {
+    const orgA = await newOrg("Test Org Equipo Cross A");
+    const orgB = await newOrg("Test Org Equipo Cross B");
+    const [tipoA] = await db
+      .insert(permissionType)
+      .values({ orgId: orgA.id, name: "Gerente", grants: { equipo: "empresa" } })
+      .returning();
+    if (!tipoA) throw new Error("insert de permission_type no devolvió fila");
+
+    const userId = crypto.randomUUID();
+    const deOtraEmpresa = crypto.randomUUID();
+    await db.insert(profile).values([
+      { id: userId, email: `${userId}@example.com` },
+      { id: deOtraEmpresa, email: `${deOtraEmpresa}@example.com` },
+    ]);
+    createdProfileIds.push(userId, deOtraEmpresa);
+    await db.insert(membership).values([
+      { userId, orgId: orgA.id, role: "employee", permissionTypeId: tipoA.id, acceptedAt: new Date() },
+      { userId: deOtraEmpresa, orgId: orgB.id, role: "employee", acceptedAt: new Date() },
+    ]);
+
+    const companeros = await listTeammates(userId, orgA.id);
+    expect(companeros.some((c) => c.userId === deOtraEmpresa)).toBe(false);
+  });
 });
