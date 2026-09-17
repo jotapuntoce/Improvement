@@ -7,7 +7,12 @@ import { db } from "@jotapuntoce/db";
 import { area, membership, objective, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { grantsSchema, scopeFor } from "../server/permissions/sections.ts";
 import { resolveSection } from "../server/auth/guard.ts";
-import { createPermissionType, deletePermissionType } from "../server/permissions/mutations.ts";
+import {
+  createPermissionType,
+  deletePermissionType,
+  listPermissionTypes,
+  updatePermissionType,
+} from "../server/permissions/mutations.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -29,6 +34,17 @@ async function newOrg(name: string) {
   if (!org) throw new Error("insert de organization no devolvió fila");
   createdOrgIds.push(org.id);
   return org;
+}
+
+async function orgConDueno(name: string) {
+  const org = await newOrg(name);
+  const ownerId = crypto.randomUUID();
+  await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+  createdProfileIds.push(ownerId);
+  await db
+    .insert(membership)
+    .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+  return { org, ownerId };
 }
 
 async function asUser<T>(userId: string, query: string): Promise<T[]> {
@@ -263,6 +279,7 @@ describe("createPermissionType", () => {
 
       const result = await createPermissionType(ownerId, org.id, "Imposible", { clientes: "propio" });
       expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("VALIDATION_ERROR");
     },
   );
 });
@@ -298,6 +315,71 @@ describe("deletePermissionType", () => {
       expect((await deletePermissionType(ownerId, org.id, creado.data)).ok).toBe(true);
       const { scope } = await resolveSection(employeeId, org.id, "objetivos");
       expect(scope).toBe("ninguno");
+    },
+  );
+
+  it(
+    "WHEN el dueño de OTRA empresa manda el id de un tipo ajeno THE SYSTEM SHALL responder NOT_FOUND " +
+      "y no borrar la fila — mismo patrón que removeArea, el where escopa por orgId",
+    async () => {
+      const a = await orgConDueno("Test Org Tipos Delete Cross A");
+      const b = await orgConDueno("Test Org Tipos Delete Cross B");
+
+      const creado = await createPermissionType(a.ownerId, a.org.id, "De A", { objetivos: "area" });
+      if (!creado.ok) throw new Error("createPermissionType falló");
+
+      const result = await deletePermissionType(b.ownerId, b.org.id, creado.data);
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("NOT_FOUND");
+
+      const tiposA = await listPermissionTypes(a.org.id);
+      expect(tiposA.some((t) => t.id === creado.data)).toBe(true);
+    },
+  );
+});
+
+describe("updatePermissionType", () => {
+  it(
+    "WHEN el dueño cambia el nombre y los grants de un tipo THE SYSTEM SHALL reflejar el cambio al " +
+      "releer con listPermissionTypes",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Tipos Update");
+      const creado = await createPermissionType(ownerId, org.id, "Vendedor", { objetivos: "area" });
+      if (!creado.ok) throw new Error("createPermissionType falló");
+
+      const result = await updatePermissionType(ownerId, org.id, creado.data, "Vendedor Senior", {
+        objetivos: "empresa",
+        clientes: "empresa",
+      });
+      expect(result.ok).toBe(true);
+
+      const tipos = await listPermissionTypes(org.id);
+      const actualizado = tipos.find((t) => t.id === creado.data);
+      expect(actualizado?.name).toBe("Vendedor Senior");
+      expect(actualizado?.grants).toEqual({ objetivos: "empresa", clientes: "empresa" });
+    },
+  );
+
+  it(
+    "WHEN el dueño de OTRA empresa manda el id de un tipo ajeno con SU propio orgId THE SYSTEM SHALL " +
+      "responder NOT_FOUND y no tocar la fila — lo contrario delataría que un tipo ajeno existe",
+    async () => {
+      const a = await orgConDueno("Test Org Tipos Update Cross A");
+      const b = await orgConDueno("Test Org Tipos Update Cross B");
+
+      const creado = await createPermissionType(a.ownerId, a.org.id, "De A", { objetivos: "area" });
+      if (!creado.ok) throw new Error("createPermissionType falló");
+
+      const result = await updatePermissionType(b.ownerId, b.org.id, creado.data, "Secuestrado", {
+        objetivos: "empresa",
+      });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("NOT_FOUND");
+
+      const tiposA = await listPermissionTypes(a.org.id);
+      const fila = tiposA.find((t) => t.id === creado.data);
+      expect(fila?.name).toBe("De A");
+      expect(fila?.grants).toEqual({ objetivos: "area" });
     },
   );
 });
