@@ -7,6 +7,7 @@ import { db } from "@jotapuntoce/db";
 import { area, membership, objective, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { grantsSchema, scopeFor } from "../server/permissions/sections.ts";
 import { resolveSection } from "../server/auth/guard.ts";
+import { createPermissionType, deletePermissionType } from "../server/permissions/mutations.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -229,4 +230,74 @@ describe("resolveSection", () => {
     const { scope } = await resolveSection(employeeId, org.id, "objetivos");
     expect(scope).toBe("ninguno");
   });
+});
+
+describe("createPermissionType", () => {
+  it("WHEN el dueño crea un tipo THE SYSTEM SHALL guardarlo con su mapa de alcances", async () => {
+    const org = await newOrg("Test Org Tipos");
+    const ownerId = crypto.randomUUID();
+    await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+    createdProfileIds.push(ownerId);
+    await db
+      .insert(membership)
+      .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+    const result = await createPermissionType(ownerId, org.id, "Vendedor", {
+      objetivos: "area",
+      clientes: "empresa",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it(
+    "WHEN el mapa trae un alcance que esa sección no filtra THE SYSTEM SHALL rechazarlo antes de " +
+      "escribir — una fila inválida haría que scopeFor devuelva `ninguno` sin que nadie sepa por qué",
+    async () => {
+      const org = await newOrg("Test Org Tipos Invalido");
+      const ownerId = crypto.randomUUID();
+      await db.insert(profile).values({ id: ownerId, email: `${ownerId}@example.com` });
+      createdProfileIds.push(ownerId);
+      await db
+        .insert(membership)
+        .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+      const result = await createPermissionType(ownerId, org.id, "Imposible", { clientes: "propio" });
+      expect(result.ok).toBe(false);
+    },
+  );
+});
+
+describe("deletePermissionType", () => {
+  it(
+    "WHEN se borra un tipo que alguien tiene asignado THE SYSTEM SHALL dejar a esa persona sin " +
+      "tipo, o sea sin ver nada — es el comportamiento seguro, no un accidente",
+    async () => {
+      const org = await newOrg("Test Org Tipos Borrado");
+      const ownerId = crypto.randomUUID();
+      const employeeId = crypto.randomUUID();
+      await db.insert(profile).values([
+        { id: ownerId, email: `${ownerId}@example.com` },
+        { id: employeeId, email: `${employeeId}@example.com` },
+      ]);
+      createdProfileIds.push(ownerId, employeeId);
+      await db
+        .insert(membership)
+        .values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+      const creado = await createPermissionType(ownerId, org.id, "Temporal", { objetivos: "empresa" });
+      if (!creado.ok) throw new Error("createPermissionType falló");
+
+      await db.insert(membership).values({
+        userId: employeeId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: creado.data,
+        acceptedAt: new Date(),
+      });
+
+      expect((await deletePermissionType(ownerId, org.id, creado.data)).ok).toBe(true);
+      const { scope } = await resolveSection(employeeId, org.id, "objetivos");
+      expect(scope).toBe("ninguno");
+    },
+  );
 });

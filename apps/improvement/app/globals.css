@@ -571,3 +571,14 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
+
+/* --- Tipos de permiso (/[org]/equipo/permisos) — una .config-card por tipo, con su rejilla de
+   sección x alcance. Reusa .config-input y .panel-cta/.panel-btn-ghost; lo nuevo es solo la rejilla. */
+.permiso-card--new { border-style: dashed; }
+.permiso-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.permiso-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+.permiso-actions { display: flex; gap: 10px; }
