@@ -266,12 +266,20 @@ export default async function ConfiguracionPage() {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const [profile, companies, payments] = await Promise.all([
+  const [profile, allCompanies, payments] = await Promise.all([
     getMyProfile(userId),
     loadCompanies(userId),
     listMyPayments(userId),
   ]);
   if (!profile) redirect("/login");
+
+  // Esta pantalla es del dueño: organigrama, nombres de sección y cuáles apagó, giro de cada empresa.
+  // loadCompanies devuelve toda membership (dueño o empleado) — filtrar aquí y no ahí, porque
+  // /empresas sí necesita las empresas donde el usuario es empleado para su propio selector. Un
+  // empleado que teclee la URL nunca debe llegar a ver esto (redirect, nunca 403 — mismo criterio que
+  // requireOrgMembership).
+  const companies = allCompanies.filter((c) => c.role === "owner");
+  if (companies.length === 0) redirect("/empresas");
 
   const orgIds = companies.map((c) => c.orgId);
   const [kpisByOrg, areasByOrg] = await Promise.all([loadOrgKpis(orgIds), listAreasByOrg(orgIds)]);

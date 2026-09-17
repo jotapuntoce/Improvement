@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization } from "@jotapuntoce/db/schema";
 import { isIndustry } from "@jotapuntoce/ui/building/industries.ts";
-import { assertMembership, findOwnerMembership } from "../auth/guard.ts";
+import { findOwnerMembership } from "../auth/guard.ts";
 import { SECTIONS } from "../permissions/sections.ts";
 
 /**
@@ -14,10 +14,16 @@ import { SECTIONS } from "../permissions/sections.ts";
  *
  * WHEN el giro no es uno de los ids de INDUSTRIES THE SYSTEM SHALL rechazarlo sin escribir: un
  * valor libre caería al glyph default y el dueño vería su cambio guardado sin efecto visible.
- * assertMembership primero — nadie cambia el ícono de una empresa que no es suya.
+ * findOwnerMembership primero, no solo assertMembership: es una escritura visible para toda la
+ * empresa (el ícono en /empresas), y un empleado no decide a qué se dedica la empresa de su jefe.
  */
 export async function updateCompanyIndustry(userId: string, orgId: string, industry: string) {
-  await assertMembership(userId, orgId);
+  if (!(await findOwnerMembership(userId, orgId))) {
+    return {
+      ok: false as const,
+      error: { code: "FORBIDDEN" as const, message: "Solo el dueño personaliza su empresa." },
+    };
+  }
 
   if (!isIndustry(industry)) {
     return {

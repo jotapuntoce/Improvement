@@ -12,6 +12,7 @@ export async function loadCompanies(userId: string): Promise<CompanySummary[]> {
       name: organization.name,
       industry: organization.industry,
       sectionLabels: organization.sectionLabels,
+      role: membership.role,
     })
     .from(membership)
     .innerJoin(organization, eq(organization.id, membership.orgId))
