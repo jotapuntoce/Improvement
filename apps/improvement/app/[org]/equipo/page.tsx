@@ -69,11 +69,18 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
         </div>
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
           {team.map((member) => (
-            <li key={member.userId} style={{ ...cardStyle, display: "flex", justifyContent: "space-between" }}>
-              <span>{member.fullName ?? member.email}</span>
-              <span style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
-                {member.role === "owner" ? "Dueño" : "Empleado"}
-              </span>
+            <li key={member.userId} style={cardStyle}>
+              {/* La ficha es donde el dueño le cambia el acceso o lo da de baja. El suyo propio
+                  también abre — la ficha explica ahí por qué no se puede editar. */}
+              <Link
+                href={`/${orgId}/equipo/${member.userId}`}
+                style={{ display: "flex", justifyContent: "space-between", textDecoration: "none", color: "inherit" }}
+              >
+                <span>{member.fullName ?? member.email}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
+                  {member.role === "owner" ? "Dueño" : "Empleado"}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>
