@@ -3,7 +3,7 @@
 // — un 404, nunca un 403, para un org al que el usuario no pertenece). La paginación vive en la URL
 // (`?cursor=`), sin estado de cliente para la lista.
 import { revalidatePath } from "next/cache";
-import { requireOrgMembership } from "@/server/auth/guard";
+import { requireOrgMembership, requireSection } from "@/server/auth/guard";
 import { completeObjective, listObjectives } from "@/server/objectives/mutations";
 import { pointsForObjective } from "@/server/objectives/points";
 import { CompleteObjectiveButton } from "./CompleteObjectiveButton.tsx";
@@ -24,7 +24,7 @@ export default async function ObjetivosPage({
   const { org: orgId } = await params;
   const { cursor } = await searchParams;
 
-  const membership = await requireOrgMembership(orgId);
+  const { membership } = await requireSection(orgId, "objetivos");
   const { data } = await listObjectives(membership.userId, orgId, { cursor: cursor ?? null });
 
   return (

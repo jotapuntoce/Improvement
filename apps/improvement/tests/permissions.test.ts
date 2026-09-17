@@ -13,6 +13,7 @@ import {
   listPermissionTypes,
   updatePermissionType,
 } from "../server/permissions/mutations.ts";
+import { listObjectives } from "../server/objectives/mutations.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -380,6 +381,174 @@ describe("updatePermissionType", () => {
       const fila = tiposA.find((t) => t.id === creado.data);
       expect(fila?.name).toBe("De A");
       expect(fila?.grants).toEqual({ objetivos: "area" });
+    },
+  );
+});
+
+describe("listObjectives con alcance", () => {
+  it(
+    "WHEN el empleado tiene alcance `propio` THE SYSTEM SHALL devolverle solo lo asignado a él, " +
+      "aunque su compañero tenga objetivos en la misma área",
+    async () => {
+      const org = await newOrg("Test Org Alcance Propio");
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Operativo", grants: { objetivos: "propio" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const yo = crypto.randomUUID();
+      const companero = crypto.randomUUID();
+      await db.insert(profile).values([
+        { id: yo, email: `${yo}@example.com` },
+        { id: companero, email: `${companero}@example.com` },
+      ]);
+      createdProfileIds.push(yo, companero);
+      await db.insert(membership).values([
+        { userId: yo, orgId: org.id, role: "employee", permissionTypeId: tipo.id, acceptedAt: new Date() },
+        { userId: companero, orgId: org.id, role: "employee", permissionTypeId: tipo.id, acceptedAt: new Date() },
+      ]);
+
+      await db.insert(objective).values([
+        { orgId: org.id, title: "Mío", impactWeight: 10, dueDate: new Date(), assignedEmployeeId: yo },
+        { orgId: org.id, title: "Suyo", impactWeight: 10, dueDate: new Date(), assignedEmployeeId: companero },
+      ]);
+
+      const { data } = await listObjectives(yo, org.id);
+      expect(data.objectives.map((o) => o.title)).toEqual(["Mío"]);
+    },
+  );
+
+  it(
+    "WHEN el empleado tiene alcance `area` pero NO tiene área asignada THE SYSTEM SHALL devolver " +
+      "cero, no todo — un miembro a medio configurar nunca ve de más",
+    async () => {
+      const org = await newOrg("Test Org Alcance Sin Area");
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "A medias", grants: { objetivos: "area" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      await db.insert(profile).values({ id: userId, email: `${userId}@example.com` });
+      createdProfileIds.push(userId);
+      await db.insert(membership).values({
+        userId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        acceptedAt: new Date(),
+      });
+
+      await db
+        .insert(objective)
+        .values({ orgId: org.id, title: "De nadie", impactWeight: 10, dueDate: new Date() });
+
+      const { data } = await listObjectives(userId, org.id);
+      expect(data.objectives.length).toBe(0);
+    },
+  );
+
+  it("WHEN la sección está en `ninguno` THE SYSTEM SHALL devolver la lista vacía, no lanzar", async () => {
+    const org = await newOrg("Test Org Alcance Ninguno");
+    const userId = crypto.randomUUID();
+    await db.insert(profile).values({ id: userId, email: `${userId}@example.com` });
+    createdProfileIds.push(userId);
+    await db
+      .insert(membership)
+      .values({ userId, orgId: org.id, role: "employee", acceptedAt: new Date() });
+
+    await db.insert(objective).values({ orgId: org.id, title: "Oculto", impactWeight: 10, dueDate: new Date() });
+
+    const { data } = await listObjectives(userId, org.id);
+    expect(data.objectives).toEqual([]);
+  });
+
+  it(
+    "WHEN el empleado tiene alcance `empresa` THE SYSTEM SHALL devolverle todos los objetivos del " +
+      "org, sin importar área ni a quién estén asignados",
+    async () => {
+      const org = await newOrg("Test Org Alcance Empresa");
+      const [areaA] = await db
+        .insert(area)
+        .values({ orgId: org.id, name: "Área A", color: "#f59e0b" })
+        .returning();
+      const [areaB] = await db
+        .insert(area)
+        .values({ orgId: org.id, name: "Área B", color: "#22d3ee" })
+        .returning();
+      if (!areaA || !areaB) throw new Error("insert de area no devolvió fila");
+
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Gerente", grants: { objetivos: "empresa" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      await db.insert(profile).values({ id: userId, email: `${userId}@example.com` });
+      createdProfileIds.push(userId);
+      await db.insert(membership).values({
+        userId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        areaId: areaA.id,
+        acceptedAt: new Date(),
+      });
+
+      await db.insert(objective).values([
+        { orgId: org.id, areaId: areaA.id, title: "De A", impactWeight: 10, dueDate: new Date() },
+        { orgId: org.id, areaId: areaB.id, title: "De B", impactWeight: 10, dueDate: new Date() },
+        { orgId: org.id, title: "Sin área", impactWeight: 10, dueDate: new Date() },
+      ]);
+
+      const { data } = await listObjectives(userId, org.id);
+      expect(data.objectives.map((o) => o.title).sort()).toEqual(["De A", "De B", "Sin área"]);
+    },
+  );
+
+  it(
+    "WHEN el empleado tiene alcance `area` CON área asignada THE SYSTEM SHALL devolverle los " +
+      "objetivos de su área y no los de otra",
+    async () => {
+      const org = await newOrg("Test Org Alcance Area Con Area");
+      const [areaSuya] = await db
+        .insert(area)
+        .values({ orgId: org.id, name: "Suya", color: "#f59e0b" })
+        .returning();
+      const [areaAjena] = await db
+        .insert(area)
+        .values({ orgId: org.id, name: "Ajena", color: "#22d3ee" })
+        .returning();
+      if (!areaSuya || !areaAjena) throw new Error("insert de area no devolvió fila");
+
+      const [tipo] = await db
+        .insert(permissionType)
+        .values({ orgId: org.id, name: "Jefe de área", grants: { objetivos: "area" } })
+        .returning();
+      if (!tipo) throw new Error("insert de permission_type no devolvió fila");
+
+      const userId = crypto.randomUUID();
+      await db.insert(profile).values({ id: userId, email: `${userId}@example.com` });
+      createdProfileIds.push(userId);
+      await db.insert(membership).values({
+        userId,
+        orgId: org.id,
+        role: "employee",
+        permissionTypeId: tipo.id,
+        areaId: areaSuya.id,
+        acceptedAt: new Date(),
+      });
+
+      await db.insert(objective).values([
+        { orgId: org.id, areaId: areaSuya.id, title: "De su área", impactWeight: 10, dueDate: new Date() },
+        { orgId: org.id, areaId: areaAjena.id, title: "De otra área", impactWeight: 10, dueDate: new Date() },
+      ]);
+
+      const { data } = await listObjectives(userId, org.id);
+      expect(data.objectives.map((o) => o.title)).toEqual(["De su área"]);
     },
   );
 });

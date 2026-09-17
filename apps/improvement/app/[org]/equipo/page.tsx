@@ -2,8 +2,9 @@
 // ve el número por persona (Pitfalls §02-producto-core): esta rama usa listTeamForOwner(), cuyo
 // shape no trae ese campo, así que no hay forma de filtrarlo mal aquí — no existe en el dato.
 import Link from "next/link";
-import { requireOrgMembership } from "@/server/auth/guard";
+import { requireSection } from "@/server/auth/guard";
 import { getResponsibilityLevel, listTeamForOwner } from "@/server/employees/responsibility";
+import { listTeammates } from "@/server/employees/teammates";
 import { listLiveInvitations } from "@/server/invitations/loadInvitations";
 
 const pageStyle = {
@@ -50,7 +51,7 @@ const ghostLinkStyle = {
 
 export default async function EquipoPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
-  const memberRow = await requireOrgMembership(orgId);
+  const { membership: memberRow, scope } = await requireSection(orgId, "equipo");
 
   if (memberRow.role === "owner") {
     const team = await listTeamForOwner(orgId);
@@ -94,6 +95,7 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
   }
 
   const level = await getResponsibilityLevel(memberRow.userId, memberRow.userId, orgId);
+  const companeros = await listTeammates(orgId, scope === "area" ? memberRow.areaId : null);
   return (
     <main style={pageStyle}>
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Tu equipo</h1>
@@ -113,6 +115,16 @@ export default async function EquipoPage({ params }: { params: Promise<{ org: st
           {level}%
         </p>
       </div>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+        {companeros.map((c) => (
+          <li key={c.userId} style={cardStyle}>
+            <p style={{ margin: 0 }}>{c.fullName ?? c.email}</p>
+            {c.jobTitle && (
+              <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "13px" }}>{c.jobTitle}</p>
+            )}
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

@@ -1,13 +1,13 @@
 // Catálogo global de PowerUps con balance visible — §9.6 del blueprint. Server Component: requiere
 // tenencia con requireOrgMembership antes de tocar cualquier dato, mismo patrón que /[org]/objetivos.
 import { revalidatePath } from "next/cache";
-import { requireOrgMembership } from "@/server/auth/guard";
+import { requireOrgMembership, requireSection } from "@/server/auth/guard";
 import { listActivePowerups, pointsBalance, redeemPowerup } from "@/server/powerups/mutations";
 import { RedeemPowerupButton } from "./RedeemPowerupButton.tsx";
 
 export default async function PowerupsPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
-  const memberRow = await requireOrgMembership(orgId);
+  const { membership: memberRow } = await requireSection(orgId, "powerups");
 
   const [balance, catalog] = await Promise.all([
     pointsBalance(memberRow.userId),
