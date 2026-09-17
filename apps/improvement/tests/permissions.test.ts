@@ -169,6 +169,15 @@ describe("scopeFor", () => {
   it("WHEN el mapa concede un alcance THE SYSTEM SHALL devolverlo tal cual", () => {
     expect(scopeFor("employee", { objetivos: "area" }, "objetivos")).toBe("area");
   });
+
+  it(
+    "WHEN grants no pasa grantsSchema (un alcance inventado) THE SYSTEM SHALL devolver `ninguno`, " +
+      "fail-closed, y no lanzar — la fila que decide qué ve todo el producto no puede abrir por un " +
+      "dato corrupto",
+    () => {
+      expect(scopeFor("employee", { objetivos: "bogus" }, "objetivos")).toBe("ninguno");
+    },
+  );
 });
 
 describe("grantsSchema", () => {
@@ -250,6 +259,38 @@ describe("resolveSection", () => {
     const { scope } = await resolveSection(employeeId, org.id, "objetivos");
     expect(scope).toBe("ninguno");
   });
+
+  it(
+    "WHEN permission_type_id apunta a un tipo de OTRA empresa (fila inconsistente) THE SYSTEM SHALL " +
+      "devolver `ninguno`, no los grants de esa otra empresa — la consulta de permission_type va " +
+      "acotada por orgId, no solo por el id del tipo",
+    async () => {
+      const propia = await newOrg("Test Org Resolve Cross Propia");
+      const ajena = await newOrg("Test Org Resolve Cross Ajena");
+
+      const [tipoAjeno] = await db
+        .insert(permissionType)
+        .values({ orgId: ajena.id, name: "Gerente de la otra", grants: { objetivos: "empresa" } })
+        .returning();
+      if (!tipoAjeno) throw new Error("insert de permission_type no devolvió fila");
+
+      const employeeId = crypto.randomUUID();
+      await db.insert(profile).values({ id: employeeId, email: `${employeeId}@example.com` });
+      createdProfileIds.push(employeeId);
+      // Fila deliberadamente inconsistente: membership de `propia` con un permissionTypeId de
+      // `ajena`. No hay FK compuesta que lo impida — es justo el escenario del hallazgo #3.
+      await db.insert(membership).values({
+        userId: employeeId,
+        orgId: propia.id,
+        role: "employee",
+        permissionTypeId: tipoAjeno.id,
+        acceptedAt: new Date(),
+      });
+
+      const { scope } = await resolveSection(employeeId, propia.id, "objetivos");
+      expect(scope).toBe("ninguno");
+    },
+  );
 });
 
 describe("createPermissionType", () => {
@@ -284,6 +325,64 @@ describe("createPermissionType", () => {
       const result = await createPermissionType(ownerId, org.id, "Imposible", { clientes: "propio" });
       expect(result.ok).toBe(false);
       expect(result.ok === false && result.error.code).toBe("VALIDATION_ERROR");
+    },
+  );
+
+  it(
+    "WHEN el dueño crea dos tipos con el mismo nombre THE SYSTEM SHALL devolver un Result de error " +
+      "(DUPLICATE_NAME), no dejar salir la excepción de Postgres del uniqueIndex del Server Action",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Tipos Duplicado");
+      const primero = await createPermissionType(ownerId, org.id, "Vendedor", { objetivos: "area" });
+      expect(primero.ok).toBe(true);
+
+      const result = await createPermissionType(ownerId, org.id, "Vendedor", { objetivos: "empresa" });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("DUPLICATE_NAME");
+
+      const tipos = await listPermissionTypes(org.id);
+      expect(tipos.filter((t) => t.name === "Vendedor").length).toBe(1);
+    },
+  );
+});
+
+describe("listPermissionTypes", () => {
+  it(
+    "WHEN dos personas tienen un tipo asignado y una tercera tiene otro THE SYSTEM SHALL devolver " +
+      "assignedCount acotado por orgId, contando solo a la gente de esta empresa",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Tipos Conteo");
+      const conGente = await createPermissionType(ownerId, org.id, "Con gente", { objetivos: "area" });
+      const sinGente = await createPermissionType(ownerId, org.id, "Sin gente", { objetivos: "area" });
+      if (!conGente.ok || !sinGente.ok) throw new Error("createPermissionType falló");
+
+      const empleadoUno = crypto.randomUUID();
+      const empleadoDos = crypto.randomUUID();
+      await db.insert(profile).values([
+        { id: empleadoUno, email: `${empleadoUno}@example.com` },
+        { id: empleadoDos, email: `${empleadoDos}@example.com` },
+      ]);
+      createdProfileIds.push(empleadoUno, empleadoDos);
+      await db.insert(membership).values([
+        {
+          userId: empleadoUno,
+          orgId: org.id,
+          role: "employee",
+          permissionTypeId: conGente.data,
+          acceptedAt: new Date(),
+        },
+        {
+          userId: empleadoDos,
+          orgId: org.id,
+          role: "employee",
+          permissionTypeId: conGente.data,
+          acceptedAt: new Date(),
+        },
+      ]);
+
+      const tipos = await listPermissionTypes(org.id);
+      expect(tipos.find((t) => t.id === conGente.data)?.assignedCount).toBe(2);
+      expect(tipos.find((t) => t.id === sinGente.data)?.assignedCount).toBe(0);
     },
   );
 });
@@ -384,6 +483,26 @@ describe("updatePermissionType", () => {
       const fila = tiposA.find((t) => t.id === creado.data);
       expect(fila?.name).toBe("De A");
       expect(fila?.grants).toEqual({ objetivos: "area" });
+    },
+  );
+
+  it(
+    "WHEN el dueño renombra un tipo al nombre de OTRO tipo de la misma empresa THE SYSTEM SHALL " +
+      "rechazarlo con DUPLICATE_NAME, sin tocar la fila",
+    async () => {
+      const { org, ownerId } = await orgConDueno("Test Org Tipos Update Duplicado");
+      const uno = await createPermissionType(ownerId, org.id, "Vendedor", { objetivos: "area" });
+      const dos = await createPermissionType(ownerId, org.id, "Soporte", { objetivos: "empresa" });
+      if (!uno.ok || !dos.ok) throw new Error("createPermissionType falló");
+
+      const result = await updatePermissionType(ownerId, org.id, dos.data, "Vendedor", {
+        objetivos: "empresa",
+      });
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("DUPLICATE_NAME");
+
+      const tipos = await listPermissionTypes(org.id);
+      expect(tipos.find((t) => t.id === dos.data)?.name).toBe("Soporte");
     },
   );
 });
@@ -776,6 +895,36 @@ describe("loadVisibleSections", () => {
 
       const secciones = await loadVisibleSections(userId, org.id);
       expect(secciones.map((s) => s.slug)).toEqual(["objetivos"]);
+    },
+  );
+
+  it(
+    "WHEN permission_type_id apunta a un tipo de OTRA empresa THE SYSTEM SHALL tratarlo como sin " +
+      "tipo (nada visible), no traer los grants de esa otra empresa — mismo hallazgo #3 que " +
+      "resolveSection, pero por el loader del menú",
+    async () => {
+      const propia = await newOrg("Test Org Secciones Cross Propia");
+      const ajena = await newOrg("Test Org Secciones Cross Ajena");
+
+      const [tipoAjeno] = await db
+        .insert(permissionType)
+        .values({ orgId: ajena.id, name: "Ve todo en la otra", grants: { objetivos: "empresa" } })
+        .returning();
+      if (!tipoAjeno) throw new Error("insert de permission_type no devolvió fila");
+
+      const employeeId = crypto.randomUUID();
+      await db.insert(profile).values({ id: employeeId, email: `${employeeId}@example.com` });
+      createdProfileIds.push(employeeId);
+      await db.insert(membership).values({
+        userId: employeeId,
+        orgId: propia.id,
+        role: "employee",
+        permissionTypeId: tipoAjeno.id,
+        acceptedAt: new Date(),
+      });
+
+      const secciones = await loadVisibleSections(employeeId, propia.id);
+      expect(secciones).toEqual([]);
     },
   );
 });

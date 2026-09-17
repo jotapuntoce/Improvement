@@ -152,7 +152,7 @@ export async function resolveSection(
   const [type] = await db
     .select({ grants: permissionType.grants })
     .from(permissionType)
-    .where(eq(permissionType.id, row.permissionTypeId))
+    .where(and(eq(permissionType.id, row.permissionTypeId), eq(permissionType.orgId, orgId)))
     .limit(1);
 
   return { membership: row, scope: scopeFor(row.role, type?.grants ?? null, section) };

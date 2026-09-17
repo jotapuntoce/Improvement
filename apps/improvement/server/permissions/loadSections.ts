@@ -3,7 +3,7 @@
 // Dos filtros distintos que se ven parecido pero no lo son: `hidden` es del dueño ("esta empresa no
 // usa PowerUps") y aplica a todos; el alcance `ninguno` es de la persona. Los dos terminan en lo
 // mismo — la sección no se dibuja — pero por razones distintas.
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, permissionType } from "@jotapuntoce/db/schema";
 import { assertMembership } from "../auth/guard.ts";
@@ -39,7 +39,7 @@ export async function loadVisibleSections(userId: string, orgId: string): Promis
     const [type] = await db
       .select({ grants: permissionType.grants })
       .from(permissionType)
-      .where(eq(permissionType.id, memberRow.permissionTypeId))
+      .where(and(eq(permissionType.id, memberRow.permissionTypeId), eq(permissionType.orgId, orgId)))
       .limit(1);
     grants = type?.grants ?? null;
   }
