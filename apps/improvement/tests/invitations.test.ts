@@ -1,10 +1,11 @@
 // Invitaciones: el token vive una vez y solo en el correo de quien lo recibió — en la base queda
 // únicamente su hash, así que quien se robe la base no se roba invitaciones usables.
 import { afterEach, describe, expect, it } from "vitest";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { invitation, membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
-import { createInvitation, hashToken } from "../server/invitations/mutations.ts";
+import { area, invitation, membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
+import { acceptInvitation, createInvitation, hashToken } from "../server/invitations/mutations.ts";
+import { findOpenInvitation } from "../server/invitations/loadInvitations.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -108,4 +109,203 @@ describe("createInvitation", () => {
       expect(row).toBeUndefined();
     },
   );
+});
+
+const formValido = {
+  fullName: "Lucía Ramírez",
+  phone: "5215512345678",
+  areaId: null,
+  jobTitle: "Jefa de obra",
+  responsibilities: "Coordina a los maestros y cierra las bitácoras",
+};
+
+describe("acceptInvitation", () => {
+  it(
+    "WHEN alguien acepta con un token vivo THE SYSTEM SHALL crear su perfil y su membresía con el " +
+      "puesto y el tipo de permiso que traía la invitación",
+    async () => {
+      const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta");
+      const emitida = await createInvitation(ownerId, org.id, "lucia@example.com", tipo.id);
+      if (!emitida.ok) throw new Error("createInvitation falló");
+
+      const nuevoId = crypto.randomUUID();
+      createdProfileIds.push(nuevoId);
+
+      const result = await acceptInvitation(
+        emitida.data.token,
+        { id: nuevoId, email: "lucia@example.com" },
+        formValido,
+      );
+      expect(result.ok).toBe(true);
+
+      const [row] = await db
+        .select()
+        .from(membership)
+        .where(and(eq(membership.userId, nuevoId), eq(membership.orgId, org.id)));
+      expect(row?.permissionTypeId).toBe(tipo.id);
+      expect(row?.jobTitle).toBe("Jefa de obra");
+      expect(row?.role).toBe("employee");
+
+      const [perfil] = await db.select().from(profile).where(eq(profile.id, nuevoId));
+      expect(perfil?.phone).toBe("5215512345678");
+    },
+  );
+
+  it("WHEN el mismo enlace se usa dos veces THE SYSTEM SHALL rechazar el segundo intento", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Dos Veces");
+    const emitida = await createInvitation(ownerId, org.id, "repetida@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    const primero = crypto.randomUUID();
+    const segundo = crypto.randomUUID();
+    createdProfileIds.push(primero, segundo);
+
+    const uno = await acceptInvitation(emitida.data.token, { id: primero, email: "repetida@example.com" }, formValido);
+    const dos = await acceptInvitation(emitida.data.token, { id: segundo, email: "repetida@example.com" }, formValido);
+
+    expect(uno.ok).toBe(true);
+    expect(dos.ok).toBe(false);
+    expect(dos.ok === false && dos.error.code).toBe("NOT_FOUND");
+
+    const filas = await db.select().from(membership).where(eq(membership.userId, segundo));
+    expect(filas.length).toBe(0);
+  });
+
+  it(
+    "WHEN quien acepta se registró con OTRO correo THE SYSTEM SHALL rechazarlo — el correo lo fijó " +
+      "el dueño al invitar y el formulario no lo puede cambiar",
+    async () => {
+      const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Otro Correo");
+      const emitida = await createInvitation(ownerId, org.id, "invitado@example.com", tipo.id);
+      if (!emitida.ok) throw new Error("createInvitation falló");
+
+      const intruso = crypto.randomUUID();
+      const result = await acceptInvitation(
+        emitida.data.token,
+        { id: intruso, email: "intruso@example.com" },
+        formValido,
+      );
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("FORBIDDEN");
+
+      const filas = await db.select().from(membership).where(eq(membership.userId, intruso));
+      expect(filas.length).toBe(0);
+    },
+  );
+
+  it("WHEN el enlace ya venció THE SYSTEM SHALL rechazarlo", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Vencida");
+    const emitida = await createInvitation(ownerId, org.id, "tarde@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    await db
+      .update(invitation)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(invitation.tokenHash, hashToken(emitida.data.token)));
+
+    const tarde = crypto.randomUUID();
+    const result = await acceptInvitation(emitida.data.token, { id: tarde, email: "tarde@example.com" }, formValido);
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error.code).toBe("NOT_FOUND");
+
+    const filas = await db.select().from(membership).where(eq(membership.userId, tarde));
+    expect(filas.length).toBe(0);
+  });
+
+  it("WHEN el formulario viene incompleto THE SYSTEM SHALL rechazarlo sin crear nada", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Incompleto");
+    const emitida = await createInvitation(ownerId, org.id, "incompleto@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    const usuario = crypto.randomUUID();
+    const result = await acceptInvitation(
+      emitida.data.token,
+      { id: usuario, email: "incompleto@example.com" },
+      { ...formValido, fullName: "" },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error.code).toBe("VALIDATION_ERROR");
+
+    const filas = await db.select().from(membership).where(eq(membership.userId, usuario));
+    expect(filas.length).toBe(0);
+  });
+
+  it(
+    "WHEN el areaId del formulario es de OTRA empresa THE SYSTEM SHALL rechazarlo sin crear perfil " +
+      "ni membresía — el areaId lo manda quien acepta, alguien todavía sin confiar, y podría mandar " +
+      "el id de un área ajena",
+    async () => {
+      const propia = await orgConDuenoYTipo("Test Org Acepta Area Propia");
+      const ajena = await orgConDuenoYTipo("Test Org Acepta Area Ajena");
+
+      const [areaAjena] = await db
+        .insert(area)
+        .values({ orgId: ajena.org.id, name: "Ventas", color: "#7c5cff" })
+        .returning();
+      if (!areaAjena) throw new Error("insert de area no devolvió fila");
+
+      const emitida = await createInvitation(propia.ownerId, propia.org.id, "colado@example.com", propia.tipo.id);
+      if (!emitida.ok) throw new Error("createInvitation falló");
+
+      const usuario = crypto.randomUUID();
+      const result = await acceptInvitation(
+        emitida.data.token,
+        { id: usuario, email: "colado@example.com" },
+        { ...formValido, areaId: areaAjena.id },
+      );
+      expect(result.ok).toBe(false);
+      expect(result.ok === false && result.error.code).toBe("NOT_FOUND");
+
+      const filas = await db.select().from(membership).where(eq(membership.userId, usuario));
+      expect(filas.length).toBe(0);
+      const perfiles = await db.select().from(profile).where(eq(profile.id, usuario));
+      expect(perfiles.length).toBe(0);
+    },
+  );
+});
+
+describe("findOpenInvitation", () => {
+  it("WHEN el token está vivo THE SYSTEM SHALL devolver la invitación", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Find Vivo");
+    const emitida = await createInvitation(ownerId, org.id, "viva@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    const encontrada = await findOpenInvitation(emitida.data.token);
+    expect(encontrada?.orgId).toBe(org.id);
+    expect(encontrada?.email).toBe("viva@example.com");
+    expect(encontrada?.orgName).toBe(org.name);
+  });
+
+  it("WHEN el token no existe THE SYSTEM SHALL devolver null", async () => {
+    const encontrada = await findOpenInvitation(crypto.randomUUID());
+    expect(encontrada).toBeNull();
+  });
+
+  it("WHEN el token ya fue usado THE SYSTEM SHALL devolver null", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Find Usado");
+    const emitida = await createInvitation(ownerId, org.id, "usada@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    const usuario = crypto.randomUUID();
+    createdProfileIds.push(usuario);
+    const aceptado = await acceptInvitation(emitida.data.token, { id: usuario, email: "usada@example.com" }, formValido);
+    if (!aceptado.ok) throw new Error("acceptInvitation falló preparando el caso");
+
+    const encontrada = await findOpenInvitation(emitida.data.token);
+    expect(encontrada).toBeNull();
+  });
+
+  it("WHEN el token venció THE SYSTEM SHALL devolver null", async () => {
+    const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Find Vencido");
+    const emitida = await createInvitation(ownerId, org.id, "vencida@example.com", tipo.id);
+    if (!emitida.ok) throw new Error("createInvitation falló");
+
+    await db
+      .update(invitation)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(invitation.tokenHash, hashToken(emitida.data.token)));
+
+    const encontrada = await findOpenInvitation(emitida.data.token);
+    expect(encontrada).toBeNull();
+  });
 });
