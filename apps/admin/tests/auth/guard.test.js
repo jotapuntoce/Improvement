@@ -30,7 +30,7 @@ afterEach(async () => {
 
 describe("findProfile", () => {
   it("WHEN el userId tiene profile THE SYSTEM SHALL devolver la fila", async () => {
-    const p = await makeProfile(true);
+    const p = await makeProfile(false);
 
     const row = await findProfile(p.id);
 
@@ -47,7 +47,14 @@ describe("findProfile", () => {
 
 describe("assertPlatformAdmin", () => {
   it("WHEN el profile tiene is_platform_admin=true THE SYSTEM SHALL devolver la fila", async () => {
-    const p = await makeProfile(true);
+    // Reutiliza un platform admin real ya existente en vez de crear uno temporal: insertar y luego
+    // borrar una fila con is_platform_admin=true aquí compite contra cualquier código que en otro
+    // proceso lea "todos los platform admins" y actúe sobre esa lista dentro de la misma transacción
+    // (provisionOrganization, app/company-requests/actions.js) — contra la misma base real, en
+    // paralelo. Encontrado corriendo tests/company-requests.test.js junto a este archivo: el admin
+    // desaparecía entre el select y el insert de membership, violando la FK.
+    const [p] = await db.select().from(profile).where(eq(profile.isPlatformAdmin, true)).limit(1);
+    if (!p) throw new Error("este entorno no tiene ningún profile con is_platform_admin=true");
 
     const row = await assertPlatformAdmin(p.id);
 

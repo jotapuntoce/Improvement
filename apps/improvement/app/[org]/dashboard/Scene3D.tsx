@@ -9,7 +9,10 @@ import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { shouldAutoRotate, type SceneGraph } from "@/server/scene/sceneGraph";
+import { SceneList } from "./SceneList.tsx";
 
+// Los colores del <meshStandardMaterial> de three.js no entienden var(--token): aquí sí van los hex,
+// y son exactamente los de --danger / --accent-2 / --success en packages/ui/src/tokens.css.
 const STATUS_COLOR: Record<string, string> = {
   alerta: "#f87171",
   activo: "#22d3ee",
@@ -23,42 +26,6 @@ function detectWebgl(): boolean {
   } catch {
     return false;
   }
-}
-
-export function SceneListFallback({ graph }: { graph: SceneGraph }) {
-  return (
-    <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-      <section>
-        <h2 style={{ fontSize: "14px", color: "var(--text-secondary)", margin: "0 0 8px" }}>Áreas</h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
-          {graph.zones.map((zone) => (
-            <li key={zone.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-              <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: zone.color }} />
-              {zone.name}
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section>
-        <h2 style={{ fontSize: "14px", color: "var(--text-secondary)", margin: "0 0 8px" }}>Equipo</h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
-          {graph.avatars.map((avatar) => (
-            <li key={avatar.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-              <span
-                style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  background: STATUS_COLOR[avatar.status] ?? STATUS_COLOR.ok,
-                }}
-              />
-              {avatar.name}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
 }
 
 export function Scene3D({ graph }: { graph: SceneGraph }) {
@@ -80,7 +47,7 @@ export function Scene3D({ graph }: { graph: SceneGraph }) {
 
   // null = todavía sin resolver del lado del cliente — evita parpadear entre Canvas y fallback.
   if (webglSupported === null) return null;
-  if (!webglSupported) return <SceneListFallback graph={graph} />;
+  if (!webglSupported) return <SceneList graph={graph} />;
 
   return (
     <Canvas camera={{ position: [0, 8, 14], fov: 50 }} style={{ width: "100%", height: "100%" }}>

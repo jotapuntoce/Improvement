@@ -7,21 +7,13 @@ import { assertMembership } from "../auth/guard.ts";
 
 export type BuildStage = typeof orgBuildStage.$inferSelect;
 
-/**
- * WHEN ninguna etapa está en_progreso y la última está completada THE SYSTEM SHALL marcar esa
- * última como la etapa actual (criterio #3). Prioridad: la primera en_progreso; si no hay ninguna,
- * la última si está completada (mapa terminado); si no, -1 — nada que marcar "estás aquí" todavía.
- * Función pura — separada de getBuildMap() para poder probar la derivación sin tocar la base.
- */
-export function deriveCurrentStageIndex(stages: Pick<BuildStage, "status">[]): number {
-  const inProgressIndex = stages.findIndex((s) => s.status === "en_progreso");
-  if (inProgressIndex !== -1) return inProgressIndex;
-
-  const last = stages[stages.length - 1];
-  if (last && last.status === "completada") return stages.length - 1;
-
-  return -1;
-}
+// WHEN ninguna etapa está en_progreso y la última está completada THE SYSTEM SHALL marcar esa última
+// como la etapa actual (criterio #3). La implementación vive en server/companies/companyList.ts,
+// junto a deriveStageLabel, que aplica exactamente la misma regla de prioridad — el panel del dueño
+// necesitaba la misma derivación y tenerla escrita dos veces era garantizar que una se quedara
+// atrás. Se reexporta para no romper a quien ya la importaba de aquí (tests/build-map.test.ts).
+import { deriveCurrentStageIndex } from "../companies/companyList.ts";
+export { deriveCurrentStageIndex };
 
 export interface BuildMap {
   stages: BuildStage[];

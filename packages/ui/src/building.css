@@ -256,6 +256,39 @@
   color: var(--text-secondary);
 }
 
+/* Variante de navegación jerárquica (components/BackLink.tsx, apps/improvement): despegada del
+   flujo para quedar sobre cualquier pantalla — la escena 3D del dashboard ocupa 100vh y no deja
+   lugar para un encabezado, y las páginas con padding normal tampoco tienen uno.
+   A la derecha, no a la izquierda: las páginas de [org] (objetivos, equipo, powerups…) abren con su
+   <h1> pegado al margen izquierdo y con el padding declarado inline, que gana sobre cualquier regla
+   de aquí — el chip quedaba encima del título. La columna derecha está libre en las 8 rutas. */
+.jpc-back-link--fixed {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  margin-top: 0;
+  width: fit-content;
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.jpc-back-link--fixed:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-2);
+}
+.jpc-back-link--fixed:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jpc-back-link--fixed { transition: none; }
+}
+
 /* Reception.tsx (packages/ui) acepta cualquier children — cuando es un <form> (caso de
    apps/admin, login real), display:contents lo "aplana" para que sus campos hereden el
    flex/gap de .jpc-reception-card directo, igual que antes de generalizar el componente. */
@@ -264,13 +297,38 @@
 }
 
 /* ===== Panel de empresas (/empresas, apps/improvement) ===== */
+/* column, no la fila por default: con un solo hijo (el grid de empresas) la diferencia no se veía,
+   pero al sumar el formulario de "solicitar empresa" quedaba sentado AL LADO del portafolio en vez
+   de debajo. El gap sustituye al margin-top que el form traía inline y que en fila no hacía nada. */
 .empresas-page {
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 28px;
   background: linear-gradient(180deg, var(--sky-top), var(--sky-bot) 70%);
   padding: 40px 20px;
+}
+
+.empresas-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+}
+/* Separador suave entre el portafolio y la zona de "pedir otra empresa": sin él las dos partes se
+   leen como una sola lista revuelta. */
+.empresas-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  width: min(100%, 560px);
 }
 
 .empresas-intro {

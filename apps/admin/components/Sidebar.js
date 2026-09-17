@@ -14,6 +14,8 @@ export default function Sidebar({ orgCount = 0 }) {
   const NAV_ITEMS = [
     { href: "/", label: "Dashboard", sub: "Resumen", icon: "◈" },
     { href: "/improvement", label: "Improvement", sub: "Productos", appIcon: true },
+    { href: "/planos", label: "Planos", sub: "Ensambles", icon: "⬡" },
+    { href: "/company-requests", label: "Solicitudes", sub: "Auto-registro", icon: "✉" },
   ];
 
   return (

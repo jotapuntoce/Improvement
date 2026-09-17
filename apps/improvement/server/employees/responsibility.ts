@@ -84,6 +84,12 @@ export type TeamMemberSummary = {
  * campo de nivel de responsabilidad por fila (criterio #3). Esta es la única fuente de datos de esa
  * vista — su shape no incluye responsibilityLevel, así que la página no puede filtrarlo sin
  * agregarlo a mano (y no lo hace, ver [org]/equipo/page.tsx).
+ *
+ * WHEN un platform admin tiene membership en el org THE SYSTEM SHALL excluirlo de esta lista: entra
+ * a cada organización nueva por rol (provisionOrganization y approveCompanyRequest en apps/admin le
+ * dan membership owner) para poder dar soporte, pero no es parte del equipo del cliente — sin este
+ * filtro el dueño abría /equipo y veía el correo personal de Jose Carlos como un miembro más.
+ * El filtro es por is_platform_admin, nunca por un id o correo literal (.claude/rules/motor-generico.md).
  */
 export async function listTeamForOwner(orgId: string): Promise<TeamMemberSummary[]> {
   const rows = await db
@@ -95,7 +101,7 @@ export async function listTeamForOwner(orgId: string): Promise<TeamMemberSummary
     })
     .from(membership)
     .innerJoin(profile, eq(profile.id, membership.userId))
-    .where(eq(membership.orgId, orgId));
+    .where(and(eq(membership.orgId, orgId), eq(profile.isPlatformAdmin, false)));
 
   return rows;
 }

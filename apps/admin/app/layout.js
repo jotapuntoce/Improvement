@@ -4,6 +4,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { getOrgStats } from "@/lib/orgStats.js";
+import { signOut } from "./logout/actions.js";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,7 +60,7 @@ export default async function RootLayout({ children }) {
         <div className="app-bg" aria-hidden="true" />
         <Sidebar orgCount={totalOrgs} />
         <div className="app-main">
-          <Topbar orgCount={totalOrgs} />
+          <Topbar orgCount={totalOrgs} signOut={signOut} />
           <main className="app-content">{children}</main>
         </div>
       </body>
