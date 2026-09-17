@@ -162,7 +162,13 @@ export async function acceptInvitation(
           set: { fullName: parsed.data.fullName, phone: parsed.data.phone },
         });
 
-      await tx
+      // El chequeo de arriba (`yaMiembro`) no cierra la ventana entera: si la misma persona acepta
+      // dos invitaciones a la misma empresa casi al mismo tiempo, ambas transacciones pueden pasarlo
+      // antes de que cualquiera confirme. El `.returning()` aquí es la segunda cerradura — si el
+      // índice único (uq_membership_user_org) se comió el insert en silencio, no hay fila que
+      // devolver y lo convertimos en un fallo fuerte en vez de reportar ok:true sobre una escritura
+      // que no ocurrió (mismo criterio que `claimed` arriba, dos líneas más arriba).
+      const [insertedMembership] = await tx
         .insert(membership)
         .values({
           userId: sessionUser.id,
@@ -174,11 +180,17 @@ export async function acceptInvitation(
           responsibilities: parsed.data.responsibilities,
           acceptedAt: new Date(),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ userId: membership.userId });
+      if (!insertedMembership) throw new Error("ALREADY_MEMBER");
 
       return { ok: true as const, data: { orgId: inv.orgId } };
     });
-  } catch {
+  } catch (err) {
+    // Misma persona, misma situación que el chequeo previo a la transacción: le decimos lo mismo.
+    if (err instanceof Error && err.message === "ALREADY_MEMBER") {
+      return fail("Ya eres parte de esta empresa. Entra desde /login.", "ALREADY_MEMBER");
+    }
     return fail("Este enlace ya no sirve.", "NOT_FOUND");
   }
 }

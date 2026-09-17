@@ -316,6 +316,50 @@ describe("acceptInvitation", () => {
       expect(inv?.acceptedAt).toBeNull();
     },
   );
+
+  it(
+    "WHEN el mismo correo (todavía sin ser miembro) acepta DOS invitaciones distintas a la misma " +
+      "empresa AL MISMO TIEMPO THE SYSTEM SHALL dejar pasar solo una — el chequeo previo a la " +
+      "transacción no cierra la ventana completa: las dos llamadas pueden pasarlo antes de que " +
+      "cualquiera confirme, y solo el índice único (uq_membership_user_org) decide cuál gana",
+    async () => {
+      const { org, ownerId, tipo } = await orgConDuenoYTipo("Test Org Acepta Carrera");
+
+      const emitidaA = await createInvitation(ownerId, org.id, "carrera@example.com", tipo.id);
+      const emitidaB = await createInvitation(ownerId, org.id, "carrera@example.com", tipo.id);
+      if (!emitidaA.ok || !emitidaB.ok) throw new Error("createInvitation falló");
+
+      const usuario = crypto.randomUUID();
+      createdProfileIds.push(usuario);
+      const sessionUser = { id: usuario, email: "carrera@example.com" };
+
+      const [resA, resB] = await Promise.all([
+        acceptInvitation(emitidaA.data.token, sessionUser, formValido),
+        acceptInvitation(emitidaB.data.token, sessionUser, formValido),
+      ]);
+
+      const ganadores = [resA, resB].filter((r) => r.ok);
+      const perdedores = [resA, resB].filter((r) => !r.ok);
+      expect(ganadores.length).toBe(1);
+      expect(perdedores.length).toBe(1);
+      expect(perdedores[0]!.ok === false && perdedores[0]!.error.code).toBe("ALREADY_MEMBER");
+
+      const filas = await db
+        .select()
+        .from(membership)
+        .where(and(eq(membership.userId, usuario), eq(membership.orgId, org.id)));
+      expect(filas.length).toBe(1);
+
+      // La invitación de quien perdió la carrera hizo rollback junto con el resto de su transacción:
+      // sigue sin consumir, no debe quedar acceptedAt puesto sobre un insert que nunca ocurrió.
+      const emitidaPerdedora = resA.ok ? emitidaB : emitidaA;
+      const [invPerdedora] = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.tokenHash, hashToken(emitidaPerdedora.data.token)));
+      expect(invPerdedora?.acceptedAt).toBeNull();
+    },
+  );
 });
 
 describe("findOpenInvitation", () => {
