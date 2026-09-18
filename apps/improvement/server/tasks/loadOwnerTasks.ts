@@ -65,6 +65,33 @@ function sortTasks(tasks: OwnerTask[]): OwnerTask[] {
   });
 }
 
+/** Qué parte del peso total concentra el grupo vital. La regla 80/20, escrita una sola vez. */
+export const PARETO_SHARE = 0.8;
+
+/**
+ * Los pocos pendientes que concentran el 80% del peso de todo lo que hay pendiente hoy.
+ *
+ * La lista entra ya ordenada por prioridad, así que el grupo vital es un prefijo: se van sumando
+ * prioridades desde el más urgente hasta cubrir el 80%. Lo que queda afuera no es basura — es el
+ * 20% de resultado que cuesta el 80% del día, y por eso no va arriba.
+ *
+ * Devuelve cuántos son, no las tareas: quien dibuja ya tiene la lista y solo necesita saber dónde
+ * está el corte. Devolver una segunda lista invitaba a que las dos se desincronizaran.
+ */
+export function paretoCut(tasks: OwnerTask[]): number {
+  if (tasks.length === 0) return 0;
+  const total = tasks.reduce((n, t) => n + t.priority, 0);
+  // Sin peso que repartir (todo en cero) no hay 20% que valga más que otro: todos son vitales.
+  if (total <= 0) return tasks.length;
+
+  let acumulado = 0;
+  for (let i = 0; i < tasks.length; i++) {
+    acumulado += tasks[i]!.priority;
+    if (acumulado / total >= PARETO_SHARE) return i + 1;
+  }
+  return tasks.length;
+}
+
 export async function loadOwnerTasks(userId: string, now = new Date()): Promise<OwnerTask[]> {
   // Solo las empresas donde es DUEÑO: un empleado que entre aquí no tiene por qué ver la deuda de su
   // jefe, y el panel de portafolio es del dueño por definición.

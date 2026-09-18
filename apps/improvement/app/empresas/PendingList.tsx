@@ -4,9 +4,17 @@
 // mi empresa?", que es una pregunta que se hace una vez a la semana; esto contesta "¿qué hago hoy?",
 // que es por lo que abre el panel. El rastreador sigue ahí, detrás del botón de construcción.
 //
-// Server Component: el orden ya viene resuelto de server/tasks/loadOwnerTasks.ts.
+// TRES y no seis. Seis pendientes no son una prioridad, son una lista de quehaceres: el dueño la
+// lee entera y arranca por el que le dé menos flojera. Tres caben de un vistazo y obligan a que
+// algo se quede afuera, que es justamente lo que los vuelve una decisión.
+//
+// El resto no se esconde, se pliega: un <details> nativo los abre todos. Sin "use client" — un
+// acordeón es exactamente lo que el navegador ya sabe hacer solo.
+//
+// Server Component: el orden y el corte de Pareto ya vienen resueltos de
+// server/tasks/loadOwnerTasks.ts.
 import Link from "next/link";
-import type { OwnerTask } from "@/server/tasks/loadOwnerTasks";
+import { paretoCut, type OwnerTask } from "@/server/tasks/loadOwnerTasks";
 
 const KIND_LABEL: Record<string, string> = {
   pago: "Pago",
@@ -16,16 +24,14 @@ const KIND_LABEL: Record<string, string> = {
 
 const DAY = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
 
-// Seis y no todos: la lista vive arriba del panel y una empresa con cuarenta objetivos abiertos
-// empujaría las tarjetas fuera de la pantalla. Lo que no cabe se ve en el panel de la empresa.
-const VISIBLE = 6;
+const VISIBLE = 3;
 
 function dueText(task: OwnerTask): string {
   if (!task.dueDate) return "Sin fecha";
   return task.overdue ? `Venció el ${DAY.format(task.dueDate)}` : DAY.format(task.dueDate);
 }
 
-function TaskRow({ task }: { task: OwnerTask }) {
+function TaskRow({ task, vital }: { task: OwnerTask; vital?: boolean }) {
   const body = (
     <>
       <span className={`pendiente-kind pendiente-kind--${task.kind}`}>{KIND_LABEL[task.kind]}</span>
@@ -40,7 +46,7 @@ function TaskRow({ task }: { task: OwnerTask }) {
   );
 
   return (
-    <li className="pendiente">
+    <li className={vital ? "pendiente pendiente--vital" : "pendiente"}>
       {task.href ? (
         <Link href={task.href} className="pendiente-link">
           {body}
@@ -54,6 +60,9 @@ function TaskRow({ task }: { task: OwnerTask }) {
 
 export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
   const overdue = tasks.filter((t) => t.overdue).length;
+  const vitales = paretoCut(tasks);
+  const arriba = tasks.slice(0, VISIBLE);
+  const resto = tasks.slice(VISIBLE);
 
   return (
     <section className="pendientes" aria-label="Tus pendientes">
@@ -74,14 +83,31 @@ export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
       ) : (
         <>
           <ol className="pendientes-list">
-            {tasks.slice(0, VISIBLE).map((task) => (
-              <TaskRow key={task.id} task={task} />
+            {arriba.map((task, i) => (
+              <TaskRow key={task.id} task={task} vital={i < vitales} />
             ))}
           </ol>
-          {tasks.length > VISIBLE && (
-            <p className="pendientes-more">
-              Y {tasks.length - VISIBLE} más. Entra a una empresa para verlos todos.
+
+          {vitales <= VISIBLE && tasks.length > vitales && (
+            <p className="pendientes-pareto">
+              {vitales === 1
+                ? "Ese pendiente concentra el 80% de lo que hoy mueve tus empresas."
+                : `Esos ${vitales} concentran el 80% de lo que hoy mueve tus empresas.`}{" "}
+              Lo demás puede esperar sin costarte nada.
             </p>
+          )}
+
+          {resto.length > 0 && (
+            <details className="pendientes-resto">
+              <summary className="pendientes-more">
+                Ver los otros {resto.length} {resto.length === 1 ? "pendiente" : "pendientes"}
+              </summary>
+              <ol className="pendientes-list">
+                {resto.map((task, i) => (
+                  <TaskRow key={task.id} task={task} vital={i + VISIBLE < vitales} />
+                ))}
+              </ol>
+            </details>
           )}
         </>
       )}

@@ -637,3 +637,12 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   font-size: 12px;
   white-space: pre-wrap;
 }
+
+/* --- Pendientes: el grupo vital (Pareto) y el resto plegado.
+   El borde de acento marca los pocos que concentran el 80% del peso del día; el <details> nativo
+   guarda los demás sin esconderlos. */
+.pendiente--vital > .pendiente-link { border-color: color-mix(in srgb, var(--accent-1) 45%, var(--border)); }
+.pendientes-pareto { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.pendientes-resto { display: flex; flex-direction: column; gap: 8px; }
+.pendientes-resto > summary { cursor: pointer; }
+.pendientes-resto > summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }

@@ -9,7 +9,7 @@ import { organization, profile, membership, objective, orgKpi, payment } from "@
 import { listMyPayments } from "../server/billing/payments.ts";
 import { defaultSelection, type PanelCompany } from "../server/companies/loadOwnerPanel.ts";
 import { loadOrgKpis } from "../server/kpis/loadKpis.ts";
-import { taskPriority } from "../server/tasks/loadOwnerTasks.ts";
+import { paretoCut, taskPriority, type OwnerTask } from "../server/tasks/loadOwnerTasks.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -223,5 +223,44 @@ describe("loadOrgKpis", () => {
     const kpis = (await loadOrgKpis([org.id])).get(org.id) ?? [];
     expect(kpis[0]?.value).toBe(1_240_000);
     expect(kpis[0]?.format).toBe("dinero");
+  });
+});
+
+describe("paretoCut", () => {
+  // Solo la prioridad importa aquí; el resto del OwnerTask es relleno para que compile.
+  const tarea = (priority: number): OwnerTask => ({
+    id: `t-${priority}-${Math.random()}`,
+    kind: "objetivo",
+    title: "x",
+    context: "y",
+    dueDate: null,
+    overdue: false,
+    priority,
+    href: null,
+  });
+
+  it("WHEN no hay pendientes THE SYSTEM SHALL devolver cero, no lanzar", () => {
+    expect(paretoCut([])).toBe(0);
+  });
+
+  it(
+    "WHEN unos pocos pendientes concentran el 80% del peso THE SYSTEM SHALL cortar ahí y dejar " +
+      "la cola afuera",
+    () => {
+      // 1000 de 1120 = 89% en el primero: el corte cae en 1.
+      const tareas = [tarea(1000), tarea(40), tarea(40), tarea(20), tarea(20)];
+      expect(paretoCut(tareas)).toBe(1);
+    },
+  );
+
+  it("WHEN todos pesan lo mismo THE SYSTEM SHALL no privilegiar a ninguno de más", () => {
+    const tareas = Array.from({ length: 10 }, () => tarea(50));
+    // 8 de 10 son el 80% exacto.
+    expect(paretoCut(tareas)).toBe(8);
+  });
+
+  it("WHEN todo pesa cero THE SYSTEM SHALL tratarlos a todos como vitales, no dividir entre cero", () => {
+    const tareas = [tarea(0), tarea(0), tarea(0)];
+    expect(paretoCut(tareas)).toBe(3);
   });
 });

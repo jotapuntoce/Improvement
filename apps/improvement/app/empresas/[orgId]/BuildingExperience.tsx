@@ -80,9 +80,14 @@ export function BuildingExperience({
             Equipo
           </Link>
           {esDueno && (
-            <Link href={`/${orgId}/necesidades`} className="jpc-reception-door">
-              Lo que necesita
-            </Link>
+            <>
+              <Link href={`/${orgId}/necesidades`} className="jpc-reception-door">
+                Lo que necesita
+              </Link>
+              <Link href={`/${orgId}/improvement`} className="jpc-reception-door">
+                Improvement
+              </Link>
+            </>
           )}
           <button type="button" className="jpc-reception-door" onClick={() => setAfuera(true)}>
             Ver el edificio
