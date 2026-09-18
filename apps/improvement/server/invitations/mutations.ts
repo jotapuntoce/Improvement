@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, invitation, membership, permissionType, profile } from "@jotapuntoce/db/schema";
 import { findOwnerMembership } from "../auth/guard.ts";
+import { belongsToOrg } from "../db/belongsToOrg.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
@@ -37,16 +38,11 @@ export async function createInvitation(
   const correo = emailSchema.safeParse(email.trim().toLowerCase());
   if (!correo.success) return fail("Ese correo no es válido.");
 
-  // El tipo tiene que ser de ESTA empresa: sin este chequeo, el dueño de una podría colar el id de
-  // un tipo de otra y conceder permisos que no son suyos. NOT_FOUND y no VALIDATION_ERROR: desde el
-  // punto de vista de este org, ese id de tipo simplemente no existe (mismo criterio que
-  // server/areas/mutations.ts con un id ajeno).
-  const [tipo] = await db
-    .select({ id: permissionType.id })
-    .from(permissionType)
-    .where(and(eq(permissionType.id, permissionTypeId), eq(permissionType.orgId, orgId)))
-    .limit(1);
-  if (!tipo) return fail("Ese tipo de permiso no es de esta empresa.", "NOT_FOUND");
+  // NOT_FOUND y no VALIDATION_ERROR: desde el punto de vista de este org, un id de tipo ajeno
+  // simplemente no existe (mismo criterio que server/areas/mutations.ts con un id ajeno).
+  if (!(await belongsToOrg(permissionType, permissionTypeId, orgId))) {
+    return fail("Ese tipo de permiso no es de esta empresa.", "NOT_FOUND");
+  }
 
   const token = randomUUID();
   const expiresAt = new Date(Date.now() + DIAS_DE_VIDA * 86_400_000);
@@ -58,7 +54,7 @@ export async function createInvitation(
       email: correo.data,
       role: "employee",
       tokenHash: hashToken(token),
-      permissionTypeId: tipo.id,
+      permissionTypeId,
       expiresAt,
     })
     .returning({ id: invitation.id });
@@ -113,13 +109,8 @@ export async function acceptInvitation(
     return fail("Este enlace es para otro correo.", "FORBIDDEN");
   }
 
-  if (parsed.data.areaId !== null) {
-    const [areaPropia] = await db
-      .select({ id: area.id })
-      .from(area)
-      .where(and(eq(area.id, parsed.data.areaId), eq(area.orgId, inv.orgId)))
-      .limit(1);
-    if (!areaPropia) return fail("Esa área no es de esta empresa.", "NOT_FOUND");
+  if (parsed.data.areaId !== null && !(await belongsToOrg(area, parsed.data.areaId, inv.orgId))) {
+    return fail("Esa área no es de esta empresa.", "NOT_FOUND");
   }
 
   // Nada impide hoy que el dueño invite otra vez a un correo que ya está adentro (createInvitation

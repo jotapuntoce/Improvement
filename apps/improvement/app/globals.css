@@ -306,6 +306,7 @@ a.company-card:focus-visible { outline: 2px solid var(--accent-2); outline-offse
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   color: var(--bg);
   align-self: flex-start;
+  text-decoration: none;
 }
 .panel-cta:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .panel-btn-ghost {
@@ -316,6 +317,7 @@ a.company-card:focus-visible { outline: 2px solid var(--accent-2); outline-offse
   color: var(--text-secondary);
   font-size: 14px;
   cursor: pointer;
+  text-decoration: none;
 }
 .panel-dialog {
   /* margin: auto explícito: un <dialog> modal se centra solo, pero el preflight de Tailwind pone
@@ -602,3 +604,19 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   word-break: break-all;
 }
 .invite-error { color: var(--danger); font-size: 13px; }
+
+/* --- Equipo (/[org]/equipo) — lista de personas y nivel propio. Todo lo demás en esa pantalla son
+   .config-* y .panel-cta/.panel-btn-ghost; lo único que no existía es la lista y el número grande. */
+.equipo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.equipo-row { display: flex; justify-content: space-between; gap: 12px; text-decoration: none; color: inherit; }
+.equipo-name { margin: 0; }
+.equipo-role { color: var(--text-secondary); font-size: 13px; }
+.equipo-nivel {
+  margin: 4px 0 0;
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

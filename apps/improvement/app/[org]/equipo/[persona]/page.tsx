@@ -3,27 +3,28 @@
 // Solo dueño. Quien no lo sea recibe 404 — findTeamMemberForOwner devuelve null tanto si quien
 // pregunta no es el dueño como si esa persona no es de su equipo, así que la pantalla no distingue
 // los dos casos y no delata que ese id exista en otra empresa.
-//
-// Sin "use client": <form> nativos con Server Actions, y las clases reales de globals.css que ya usa
-// /[org]/equipo/permisos (config-page, config-card, config-input, panel-cta, panel-btn-ghost).
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireOrgMembership } from "@/server/auth/guard";
+import { getSessionUserId } from "@/server/auth/guard";
 import { findTeamMemberForOwner } from "@/server/employees/responsibility";
 import { removeMembership, updateMembership } from "@/server/employees/mutations";
 import { listPermissionTypes } from "@/server/permissions/mutations";
 import { listAreasByOrg } from "@/server/areas/listAreas.ts";
-import { redirect } from "next/navigation";
 
 export default async function PersonaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ org: string; persona: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { org: orgId, persona: targetUserId } = await params;
-  const member = await requireOrgMembership(orgId);
-  const ficha = await findTeamMemberForOwner(member.userId, orgId, targetUserId);
+  const { error } = await searchParams;
+
+  const userId = await getSessionUserId();
+  if (!userId) notFound();
+  const ficha = await findTeamMemberForOwner(userId, orgId, targetUserId);
   if (!ficha) notFound();
 
   const [tipos, areasPorOrg] = await Promise.all([
@@ -32,24 +33,30 @@ export default async function PersonaPage({
   ]);
   const areas = areasPorOrg.get(orgId) ?? [];
   const esDueno = ficha.role === "owner";
+  const fichaUrl = `/${orgId}/equipo/${targetUserId}`;
 
+  // Las dos acciones vuelven con redirect: en el éxito para limpiar un ?error= viejo de la barra de
+  // direcciones, y en el fallo para que la pantalla lo diga en vez de recargarse igual y en silencio.
   async function guardar(formData: FormData) {
     "use server";
-    const row = await requireOrgMembership(orgId);
-    await updateMembership(row.userId, orgId, targetUserId, {
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    const result = await updateMembership(actor, orgId, targetUserId, {
       permissionTypeId: formData.get("permissionTypeId")?.toString() || null,
       areaId: formData.get("areaId")?.toString() || null,
       jobTitle: formData.get("jobTitle")?.toString() ?? "",
     });
-    revalidatePath(`/${orgId}/equipo/${targetUserId}`);
+    if (!result.ok) redirect(`${fichaUrl}?error=${encodeURIComponent(result.error.message)}`);
     revalidatePath(`/${orgId}/equipo`);
+    redirect(fichaUrl);
   }
 
   async function darDeBaja() {
     "use server";
-    const row = await requireOrgMembership(orgId);
-    const result = await removeMembership(row.userId, orgId, targetUserId);
-    if (!result.ok) return;
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    const result = await removeMembership(actor, orgId, targetUserId);
+    if (!result.ok) redirect(`${fichaUrl}?error=${encodeURIComponent(result.error.message)}`);
     revalidatePath(`/${orgId}/equipo`);
     redirect(`/${orgId}/equipo`);
   }
@@ -61,6 +68,7 @@ export default async function PersonaPage({
         {ficha.email}
         {ficha.responsibilities ? ` · ${ficha.responsibilities}` : ""}
       </p>
+      {error && <p className="invite-error">{error}</p>}
 
       {esDueno ? (
         <div className="config-card">
