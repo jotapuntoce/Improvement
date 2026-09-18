@@ -620,3 +620,20 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   background-clip: text;
   color: transparent;
 }
+
+/* --- Objetivos y necesidades (/[org]/objetivos, /[org]/necesidades). Todo lo demás en esas dos
+   pantallas reusa .config-*, .permiso-* y .equipo-list: lo único que no existía es el título de la
+   fila, el formulario de entrega y el expediente que se le entrega a Summum. */
+.objetivo-title { margin: 0; font-weight: 600; }
+.objetivo-entrega { display: flex; flex-direction: column; gap: 10px; }
+.necesidad-brief {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}

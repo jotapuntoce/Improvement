@@ -4,8 +4,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { organization, profile, membership, objective, employeePointsLedger } from "@jotapuntoce/db/schema";
-import { completeObjective, listObjectives } from "../server/objectives/mutations.ts";
+import { organization, profile, membership, objective, orgNeed, employeePointsLedger } from "@jotapuntoce/db/schema";
+import {
+  assignObjective,
+  completeObjective,
+  createObjective,
+  listObjectives,
+} from "../server/objectives/mutations.ts";
 
 async function makeOrg(nameSuffix: string) {
   const [org] = await db
@@ -64,8 +69,9 @@ afterEach(async () => {
 
 describe("completeObjective", () => {
   it(
-    "WHEN un owner completa un objetivo con impact_weight = 40 THE SYSTEM SHALL insertar " +
-      "exactamente una fila en employee_points_ledger con points = 400",
+    "WHEN un owner completa un objetivo de peso 40 que no atiende ninguna necesidad THE SYSTEM " +
+      "SHALL insertar exactamente una fila en el ledger con points = 200 — la mitad, porque " +
+      "trabajo que no atiende nada que la empresa necesite no mueve a la empresa",
     async () => {
       const org = await makeOrg("points");
       createdOrgIds.push(org.id);
@@ -81,7 +87,7 @@ describe("completeObjective", () => {
         .from(employeePointsLedger)
         .where(eq(employeePointsLedger.objectiveId, obj.id));
       expect(ledgerRows.length).toBe(1);
-      expect(ledgerRows[0]?.points).toBe(400);
+      expect(ledgerRows[0]?.points).toBe(200);
     },
   );
 
@@ -111,6 +117,200 @@ describe("completeObjective", () => {
   );
 });
 
+async function makeEmployee(orgId: string) {
+  const userId = crypto.randomUUID();
+  await makeProfile(userId, `${userId}@example.com`);
+  await db.insert(membership).values({ userId, orgId, role: "employee", acceptedAt: new Date() });
+  return userId;
+}
+
+async function makeNeed(orgId: string, severity = 2) {
+  const [row] = await db
+    .insert(orgNeed)
+    .values({ orgId, title: `Necesidad ${Date.now()}`, severity })
+    .returning();
+  if (!row) throw new Error("insert de org_need no devolvió fila");
+  return row;
+}
+
+describe("createObjective", () => {
+  it(
+    "WHEN un empleado intenta emitir un objetivo THE SYSTEM SHALL rechazarlo — si pudiera, se " +
+      "pondría los puntos que quisiera, y el ledger es moneda canjeable",
+    async () => {
+      const org = await makeOrg("crea-empleado");
+      createdOrgIds.push(org.id);
+      const employeeId = await makeEmployee(org.id);
+      createdProfileIds.push(employeeId);
+
+      const result = await createObjective(employeeId, org.id, {
+        title: "Me asigno trabajo yo solo",
+        description: null,
+        impactWeight: 100,
+        dueDate: new Date(),
+        areaId: null,
+        assignedEmployeeId: employeeId,
+        needId: null,
+        kind: "ipa",
+        evidenceType: "ninguna",
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("FORBIDDEN");
+    },
+  );
+
+  it(
+    "WHEN el dueño emite un objetivo asignado a alguien que NO es de su equipo THE SYSTEM SHALL " +
+      "tratarlo como inexistente",
+    async () => {
+      const org = await makeOrg("crea-ajeno");
+      createdOrgIds.push(org.id);
+      const ownerId = await makeOwner(org.id);
+      createdProfileIds.push(ownerId);
+      const otro = await makeOrg("crea-ajeno-2");
+      createdOrgIds.push(otro.id);
+      const ajeno = await makeEmployee(otro.id);
+      createdProfileIds.push(ajeno);
+
+      const result = await createObjective(ownerId, org.id, {
+        title: "Trabajo para alguien de otra empresa",
+        description: null,
+        impactWeight: 10,
+        dueDate: new Date(),
+        areaId: null,
+        assignedEmployeeId: ajeno,
+        needId: null,
+        kind: "non_ipa",
+        evidenceType: "ninguna",
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.code).toBe("NOT_FOUND");
+    },
+  );
+
+  it(
+    "WHEN el dueño emite un objetivo válido THE SYSTEM SHALL guardarlo con él como emisor, y " +
+      "assignObjective SHALL poder pasárselo a otra persona después",
+    async () => {
+      const org = await makeOrg("crea-ok");
+      createdOrgIds.push(org.id);
+      const ownerId = await makeOwner(org.id);
+      createdProfileIds.push(ownerId);
+      const employeeId = await makeEmployee(org.id);
+      createdProfileIds.push(employeeId);
+      const need = await makeNeed(org.id, 3);
+
+      const result = await createObjective(ownerId, org.id, {
+        title: "Levantar el proceso de cobranza",
+        description: null,
+        impactWeight: 30,
+        dueDate: new Date(),
+        areaId: null,
+        assignedEmployeeId: null,
+        needId: need.id,
+        kind: "non_ipa",
+        evidenceType: "enlace",
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.createdBy).toBe(ownerId);
+      expect(result.data.needId).toBe(need.id);
+      expect(result.data.assignedEmployeeId).toBeNull();
+
+      const reasignado = await assignObjective(ownerId, org.id, result.data.id, employeeId);
+      expect(reasignado.ok).toBe(true);
+    },
+  );
+});
+
+describe("evidencia y habilitación", () => {
+  it(
+    "WHEN un objetivo pide un enlace y se intenta completar sin uno THE SYSTEM SHALL rechazarlo " +
+      "y no escribir nada en el ledger",
+    async () => {
+      const org = await makeOrg("evid");
+      createdOrgIds.push(org.id);
+      const ownerId = await makeOwner(org.id);
+      createdProfileIds.push(ownerId);
+      const obj = await makeObjective(org.id, {
+        assignedEmployeeId: ownerId,
+        evidenceType: "enlace",
+      });
+
+      const sinNada = await completeObjective(ownerId, org.id, obj.id);
+      expect(sinNada.ok).toBe(false);
+
+      const basura = await completeObjective(ownerId, org.id, obj.id, "no es una url");
+      expect(basura.ok).toBe(false);
+
+      const ledger = await db
+        .select()
+        .from(employeePointsLedger)
+        .where(eq(employeePointsLedger.objectiveId, obj.id));
+      expect(ledger.length).toBe(0);
+
+      const bien = await completeObjective(
+        ownerId,
+        org.id,
+        obj.id,
+        "https://drive.example.com/reporte.pdf",
+      );
+      expect(bien.ok).toBe(true);
+
+      const [fila] = await db
+        .select()
+        .from(objective)
+        .where(eq(objective.id, obj.id));
+      expect(fila?.evidenceValue).toBe("https://drive.example.com/reporte.pdf");
+      expect(fila?.evidenceSubmittedAt).not.toBeNull();
+    },
+  );
+
+  it(
+    "WHEN un IPA se completa sobre una necesidad que ya tenía trabajo non-IPA terminado THE " +
+      "SYSTEM SHALL pagarle su parte a quien lo habilitó",
+    async () => {
+      const org = await makeOrg("habilita");
+      createdOrgIds.push(org.id);
+      const ownerId = await makeOwner(org.id);
+      createdProfileIds.push(ownerId);
+      const habilitador = await makeEmployee(org.id);
+      createdProfileIds.push(habilitador);
+      const need = await makeNeed(org.id, 2);
+
+      const indirecto = await makeObjective(org.id, {
+        assignedEmployeeId: habilitador,
+        needId: need.id,
+        kind: "non_ipa",
+        impactWeight: 20,
+      });
+      expect((await completeObjective(habilitador, org.id, indirecto.id)).ok).toBe(true);
+
+      const directo = await makeObjective(org.id, {
+        assignedEmployeeId: ownerId,
+        needId: need.id,
+        kind: "ipa",
+        impactWeight: 40,
+      });
+      const result = await completeObjective(ownerId, org.id, directo.id);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.enablers).toBe(1);
+      expect(result.data.enablementShare).toBeGreaterThan(0);
+
+      const delHabilitador = await db
+        .select()
+        .from(employeePointsLedger)
+        .where(eq(employeePointsLedger.employeeId, habilitador));
+      // Dos filas: la de su propio objetivo y la parte que le tocó del ingreso que habilitó.
+      expect(delHabilitador.length).toBe(2);
+    },
+  );
+});
 describe("listObjectives", () => {
   it(
     "WHEN un empleado del org A solicita la lista de objetivos del org B THE SYSTEM SHALL " +

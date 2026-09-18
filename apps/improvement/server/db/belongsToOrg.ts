@@ -7,10 +7,10 @@
 // respuesta decide entre escribir y devolver NOT_FOUND, no entre dos filas en conflicto.
 import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, permissionType } from "@jotapuntoce/db/schema";
+import { area, orgNeed, permissionType } from "@jotapuntoce/db/schema";
 
 export async function belongsToOrg(
-  table: typeof permissionType | typeof area,
+  table: typeof permissionType | typeof area | typeof orgNeed,
   id: string,
   orgId: string,
 ): Promise<boolean> {
