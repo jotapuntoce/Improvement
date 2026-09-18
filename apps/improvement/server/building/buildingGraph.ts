@@ -31,14 +31,18 @@ export interface BuildingGraph {
   industry: string | null;
   areas: BuildingArea[];
   /**
-   * Qué tan construida está la empresa digital, 0 a 1 — derivado de org_build_stage, la misma
-   * fuente que el tracker del panel. El edificio dibuja exactamente esto (ver Building.tsx):
-   * los dos no pueden decir cosas distintas porque leen el mismo número.
+   * En qué etapa del mapa de construcción va la empresa, 1 a 8 — derivado de org_build_stage, la
+   * MISMA fuente que el tracker del panel. El edificio dibuja la escena de esta etapa (ver
+   * ESCENAS en packages/ui/src/building/Building.tsx): los dos no pueden decir cosas distintas
+   * porque leen la misma fila.
    */
-  progress: number;
+  stageOrder: number;
   /** El nombre de la etapa en curso, o null si el mapa de construcción todavía no arranca. */
   stageLabel: string | null;
 }
+
+/** Las 8 fases de BUILD_STAGES. Solo se usa como default cuando una empresa no tiene mapa. */
+const TOTAL_STAGES = 8;
 
 const WINDOWS_PER_AREA = 3;
 const BUILDING_ROWS = 8;
@@ -110,24 +114,44 @@ export function distributeCells(
  * de cells (criterio #1) — mismo layout en llamadas repetidas para la misma organización
  * (criterio #2, vía hashSeed determinista sobre el nombre).
  */
+export interface CurrentStage {
+  order: number;
+  name: string | null;
+}
+
 /**
- * Qué fracción del mapa de construcción ya se entregó.
+ * En qué etapa va la empresa, como el número de etapa (1 a 8) y su nombre.
  *
- * Una etapa en progreso cuenta como media: el dueño que va a la mitad de "Construcción" no ve
- * su edificio igual que el día que esa etapa empezó. Sin etapas devuelve 1 — una empresa sin
- * mapa se dibuja terminada, que es como se dibujaba antes de que el edificio supiera de esto.
+ * Misma prioridad que deriveStageLabel y deriveCurrentStageIndex en companies/companyList.ts —
+ * la primera en_progreso manda; si no hay ninguna, la última completada. Sin etapas devuelve la
+ * última: una empresa sin mapa se dibuja terminada, como se dibujaba antes de que el edificio
+ * supiera del tracker.
+ *
+ * Discreto y no un porcentaje: cada etapa tiene su propia escena en el edificio. Interpolar
+ * entre dos etapas dibujaría algo que no corresponde a ninguna.
  */
-export function stageProgress(stages: { status: string }[]): number {
-  if (stages.length === 0) return 1;
-  const completas = stages.filter((s) => s.status === "completada").length;
-  const enCurso = stages.filter((s) => s.status === "en_progreso").length;
-  return Math.min(1, (completas + enCurso * 0.5) / stages.length);
+export function currentStage(
+  stages: { status: string; stageName: string; stageOrder: number }[],
+): CurrentStage {
+  if (stages.length === 0) return { order: TOTAL_STAGES, name: null };
+
+  const enCurso = stages.find((s) => s.status === "en_progreso");
+  if (enCurso) return { order: enCurso.stageOrder, name: enCurso.stageName };
+
+  const completadas = stages.filter((s) => s.status === "completada");
+  const ultima = completadas[completadas.length - 1];
+  if (ultima) return { order: ultima.stageOrder, name: ultima.stageName };
+
+  // Ninguna empezó todavía: va en la primera, no en ninguna. Un dueño recién dado de alta ve su
+  // terreno, que es exactamente donde está.
+  const primera = stages[0]!;
+  return { order: primera.stageOrder, name: primera.stageName };
 }
 
 export function buildBuildingGraph(
   org: BuildingOrgInput,
   areas: BuildingAreaInput[],
-  stages: { status: string; stageName: string }[] = [],
+  stages: { status: string; stageName: string; stageOrder: number }[] = [],
 ): BuildingGraph {
   const distributed = distributeCells(
     areas.map((a) => a.id),
@@ -138,15 +162,15 @@ export function buildBuildingGraph(
   );
   const cellsById = new Map(distributed.map((d) => [d.id, d.cells] as const));
 
-  const enCurso = stages.find((s) => s.status === "en_progreso");
+  const etapa = currentStage(stages);
 
   return {
     companyName: org.name,
     slogan: org.slogan,
     accentColor: org.accentColor,
     industry: org.industry,
-    progress: stageProgress(stages),
-    stageLabel: enCurso?.stageName ?? null,
+    stageOrder: etapa.order,
+    stageLabel: etapa.name,
     areas: areas.map((a) => ({
       id: a.id,
       name: a.name,

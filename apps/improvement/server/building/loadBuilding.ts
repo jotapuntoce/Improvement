@@ -30,7 +30,11 @@ export async function loadBuilding(userId: string, orgId: string): Promise<Build
     // La MISMA fuente que el tracker del panel (org_build_stage). El edificio no calcula su
     // propio avance: lee el de siempre, así los dos no pueden contradecirse.
     db
-      .select({ status: orgBuildStage.status, stageName: orgBuildStage.stageName })
+      .select({
+        status: orgBuildStage.status,
+        stageName: orgBuildStage.stageName,
+        stageOrder: orgBuildStage.stageOrder,
+      })
       .from(orgBuildStage)
       .where(eq(orgBuildStage.orgId, orgId))
       .orderBy(asc(orgBuildStage.stageOrder)),

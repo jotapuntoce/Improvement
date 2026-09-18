@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBuildingGraph, distributeCells, stageProgress } from "../server/building/buildingGraph.ts";
+import { buildBuildingGraph, currentStage, distributeCells } from "../server/building/buildingGraph.ts";
 
 describe("distributeCells", () => {
   it(
@@ -63,28 +63,39 @@ describe("buildBuildingGraph", () => {
   });
 });
 
-describe("stageProgress", () => {
-  const etapa = (status: string) => ({ status });
-
-  it("WHEN la empresa no tiene mapa de construcción THE SYSTEM SHALL dibujar el edificio terminado", () => {
-    expect(stageProgress([])).toBe(1);
+describe("currentStage", () => {
+  const etapa = (stageOrder: number, status: string) => ({
+    stageOrder,
+    status,
+    stageName: `Etapa ${stageOrder}`,
   });
 
-  it("WHEN una etapa va en progreso THE SYSTEM SHALL contarla como media", () => {
-    const ocho = [
-      etapa("completada"),
-      etapa("completada"),
-      etapa("completada"),
-      etapa("en_progreso"),
-      etapa("bloqueada"),
-      etapa("bloqueada"),
-      etapa("bloqueada"),
-      etapa("bloqueada"),
+  it("WHEN la empresa no tiene mapa de construcción THE SYSTEM SHALL dibujarla terminada", () => {
+    expect(currentStage([]).order).toBe(8);
+  });
+
+  it("WHEN hay una etapa en progreso THE SYSTEM SHALL devolver esa, aunque haya completadas", () => {
+    const mapa = [
+      etapa(1, "completada"),
+      etapa(2, "completada"),
+      etapa(3, "completada"),
+      etapa(4, "en_progreso"),
+      etapa(5, "bloqueada"),
     ];
-    expect(stageProgress(ocho)).toBeCloseTo(3.5 / 8);
+    expect(currentStage(mapa)).toEqual({ order: 4, name: "Etapa 4" });
   });
 
-  it("WHEN todas están completadas THE SYSTEM SHALL devolver exactamente 1, nunca más", () => {
-    expect(stageProgress(Array.from({ length: 8 }, () => etapa("completada")))).toBe(1);
+  it("WHEN ninguna está en progreso THE SYSTEM SHALL devolver la última completada", () => {
+    const mapa = [etapa(1, "completada"), etapa(2, "completada"), etapa(3, "bloqueada")];
+    expect(currentStage(mapa).order).toBe(2);
   });
+
+  it(
+    "WHEN ninguna empezó todavía THE SYSTEM SHALL devolver la primera, no cero — un dueño recién " +
+      "dado de alta ve su terreno, que es exactamente donde está",
+    () => {
+      const mapa = [etapa(1, "bloqueada"), etapa(2, "bloqueada")];
+      expect(currentStage(mapa).order).toBe(1);
+    },
+  );
 });

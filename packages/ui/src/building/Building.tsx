@@ -8,6 +8,16 @@
 // desmontar esto y montar Reception.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IndustryGlyph } from "./AppIconLarge.tsx";
+import {
+  Acabados,
+  EquipoAfuera,
+  Ingenieros,
+  MonoCintas,
+  MonoListon,
+  Obra,
+  Plano,
+  Terreno,
+} from "./constructionSite.tsx";
 import type { Industry } from "./industries.ts";
 
 const COLS = 9;
@@ -46,16 +56,12 @@ export interface BuildingProps {
   areas: BuildingArea[];
   onEnter: () => void;
   /**
-   * Qué tan construida está la empresa DIGITAL, de 0 a 1 — la misma etapa que marca el tracker
-   * del panel (org_build_stage / BUILD_STAGES). El edificio se levanta de abajo hacia arriba
-   * conforme avanza: los pisos que todavía no se entregan se ven en obra, con andamios y grúa.
+   * En qué etapa del mapa de construcción va la empresa digital, 1 a 8 (BUILD_STAGES).
    *
-   * Que las ventanas de un área no se prendan hasta que su piso exista no es un bug: es el punto.
-   * El dueño ve en el edificio exactamente lo mismo que dice su tracker, sin traducir nada.
-   *
-   * Default 1 — un edificio sin etapa conocida se dibuja terminado, como siempre se dibujó.
+   * Discreto y no un porcentaje: cada etapa tiene su propia escena — el terreno solo, los
+   * ingenieros midiendo, la obra, los acabados, el equipo afuera, el moño. Ver ESCENAS.
    */
-  progress?: number;
+  stageOrder?: number;
   /** El nombre de la etapa actual, para el pie del edificio. */
   stageLabel?: string;
   /** El giro de la empresa — el glyph que va en la marquesina, sobre la puerta. */
@@ -200,16 +206,70 @@ function ScientistDefs() {
   );
 }
 
+/**
+ * Qué se ve en cada etapa del mapa de construcción (BUILD_STAGES, 1 a 8).
+ *
+ * Esta tabla ES la conexión entre el tracker y el edificio: el dueño abre su empresa y ve, sin
+ * traducir nada, exactamente en qué punto va. No hay interpolación ni porcentajes — las etapas son
+ * discretas y cada una tiene su escena. Un edificio que crece un 12.5% por etapa era mi versión
+ * anterior y no contaba nada: solo se veía más alto.
+ *
+ * `edificio`: qué tanto existe la construcción.
+ * `ventanas`: si hay gente adentro trabajando (las siluetas de las áreas).
+ * `letrero`: si el rótulo con el nombre ya está puesto.
+ * `capa`: la escena de afuera que le toca a esa etapa.
+ */
+type Escena = {
+  edificio: "ninguno" | "huella" | "parcial" | "completo";
+  ventanas: boolean;
+  letrero: boolean;
+  capa: "ingenieros" | "plano" | "obra" | "acabados" | "equipo" | "mono" | null;
+  hint: string;
+};
+
+const ESCENAS: Record<number, Escena> = {
+  // 1 Solicitud recibida
+  1: { edificio: "ninguno", ventanas: false, letrero: false, capa: null, hint: "Este es tu terreno. Aquí va a estar tu empresa." },
+  // 2 Análisis
+  2: { edificio: "ninguno", ventanas: false, letrero: false, capa: "ingenieros", hint: "Estamos midiendo tu terreno." },
+  // 3 Plano
+  3: { edificio: "huella", ventanas: false, letrero: false, capa: "plano", hint: "Ya sabemos cómo va a ser. Esta es su huella." },
+  // 4 Construcción
+  4: { edificio: "parcial", ventanas: false, letrero: false, capa: "obra", hint: "Tu empresa se está construyendo." },
+  // 5 Pruebas
+  5: { edificio: "completo", ventanas: false, letrero: true, capa: "acabados", hint: "Ya está de pie. Le estamos dando los acabados." },
+  // 6 Capacitación
+  6: { edificio: "completo", ventanas: false, letrero: true, capa: "equipo", hint: "Tu equipo está afuera, aprendiendo a usarla." },
+  // 7 Entrega
+  7: { edificio: "completo", ventanas: true, letrero: true, capa: "mono", hint: "Es tuya. Corta el listón." },
+  // 8 Seguimiento
+  8: { edificio: "completo", ventanas: true, letrero: true, capa: null, hint: "Toca el edificio para entrar →" },
+};
+
+/** Sin etapa conocida se dibuja terminado: es como se dibujaba antes de que supiera del tracker. */
+const ESCENA_DEFAULT = ESCENAS[8]!;
+
+// Dónde empieza la fachada cuando el edificio va a medias. 0.52 y no 0.5 para que se vea
+// claramente por debajo del centro — a la mitad exacta parece una decisión de nadie.
+const PARCIAL_TOP = BY0 + (BY1 - BY0) * 0.52;
+const HUELLA_ALTO = 26;
+
+// Encuadre. Con edificio se ve la escena completa; sin edificio se recorta a la franja de abajo,
+// donde está el terreno. Sin esto, las tres primeras etapas eran 500px de cielo vacío con una línea
+// de suelo hasta el fondo — se veía como una pantalla rota, no como un terreno.
+const VIEW_COMPLETO = "0 0 660 800";
+const VIEW_TERRENO = "0 592 660 208";
 export function Building({
   companyName,
   slogan,
   areas,
   onEnter,
-  progress = 1,
+  stageOrder,
   stageLabel,
   industry,
 }: BuildingProps) {
   const [entering, setEntering] = useState(false);
+  const [monoCortado, setMonoCortado] = useState(false);
   const [tagX, setTagX] = useState<number | null>(null);
   const wordRef = useRef<SVGTextElement>(null);
 
@@ -276,6 +336,12 @@ export function Building({
 
   function handleEnter() {
     if (entering) return;
+    // Entrega: el primer clic corta el listón, el segundo entra. Es la única vez que el producto
+    // le pone un paso de más a propósito — cortar el listón de tu propia empresa se hace una vez.
+    if (escena.capa === "mono" && !monoCortado) {
+      setMonoCortado(true);
+      return;
+    }
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion) {
       onEnter();
@@ -288,14 +354,12 @@ export function Building({
   const signCX = BX0 + (BX1 - BX0) / 2;
   const wordY = BY0 + 46;
 
-  // Se levanta de abajo hacia arriba: la fila ROWS-1 es la planta baja. Math.max(1, ...) para que
-  // una empresa en la etapa 1 de 8 ya tenga planta baja y puerta — un edificio de cero pisos con
-  // una puerta flotando no se lee como "apenas empezamos", se lee como un error de dibujo.
-  const clamped = Math.min(Math.max(progress, 0), 1);
-  const builtRows = clamped >= 1 ? ROWS : Math.max(1, Math.round(ROWS * clamped));
-  const firstBuiltRow = ROWS - builtRows;
-  const buildLineY = firstBuiltRow === 0 ? BY0 : GY + firstBuiltRow * CELL - (CELL - WIN) / 2;
-  const enObra = builtRows < ROWS;
+  const escena = (stageOrder ? ESCENAS[stageOrder] : undefined) ?? ESCENA_DEFAULT;
+  const hayEdificio = escena.edificio === "parcial" || escena.edificio === "completo";
+  const facadeY = escena.edificio === "parcial" ? PARCIAL_TOP : BY0;
+  // La primera fila de ventanas que cae dentro de la fachada dibujada. Abajo de eso no hay muro
+  // en el que poner una ventana, así que esas filas no se dibujan en absoluto.
+  const firstBuiltRow = Math.max(0, Math.ceil((facadeY - GY + (CELL - WIN) / 2) / CELL));
 
   return (
     <div className="jpc-stage-wrap">
@@ -314,9 +378,13 @@ export function Building({
       >
         <div className="jpc-ground-glow" aria-hidden="true" />
         <svg
-          viewBox="0 0 660 800"
+          viewBox={hayEdificio ? VIEW_COMPLETO : VIEW_TERRENO}
           role="img"
-          aria-label={`Edificio de ${companyName} de noche, con ventanas iluminadas por área`}
+          aria-label={
+            hayEdificio
+              ? `Edificio de ${companyName} de noche. ${escena.hint}`
+              : `El terreno donde se va a construir ${companyName}. ${escena.hint}`
+          }
         >
           <defs>
             <linearGradient id="jpc-facadeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -339,71 +407,44 @@ export function Building({
             ))}
           </g>
 
-          {/* La fachada terminada llega hasta buildLineY; lo de arriba es obra. */}
-          <rect
-            x={BX0}
-            y={buildLineY}
-            width={BX1 - BX0}
-            height={BY1 - buildLineY}
-            rx="6"
-            fill="url(#jpc-facadeGrad)"
-            stroke="var(--building-accent)"
-            strokeWidth="2"
-          />
-          {enObra && (
-            <g className="jpc-obra">
-              <rect
-                x={BX0}
-                y={BY0}
-                width={BX1 - BX0}
-                height={buildLineY - BY0}
-                rx="6"
-                fill="none"
-                stroke="var(--building-accent)"
-                strokeWidth="1.4"
-                strokeDasharray="6 6"
-                opacity=".45"
-              />
-              {/* Andamios: dos montantes y un travesaño por piso sin entregar. */}
-              {[BX0 + 16, BX1 - 16].map((x) => (
-                <line
-                  key={x}
-                  x1={x}
-                  y1={BY0 + 4}
-                  x2={x}
-                  y2={buildLineY}
-                  stroke="var(--building-accent)"
-                  strokeWidth="2"
-                  opacity=".5"
-                />
-              ))}
-              {Array.from({ length: firstBuiltRow }).map((_, i) => (
-                <line
-                  key={i}
-                  x1={BX0 + 16}
-                  y1={buildLineY - i * CELL - 10}
-                  x2={BX1 - 16}
-                  y2={buildLineY - i * CELL - 10}
-                  stroke="var(--building-accent)"
-                  strokeWidth="1.4"
-                  opacity=".35"
-                />
-              ))}
-              {/* Grúa: mástil, pluma y cable con el gancho colgando sobre la obra. */}
-              <g
-                stroke="var(--building-accent)"
-                strokeWidth="2"
-                fill="none"
-                opacity=".7"
-                strokeLinecap="round"
-              >
-                <line x1={BX1 + 26} y1={BY0 - 70} x2={BX1 + 26} y2={buildLineY} />
-                <line x1={BX1 - 90} y1={BY0 - 70} x2={BX1 + 58} y2={BY0 - 70} />
-                <line x1={BX1 - 40} y1={BY0 - 70} x2={BX1 - 40} y2={BY0 - 40} />
-                <path d={`M ${BX1 - 46} ${BY0 - 40} h 12 v 8 h -12 z`} />
-              </g>
-            </g>
+          {/* El terreno está siempre: debajo del edificio en cada etapa, y solo él en la primera. */}
+          <Terreno x0={BX0} x1={BX1} groundY={BY1} companyName={companyName} />
+
+          {escena.edificio === "huella" && (
+            <Plano x0={BX0} x1={BX1} groundY={BY1} huellaAlto={HUELLA_ALTO} />
           )}
+
+          {hayEdificio && (
+            <rect
+              x={BX0}
+              y={facadeY}
+              width={BX1 - BX0}
+              height={BY1 - facadeY}
+              rx="6"
+              fill="url(#jpc-facadeGrad)"
+              stroke="var(--building-accent)"
+              strokeWidth="2"
+            />
+          )}
+          {escena.capa === "mono" && (
+            <MonoCintas x0={BX0} x1={BX1} topY={BY0 - 16} bottomY={BY1} />
+          )}
+
+          {escena.capa === "ingenieros" && <Ingenieros x0={BX0} x1={BX1} groundY={BY1} />}
+          {escena.capa === "obra" && (
+            <Obra
+              x0={BX0}
+              x1={BX1}
+              topY={BY0}
+              buildLineY={facadeY}
+              groundY={BY1}
+              paso={CELL}
+            />
+          )}
+          {escena.capa === "acabados" && <Acabados x0={BX0} groundY={BY1} facadeY={facadeY} />}
+
+          {escena.letrero && (
+            <>
           <rect
             x={BX0 - 6}
             y={BY0 - 16}
@@ -424,7 +465,10 @@ export function Building({
               {slogan}
             </text>
           )}
+            </>
+          )}
 
+          {hayEdificio && (
           <g>
             {Array.from({ length: ROWS }).map((_, row) =>
               Array.from({ length: COLS }).map((_, col) => {
@@ -437,7 +481,10 @@ export function Building({
                 // Ese piso todavía no se entrega: no hay ventana que prender, ni siquiera apagada.
                 if (row < firstBuiltRow) return null;
 
-                if (!meta) {
+                // Sin área asignada, o con el edificio todavía vacío de gente: ventana apagada.
+                // Un muro liso sin una sola ventana no se lee como "en acabados", se lee como que
+                // falta dibujar algo.
+                if (!meta || !escena.ventanas) {
                   return (
                     <rect
                       key={`${row},${col}`}
@@ -467,36 +514,58 @@ export function Building({
               }),
             )}
           </g>
+          )}
 
+          {escena.ventanas && (
+          <>
           <path d={circuitD} fill="none" stroke="var(--building-accent)" strokeWidth="1.6" strokeDasharray="1 7" strokeLinecap="round" opacity=".55" />
           {circuitPoints.map((pt, i) => (
             // circuitPoints se deriva de areas.map(...) arriba, así que circuitPoints.length ===
             // areas.length siempre — areas[i]! es seguro por construcción.
             <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={areas[i]!.color} />
           ))}
+          </>
+          )}
 
-          {/* El giro de la empresa, en la marquesina sobre la puerta. Mismo glyph que su ícono. */}
-          <g
-            transform={`translate(${DOOR_CX - 16} ${DOOR_Y - 42}) scale(1.35)`}
-            color="var(--building-accent)"
-            opacity=".8"
-          >
-            <IndustryGlyph industry={industry} />
-          </g>
-
-          {[-1, 1].map((side) => {
-            const dx = DOOR_CX + (side * DOOR_GAP) / 2 + (side < 0 ? -DOOR_W : 0);
-            return (
-              <g key={side}>
-                <rect x={dx} y={DOOR_Y} width={DOOR_W} height={DOOR_H} rx="2" fill="var(--bg-facade-2)" stroke="var(--building-accent)" strokeWidth="1.4" />
-                <circle cx={side < 0 ? dx + DOOR_W - 7 : dx + 7} cy={DOOR_Y + DOOR_H / 2} r="1.6" fill="var(--building-accent)" />
+          {escena.edificio === "completo" && (
+            <>
+              {/* El giro de la empresa, en la marquesina sobre la puerta. Mismo glyph que su ícono. */}
+              <g
+                transform={`translate(${DOOR_CX - 16} ${DOOR_Y - 42}) scale(1.35)`}
+                color="var(--building-accent)"
+                opacity=".8"
+              >
+                <IndustryGlyph industry={industry} />
               </g>
-            );
-          })}
+
+              {[-1, 1].map((side) => {
+                const dx = DOOR_CX + (side * DOOR_GAP) / 2 + (side < 0 ? -DOOR_W : 0);
+                return (
+                  <g key={side}>
+                    <rect x={dx} y={DOOR_Y} width={DOOR_W} height={DOOR_H} rx="2" fill="var(--bg-facade-2)" stroke="var(--building-accent)" strokeWidth="1.4" />
+                    <circle cx={side < 0 ? dx + DOOR_W - 7 : dx + 7} cy={DOOR_Y + DOOR_H / 2} r="1.6" fill="var(--building-accent)" />
+                  </g>
+                );
+              })}
+            </>
+          )}
+
+          {/* La gente va encima de la fachada: están afuera, entre el edificio y quien mira. */}
+          {escena.capa === "equipo" && <EquipoAfuera doorCX={DOOR_CX} groundY={BY1} />}
+          {escena.capa === "mono" && (
+            <MonoListon
+              x0={BX0}
+              x1={BX1}
+              doorCX={DOOR_CX}
+              ribbonY={DOOR_Y + DOOR_H / 2}
+              cortado={monoCortado}
+            />
+          )}
         </svg>
       </div>
       <p className="jpc-enter-hint">
-        {stageLabel ? `${stageLabel} · toca el edificio para entrar →` : "Toca el edificio para entrar →"}
+        {stageLabel ? `${stageLabel} · ` : ""}
+        {escena.capa === "mono" && monoCortado ? "Listo. Entra a tu empresa →" : escena.hint}
       </p>
     </div>
   );

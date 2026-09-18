@@ -490,3 +490,26 @@
 @media (prefers-reduced-motion: reduce) {
   .jpc-obra { animation: none; }
 }
+
+/* ---- el corte del listón (etapa Entrega) ----
+   Las dos mitades se abren y se apagan. Es la única animación del producto que existe nada más
+   porque se siente bien: el dueño cortando el listón de su propia empresa. */
+.jpc-liston-izq,
+.jpc-liston-der {
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
+}
+/* El origen de giro lo pone MonoListon inline, en el punto exacto del corte. Las dos mitades
+   caen desde ahí en vez de deslizarse: 28px de un viewBox de 660 eran cinco pixeles en pantalla y
+   no se notaba que algo hubiera pasado. */
+.jpc-liston--cortado .jpc-liston-izq { transform: rotate(-22deg) translateY(14px); opacity: 0.4; }
+.jpc-liston--cortado .jpc-liston-der { transform: rotate(22deg) translateY(14px); opacity: 0.4; }
+@media (prefers-reduced-motion: reduce) {
+  .jpc-liston-izq,
+  .jpc-liston-der { transition: none; }
+}
+
+/* El rótulo del letrero de obra: mismo tratamiento que .jpc-reception-eyebrow. */
+.jpc-obra-sign {
+  font-family: var(--font-geist-mono), monospace;
+  letter-spacing: 0.18em;
+}

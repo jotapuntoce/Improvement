@@ -1,15 +1,16 @@
 "use client";
 
-// El panel de una empresa. Abre EN la recepción, no antes.
+// Entrar a una empresa: edificio → recepción → lo que el dueño venga a hacer.
 //
-// Antes esto era edificio → zoom → una tarjeta que decía "Bienvenido de vuelta" → un botón para
-// entrar al dashboard: tres clics y dos pantallas de saludo para llegar a lo que el dueño venía a
-// hacer. Ahora entrar a su empresa lo deja directamente adentro, en una recepción de verdad —
-// mostrador, sillas, el logo de su giro en la pared — y desde ahí abre lo que necesita.
+// El edificio ES la empresa, y es lo primero que se ve. No es un peaje: es la única pantalla del
+// producto que contesta "¿cómo va mi empresa?" sin que nadie lea nada. Según la etapa del mapa de
+// construcción se ve el terreno solo, los ingenieros midiéndolo, la obra levantándose, los acabados,
+// el equipo afuera aprendiendo, el moño de entrega o la empresa completa y operando. La tabla de
+// escenas vive en packages/ui/src/building/Building.tsx.
 //
-// El edificio no se fue: es lo que se ve al salir a la calle ("Ver el edificio"), y ahí es donde
-// enseña en qué etapa va la construcción de su empresa digital. Dejó de ser un peaje de entrada y
-// pasó a ser lo que siempre debió: la vista de afuera.
+// Lo que sí se quitó fue el "Bienvenido de vuelta": la recepción ya no saluda: ahora es una
+// recepción de verdad — mostrador, sillas, el logo del giro en la pared — con las puertas de la
+// empresa a la mano.
 //
 // accent_color se aplica una sola vez, en este wrapper — Building.tsx y Reception.tsx lo heredan
 // vía CSS custom property, ninguno de los dos lo recibe como prop.
@@ -29,28 +30,28 @@ export function BuildingExperience({
   graph: BuildingGraph;
   esDueno: boolean;
 }) {
-  const [afuera, setAfuera] = useState(false);
+  const [adentro, setAdentro] = useState(false);
   const router = useRouter();
 
   const sceneStyle = graph.accentColor
     ? ({ "--building-accent": graph.accentColor } as CSSProperties)
     : undefined;
 
-  if (afuera) {
+  if (!adentro) {
     return (
       <div className="jpc-scene" style={sceneStyle}>
-        {graph.areas.length === 0 && (
-          <p className="jpc-scene-note">Tu empresa digital todavía no tiene áreas configuradas.</p>
-        )}
         <Building
           companyName={graph.companyName}
           slogan={graph.slogan ?? undefined}
           areas={graph.areas}
           industry={graph.industry}
-          progress={graph.progress}
+          stageOrder={graph.stageOrder}
           stageLabel={graph.stageLabel ?? undefined}
-          onEnter={() => setAfuera(false)}
+          onEnter={() => setAdentro(true)}
         />
+        <Link href="/empresas" className="jpc-back-link">
+          ← Volver a mis empresas
+        </Link>
       </div>
     );
   }
@@ -62,8 +63,8 @@ export function BuildingExperience({
         greeting={graph.slogan ?? undefined}
         scene
         industry={graph.industry}
-        backLabel="← Volver a mis empresas"
-        onBack={() => router.push("/empresas")}
+        backLabel="← Salir a la calle"
+        onBack={() => setAdentro(false)}
       >
         <button
           type="button"
@@ -89,9 +90,6 @@ export function BuildingExperience({
               </Link>
             </>
           )}
-          <button type="button" className="jpc-reception-door" onClick={() => setAfuera(true)}>
-            Ver el edificio
-          </button>
         </div>
       </Reception>
     </div>
