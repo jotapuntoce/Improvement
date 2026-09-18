@@ -2,16 +2,22 @@
 // verificado por grep en el Verify de esta tarea). Model id resuelto vía la skill claude-api antes
 // de escribir esta llamada (blueprint §17) — vive en MODEL_ID, nunca inline en el call site.
 import Anthropic from "@anthropic-ai/sdk";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, isNotNull } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, objective, client, aiSuggestion, llmCalls } from "@jotapuntoce/db/schema";
+import { area, objective, orgNeed, client, aiSuggestion, llmCalls } from "@jotapuntoce/db/schema";
 import { requireEnv } from "../../lib/env.ts";
+import { evidenceKind } from "../objectives/evidence.ts";
 import {
   buildSuggestionPrompt,
   suggestionSchema,
   SUGGESTION_SYSTEM_PROMPT,
   type SuggestionCategory,
 } from "./prompts/suggestion.ts";
+import {
+  buildReviewPrompt,
+  reviewSchema,
+  REVIEW_SYSTEM_PROMPT,
+} from "./prompts/review.ts";
 
 // claude-opus-5, confirmado vigente vía la skill claude-api el 2026-08-31 — $5.00 / $25.00 por
 // 1M tokens input/output (PRICING_USD_PER_MTOK abajo). Nunca hardcodear un id de memoria.
@@ -64,7 +70,7 @@ export interface SuggestionProvider {
  * surfacear ProviderRateLimitError (reintentable), distinto de ProviderRequestError para un 400
  * (no reintentable) — criterio #1.
  */
-class AnthropicSuggestionProvider implements SuggestionProvider {
+export class AnthropicSuggestionProvider implements SuggestionProvider {
   private readonly client: Anthropic;
 
   constructor(apiKey: string) {
@@ -250,4 +256,136 @@ export async function generateSuggestion(
   if (!suggestion) throw new Error("transacción de generateSuggestion no devolvió fila");
 
   return { ok: true, data: suggestion };
+}
+
+// ─── Agente revisor ────────────────────────────────────────────────────────────────────────────
+//
+// Revisa las entregas que ya se dieron por terminadas y dejan evidencia. Corre solo, por cron, y
+// nunca en el camino de quien completa un objetivo: la revisión es posterior y asíncrona a
+// propósito. Un revisor que bloqueara el botón de 'dar por terminado' convertiría cada entrega en
+// un trámite, y el producto quedaría a merced de que el modelo responda.
+//
+// Su veredicto tampoco toca el ledger. Los puntos ya se pagaron al completarse — ver
+// server/ai/prompts/review.ts para por qué quitar lo ya ganado sería contraproducente.
+
+const MAX_REVIEW_OUTPUT_TOKENS = 512;
+
+export interface ReviewOutcome {
+  objectiveId: string;
+  verdict: "aprobada" | "rechazada";
+  note: string;
+}
+
+/**
+ * Revisa UN objetivo ya completado que dejó evidencia.
+ *
+ * Devuelve null cuando no hay nada que revisar (no existe, no está completado, no dejó evidencia
+ * o ya se revisó): que no haya trabajo pendiente no es un error, y tratarlo como tal llenaría los
+ * logs del cron de ruido cada vez que corra sobre una empresa al día.
+ */
+export async function reviewObjective(
+  orgId: string,
+  objectiveId: string,
+  provider?: SuggestionProvider,
+): Promise<ReviewOutcome | null> {
+  const [row] = await db
+    .select({ objetivo: objective, needTitle: orgNeed.title })
+    .from(objective)
+    .leftJoin(orgNeed, eq(orgNeed.id, objective.needId))
+    .where(and(eq(objective.id, objectiveId), eq(objective.orgId, orgId)))
+    .limit(1);
+
+  const obj = row?.objetivo;
+  if (!obj || obj.status !== "completed" || !obj.evidenceValue) return null;
+  if (obj.reviewStatus !== "sin_revisar") return null;
+
+  const resolved = provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  const prompt = buildReviewPrompt({
+    title: obj.title,
+    description: obj.description,
+    evidenceLabel: evidenceKind(obj.evidenceType)?.label ?? obj.evidenceType,
+    evidenceValue: obj.evidenceValue,
+    needTitle: row?.needTitle ?? null,
+  });
+
+  const startedAt = Date.now();
+  let completion: SuggestionCompletion;
+  try {
+    completion = await resolved.complete(REVIEW_SYSTEM_PROMPT, prompt);
+  } catch {
+    // El objetivo se queda en sin_revisar y la siguiente corrida lo vuelve a tomar. No se marca
+    // rechazada: un fallo del proveedor no es un veredicto sobre el trabajo de nadie.
+    return null;
+  }
+
+  const parsed = reviewSchema.safeParse(parseCompletion(completion.text));
+  if (!parsed.success) return null;
+
+  const latencyMs = Date.now() - startedAt;
+  await db.transaction(async (tx) => {
+    await tx
+      .update(objective)
+      .set({
+        reviewStatus: parsed.data.verdict,
+        reviewNote: parsed.data.note,
+        reviewedAt: new Date(),
+      })
+      // Condicionado a sin_revisar: si otra corrida del cron se adelantó, esta no la pisa.
+      .where(and(eq(objective.id, objectiveId), eq(objective.reviewStatus, "sin_revisar")));
+
+    await tx.insert(llmCalls).values({
+      orgId,
+      purpose: "revision",
+      modelId: MODEL_ID,
+      inputTokens: completion.usage.inputTokens,
+      outputTokens: completion.usage.outputTokens,
+      cacheReadTokens: completion.usage.cacheReadTokens,
+      cacheWriteTokens: completion.usage.cacheWriteTokens,
+      latencyMs,
+      finishReason: completion.finishReason,
+      costUsd: estimateCostUsd(completion.usage).toFixed(6),
+    });
+  });
+
+  return { objectiveId, verdict: parsed.data.verdict, note: parsed.data.note };
+}
+
+/** Cuántas entregas revisa el agente en una sola corrida. Un tope y no todas: cada una es una
+ *  llamada al proveedor, y una empresa que entregue cien de golpe no debe vaciar el presupuesto
+ *  de IA de una pasada. Lo que no alcanzó se queda en sin_revisar y lo toma la siguiente. */
+const MAX_REVIEWS_PER_RUN = 20;
+
+/**
+ * El agente revisor: toma las entregas con evidencia que nadie ha revisado, de todas las empresas,
+ * y las revisa de una en una.
+ *
+ * Sin orgId de por medio a propósito: no corre en nombre de nadie ni desde una sesión, lo dispara
+ * el cron (ver app/api/cron/revisiones/route.ts). El aislamiento entre empresas no se pierde — cada
+ * revisión solo ve su propio objetivo y escribe su propia fila.
+ */
+export async function reviewPendingObjectives(
+  provider?: SuggestionProvider,
+): Promise<{ reviewed: number; approved: number; rejected: number }> {
+  const pendientes = await db
+    .select({ id: objective.id, orgId: objective.orgId })
+    .from(objective)
+    .where(
+      and(
+        eq(objective.status, "completed"),
+        eq(objective.reviewStatus, "sin_revisar"),
+        isNotNull(objective.evidenceValue),
+      ),
+    )
+    .limit(MAX_REVIEWS_PER_RUN);
+
+  let approved = 0;
+  let rejected = 0;
+  for (const p of pendientes) {
+    const outcome = await reviewObjective(p.orgId, p.id, provider);
+    if (!outcome) continue;
+    if (outcome.verdict === "aprobada") approved++;
+    else rejected++;
+  }
+
+  return { reviewed: approved + rejected, approved, rejected };
 }
