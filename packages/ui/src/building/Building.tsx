@@ -7,6 +7,8 @@
 // Enter/Espacio dispara el zoom hacia la puerta; el componente que la monta decide cuándo
 // desmontar esto y montar Reception.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IndustryGlyph } from "./AppIconLarge.tsx";
+import type { Industry } from "./industries.ts";
 
 const COLS = 9;
 const ROWS = 8;
@@ -43,6 +45,21 @@ export interface BuildingProps {
   slogan?: string;
   areas: BuildingArea[];
   onEnter: () => void;
+  /**
+   * Qué tan construida está la empresa DIGITAL, de 0 a 1 — la misma etapa que marca el tracker
+   * del panel (org_build_stage / BUILD_STAGES). El edificio se levanta de abajo hacia arriba
+   * conforme avanza: los pisos que todavía no se entregan se ven en obra, con andamios y grúa.
+   *
+   * Que las ventanas de un área no se prendan hasta que su piso exista no es un bug: es el punto.
+   * El dueño ve en el edificio exactamente lo mismo que dice su tracker, sin traducir nada.
+   *
+   * Default 1 — un edificio sin etapa conocida se dibuja terminado, como siempre se dibujó.
+   */
+  progress?: number;
+  /** El nombre de la etapa actual, para el pie del edificio. */
+  stageLabel?: string;
+  /** El giro de la empresa — el glyph que va en la marquesina, sobre la puerta. */
+  industry?: Industry | string | null;
 }
 
 // 2.6s entre turno y turno, encendida ~2.4s de eso (ver @keyframes jpc-window-turn en
@@ -183,7 +200,15 @@ function ScientistDefs() {
   );
 }
 
-export function Building({ companyName, slogan, areas, onEnter }: BuildingProps) {
+export function Building({
+  companyName,
+  slogan,
+  areas,
+  onEnter,
+  progress = 1,
+  stageLabel,
+  industry,
+}: BuildingProps) {
   const [entering, setEntering] = useState(false);
   const [tagX, setTagX] = useState<number | null>(null);
   const wordRef = useRef<SVGTextElement>(null);
@@ -263,6 +288,15 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
   const signCX = BX0 + (BX1 - BX0) / 2;
   const wordY = BY0 + 46;
 
+  // Se levanta de abajo hacia arriba: la fila ROWS-1 es la planta baja. Math.max(1, ...) para que
+  // una empresa en la etapa 1 de 8 ya tenga planta baja y puerta — un edificio de cero pisos con
+  // una puerta flotando no se lee como "apenas empezamos", se lee como un error de dibujo.
+  const clamped = Math.min(Math.max(progress, 0), 1);
+  const builtRows = clamped >= 1 ? ROWS : Math.max(1, Math.round(ROWS * clamped));
+  const firstBuiltRow = ROWS - builtRows;
+  const buildLineY = firstBuiltRow === 0 ? BY0 : GY + firstBuiltRow * CELL - (CELL - WIN) / 2;
+  const enObra = builtRows < ROWS;
+
   return (
     <div className="jpc-stage-wrap">
       <div
@@ -305,16 +339,71 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
             ))}
           </g>
 
+          {/* La fachada terminada llega hasta buildLineY; lo de arriba es obra. */}
           <rect
             x={BX0}
-            y={BY0}
+            y={buildLineY}
             width={BX1 - BX0}
-            height={BY1 - BY0}
+            height={BY1 - buildLineY}
             rx="6"
             fill="url(#jpc-facadeGrad)"
             stroke="var(--building-accent)"
             strokeWidth="2"
           />
+          {enObra && (
+            <g className="jpc-obra">
+              <rect
+                x={BX0}
+                y={BY0}
+                width={BX1 - BX0}
+                height={buildLineY - BY0}
+                rx="6"
+                fill="none"
+                stroke="var(--building-accent)"
+                strokeWidth="1.4"
+                strokeDasharray="6 6"
+                opacity=".45"
+              />
+              {/* Andamios: dos montantes y un travesaño por piso sin entregar. */}
+              {[BX0 + 16, BX1 - 16].map((x) => (
+                <line
+                  key={x}
+                  x1={x}
+                  y1={BY0 + 4}
+                  x2={x}
+                  y2={buildLineY}
+                  stroke="var(--building-accent)"
+                  strokeWidth="2"
+                  opacity=".5"
+                />
+              ))}
+              {Array.from({ length: firstBuiltRow }).map((_, i) => (
+                <line
+                  key={i}
+                  x1={BX0 + 16}
+                  y1={buildLineY - i * CELL - 10}
+                  x2={BX1 - 16}
+                  y2={buildLineY - i * CELL - 10}
+                  stroke="var(--building-accent)"
+                  strokeWidth="1.4"
+                  opacity=".35"
+                />
+              ))}
+              {/* Grúa: mástil, pluma y cable con el gancho colgando sobre la obra. */}
+              <g
+                stroke="var(--building-accent)"
+                strokeWidth="2"
+                fill="none"
+                opacity=".7"
+                strokeLinecap="round"
+              >
+                <line x1={BX1 + 26} y1={BY0 - 70} x2={BX1 + 26} y2={buildLineY} />
+                <line x1={BX1 - 90} y1={BY0 - 70} x2={BX1 + 58} y2={BY0 - 70} />
+                <line x1={BX1 - 40} y1={BY0 - 70} x2={BX1 - 40} y2={BY0 - 40} />
+                <path d={`M ${BX1 - 46} ${BY0 - 40} h 12 v 8 h -12 z`} />
+              </g>
+            </g>
+          )}
           <rect
             x={BX0 - 6}
             y={BY0 - 16}
@@ -344,6 +433,9 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
                 const wx = c.x - WIN / 2;
                 const wy = c.y - WIN / 2;
                 const isAmbient = !meta && ambientWindows.some((a) => a.row === row && a.col === col);
+
+                // Ese piso todavía no se entrega: no hay ventana que prender, ni siquiera apagada.
+                if (row < firstBuiltRow) return null;
 
                 if (!meta) {
                   return (
@@ -383,6 +475,15 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
             <circle key={i} cx={pt.x.toFixed(1)} cy={pt.y.toFixed(1)} r="2.4" fill={areas[i]!.color} />
           ))}
 
+          {/* El giro de la empresa, en la marquesina sobre la puerta. Mismo glyph que su ícono. */}
+          <g
+            transform={`translate(${DOOR_CX - 16} ${DOOR_Y - 42}) scale(1.35)`}
+            color="var(--building-accent)"
+            opacity=".8"
+          >
+            <IndustryGlyph industry={industry} />
+          </g>
+
           {[-1, 1].map((side) => {
             const dx = DOOR_CX + (side * DOOR_GAP) / 2 + (side < 0 ? -DOOR_W : 0);
             return (
@@ -394,7 +495,9 @@ export function Building({ companyName, slogan, areas, onEnter }: BuildingProps)
           })}
         </svg>
       </div>
-      <p className="jpc-enter-hint">Toca el edificio para entrar →</p>
+      <p className="jpc-enter-hint">
+        {stageLabel ? `${stageLabel} · toca el edificio para entrar →` : "Toca el edificio para entrar →"}
+      </p>
     </div>
   );
 }

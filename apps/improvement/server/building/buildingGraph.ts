@@ -13,6 +13,7 @@ export interface BuildingOrgInput {
   name: string;
   slogan: string | null;
   accentColor: string | null;
+  industry: string | null;
 }
 
 export interface BuildingArea {
@@ -27,7 +28,16 @@ export interface BuildingGraph {
   companyName: string;
   slogan: string | null;
   accentColor: string | null;
+  industry: string | null;
   areas: BuildingArea[];
+  /**
+   * Qué tan construida está la empresa digital, 0 a 1 — derivado de org_build_stage, la misma
+   * fuente que el tracker del panel. El edificio dibuja exactamente esto (ver Building.tsx):
+   * los dos no pueden decir cosas distintas porque leen el mismo número.
+   */
+  progress: number;
+  /** El nombre de la etapa en curso, o null si el mapa de construcción todavía no arranca. */
+  stageLabel: string | null;
 }
 
 const WINDOWS_PER_AREA = 3;
@@ -100,7 +110,25 @@ export function distributeCells(
  * de cells (criterio #1) — mismo layout en llamadas repetidas para la misma organización
  * (criterio #2, vía hashSeed determinista sobre el nombre).
  */
-export function buildBuildingGraph(org: BuildingOrgInput, areas: BuildingAreaInput[]): BuildingGraph {
+/**
+ * Qué fracción del mapa de construcción ya se entregó.
+ *
+ * Una etapa en progreso cuenta como media: el dueño que va a la mitad de "Construcción" no ve
+ * su edificio igual que el día que esa etapa empezó. Sin etapas devuelve 1 — una empresa sin
+ * mapa se dibuja terminada, que es como se dibujaba antes de que el edificio supiera de esto.
+ */
+export function stageProgress(stages: { status: string }[]): number {
+  if (stages.length === 0) return 1;
+  const completas = stages.filter((s) => s.status === "completada").length;
+  const enCurso = stages.filter((s) => s.status === "en_progreso").length;
+  return Math.min(1, (completas + enCurso * 0.5) / stages.length);
+}
+
+export function buildBuildingGraph(
+  org: BuildingOrgInput,
+  areas: BuildingAreaInput[],
+  stages: { status: string; stageName: string }[] = [],
+): BuildingGraph {
   const distributed = distributeCells(
     areas.map((a) => a.id),
     BUILDING_ROWS,
@@ -110,10 +138,15 @@ export function buildBuildingGraph(org: BuildingOrgInput, areas: BuildingAreaInp
   );
   const cellsById = new Map(distributed.map((d) => [d.id, d.cells] as const));
 
+  const enCurso = stages.find((s) => s.status === "en_progreso");
+
   return {
     companyName: org.name,
     slogan: org.slogan,
     accentColor: org.accentColor,
+    industry: org.industry,
+    progress: stageProgress(stages),
+    stageLabel: enCurso?.stageName ?? null,
     areas: areas.map((a) => ({
       id: a.id,
       name: a.name,

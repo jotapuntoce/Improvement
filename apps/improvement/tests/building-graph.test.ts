@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBuildingGraph, distributeCells } from "../server/building/buildingGraph.ts";
+import { buildBuildingGraph, distributeCells, stageProgress } from "../server/building/buildingGraph.ts";
 
 describe("distributeCells", () => {
   it(
@@ -42,7 +42,7 @@ describe("buildBuildingGraph", () => {
       "cada una con su color real y una lista de cells no vacía",
     () => {
       const graph = buildBuildingGraph(
-        { name: "Camibel", slogan: null, accentColor: null },
+        { name: "Camibel", slogan: null, accentColor: null, industry: null },
         [
           { id: "area-1", name: "Ventas", color: "#22d3ee" },
           { id: "area-2", name: "Operaciones", color: "#f87171" },
@@ -57,8 +57,34 @@ describe("buildBuildingGraph", () => {
   );
 
   it("WHEN se llama dos veces con la misma organización THE SYSTEM SHALL devolver el mismo layout (determinista por nombre)", () => {
-    const org = { name: "Afianza", slogan: null, accentColor: null };
+    const org = { name: "Afianza", slogan: null, accentColor: null, industry: null };
     const areas = [{ id: "x", name: "Legal", color: "#4c9b69" }];
     expect(buildBuildingGraph(org, areas)).toEqual(buildBuildingGraph(org, areas));
+  });
+});
+
+describe("stageProgress", () => {
+  const etapa = (status: string) => ({ status });
+
+  it("WHEN la empresa no tiene mapa de construcción THE SYSTEM SHALL dibujar el edificio terminado", () => {
+    expect(stageProgress([])).toBe(1);
+  });
+
+  it("WHEN una etapa va en progreso THE SYSTEM SHALL contarla como media", () => {
+    const ocho = [
+      etapa("completada"),
+      etapa("completada"),
+      etapa("completada"),
+      etapa("en_progreso"),
+      etapa("bloqueada"),
+      etapa("bloqueada"),
+      etapa("bloqueada"),
+      etapa("bloqueada"),
+    ];
+    expect(stageProgress(ocho)).toBeCloseTo(3.5 / 8);
+  });
+
+  it("WHEN todas están completadas THE SYSTEM SHALL devolver exactamente 1, nunca más", () => {
+    expect(stageProgress(Array.from({ length: 8 }, () => etapa("completada")))).toBe(1);
   });
 });

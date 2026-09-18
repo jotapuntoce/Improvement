@@ -23,7 +23,11 @@ const glyphProps = {
 
 // Un glyph por giro (industries.ts) — trazos simples, mismo lenguaje visual que la cuadrícula
 // default. "otro" y cualquier industry no reconocida caen al default (última entrada del switch).
-function Glyph({ industry }: { industry?: Industry | string | null }) {
+//
+// Exportado porque la recepción lo usa como el logo detrás del mostrador y el edificio lo pone en
+// la marquesina: el giro de la empresa se ve en los tres lugares o no se ve en ninguno, y tenerlo
+// escrito tres veces garantizaba que un giro nuevo apareciera solo en uno.
+export function IndustryGlyph({ industry }: { industry?: Industry | string | null }) {
   switch (industry) {
     case "restaurante":
       return (
@@ -111,7 +115,7 @@ export function AppIconLarge({ label, stageLabel, industry, size = 96 }: AppIcon
           height={glyphSize}
           viewBox="0 0 24 24"
         >
-          <Glyph industry={industry} />
+          <IndustryGlyph industry={industry} />
         </svg>
       </span>
       <span className="app-icon-large-badge">{stageLabel}</span>
