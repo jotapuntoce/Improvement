@@ -44,6 +44,10 @@ export const organization = pgTable("organization", {
   // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
   // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
   sectionLabels: jsonb("section_labels").notNull().default(sql`'{}'::jsonb`),
+  // En qué nivel de evolución va ESTE negocio — índice dentro de EVOLUTION_LEVELS
+  // (packages/ui/src/building/evolutionLevels.ts). Los nombres de los niveles son iguales para toda
+  // empresa; el camino para subir no lo es: ese camino son sus filas de org_need, no una columna.
+  evolutionLevel: integer("evolution_level").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -164,6 +168,28 @@ export const objective = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     impactWeight: integer("impact_weight").notNull(),
+    // 'ipa' = Income Producing Activity: toca el ingreso de la empresa de forma DIRECTA (prospección,
+    // marketing, una cena con un cliente). 'non_ipa' es todo lo demás. No es una jerarquía de valor y
+    // nunca se le muestra al empleado como tal — es la variable con la que points.ts calcula, nada
+    // más. El default es non_ipa porque la mayor parte del trabajo real de una empresa lo es.
+    kind: text("kind").notNull().default("non_ipa"),
+    // Qué se tiene que entregar para poder marcarlo completado. 'ninguna' = se completa con un clic,
+    // como hasta hoy: pedir evidencia en todo convertiría el producto en un checador.
+    evidenceType: text("evidence_type").notNull().default("ninguna"),
+    // La evidencia entregada, siempre como texto: una URL, una nota o un número en string. Un campo
+    // y no cuatro nullables — solo una clase de evidencia aplica por objetivo (la de evidenceType).
+    evidenceValue: text("evidence_value"),
+    evidenceSubmittedAt: timestamp("evidence_submitted_at", { withTimezone: true }),
+    // Veredicto del agente revisor (server/objectives/review.ts). 'sin_revisar' es el estado de todo
+    // objetivo recién completado: la revisión es posterior y asíncrona, nunca bloquea al empleado.
+    reviewStatus: text("review_status").notNull().default("sin_revisar"),
+    reviewNote: text("review_note"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // Quién emitió el trabajo. set null y no cascade: el objetivo sobrevive a quien lo creó.
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    // La necesidad de la empresa que este objetivo atiende. Es lo que impide que el equipo genere
+    // veinte tareas chicas porque sí: un objetivo sin necesidad detrás no mueve el nivel de evolución.
+    needId: uuid("need_id").references(() => orgNeed.id, { onDelete: "set null" }),
     assignedEmployeeId: uuid("assigned_employee_id").references(() => profile.id),
     status: text("status").notNull().default("pending"),
     dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
@@ -173,12 +199,100 @@ export const objective = pgTable(
   (t) => [
     check("objective_impact_weight_range", sql`${t.impactWeight} >= 0 AND ${t.impactWeight} <= 100`),
     check("objective_status_check", sql`${t.status} in ('pending','in_progress','completed')`),
+    check("objective_kind_check", sql`${t.kind} in ('ipa','non_ipa')`),
+    check(
+      "objective_evidence_type_check",
+      sql`${t.evidenceType} in ('ninguna','enlace','nota','numero','archivo')`,
+    ),
+    check(
+      "objective_review_status_check",
+      sql`${t.reviewStatus} in ('sin_revisar','aprobada','rechazada')`,
+    ),
     index("idx_objective_org_id").on(t.orgId),
     index("idx_objective_assignee_status").on(t.assignedEmployeeId, t.status),
     index("idx_objective_org_due_date").on(t.orgId, t.dueDate),
   ],
 );
 
+/**
+ * Lo que a esta empresa le falta para evolucionar, crecer, mejorar o sostener lo que ya tiene.
+ *
+ * Es el diagnóstico, y es de dónde salen los objetivos: un objetivo apunta a una necesidad
+ * (objective.need_id) y por eso vale lo que vale. Sin esta tabla el equipo puede generar trabajo
+ * infinito sin que nada de eso mueva a la empresa.
+ *
+ * `severity` son los patógenos: qué tan enferma está esa área. Es también lo que se le entrega a
+ * Summum cuando la necesidad se deriva — Improvement diagnostica desde adentro, Summum hace el
+ * match con la empresa afiliada que entra a resolver.
+ */
+export const orgNeed = pgTable(
+  "org_need",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    // 1 leve, 2 moderado, 3 crítico. Un entero y no tres literales: la severidad se ordena y se
+    // suma, y un texto obliga a un mapa de traducción en cada consulta que quiera ordenar.
+    severity: integer("severity").notNull().default(2),
+    status: text("status").notNull().default("abierta"),
+    // Quién la detectó. 'improvement' = la dedujo el Director General; 'dueno' = la dijo el dueño.
+    source: text("source").notNull().default("improvement"),
+    // El puerto de SALIDA a Summum System: cuándo se derivó y con qué nota. Nada entra por aquí —
+    // Summum recibe, no diagnostica (ver la memoria del proyecto improvement-director-general).
+    referredAt: timestamp("referred_at", { withTimezone: true }),
+    referralNote: text("referral_note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_org_need_org_id").on(t.orgId),
+    index("idx_org_need_org_status").on(t.orgId, t.status),
+    check("org_need_severity_range", sql`${t.severity} >= 1 AND ${t.severity} <= 3`),
+    check(
+      "org_need_status_check",
+      sql`${t.status} in ('abierta','en_progreso','resuelta','derivada')`,
+    ),
+    check("org_need_source_check", sql`${t.source} in ('improvement','dueno')`),
+  ],
+);
+
+/**
+ * Lo que Improvement sabe del dueño de ESTA empresa: cómo trabaja, piensa, ejecuta, delega y
+ * visualiza. Es la materia prima del Director General.
+ *
+ * Append-only, como employee_points_ledger: una respuesta vieja no se corrige, se agrega la nueva.
+ * Cómo pensaba el dueño hace seis meses es justo lo que hace visible que cambió.
+ *
+ * Nunca guarda nada de Jose Carlos: cada Improvement aprende del dueño de SU empresa, no del
+ * arquitecto que la construyó.
+ */
+export const ownerMemory = pgTable(
+  "owner_memory",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    // Qué se le preguntó. null cuando la entrada es una observación y no una respuesta.
+    question: text("question"),
+    answer: text("answer").notNull(),
+    // 'arranque' = la conversación de bienvenida; 'observacion' = lo que Improvement dedujo después.
+    topic: text("topic").notNull().default("arranque"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_owner_memory_org_id").on(t.orgId),
+    index("idx_owner_memory_owner_id").on(t.ownerId),
+    check("owner_memory_topic_check", sql`${t.topic} in ('arranque','observacion')`),
+  ],
+);
 // Append-only — nunca se recalcula ni se actualiza una fila existente (ver server/objectives/points.ts).
 export const employeePointsLedger = pgTable(
   "employee_points_ledger",

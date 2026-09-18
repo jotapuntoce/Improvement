@@ -11,6 +11,7 @@
     "./building/AvatarIcon.tsx": "./src/building/AvatarIcon.tsx",
     "./building/industries.ts": "./src/building/industries.ts",
     "./building/buildStages.ts": "./src/building/buildStages.ts",
+    "./building/evolutionLevels.ts": "./src/building/evolutionLevels.ts",
     "./building/ownerLabels.ts": "./src/building/ownerLabels.ts",
     "./building/kpis.ts": "./src/building/kpis.ts",
     "./assembly/layout.ts": "./src/assembly/layout.ts",
