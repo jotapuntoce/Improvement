@@ -64,6 +64,46 @@
   --bg-reception-bot: #26190d;
   --desk-top: #c99a5c;
 
+  /* Paleta del edificio por giro. El edificio de un cliente no puede verse igual que el de todos
+     los demas: el giro elige la paleta y una organizacion con accent_color propio sobreescribe solo
+     el acento (packages/ui/src/building/palettes.ts). Se mapean por GIRO, que es un dato, nunca por
+     nombre de empresa — motor generico, Non-negotiable #2. "construccion" es tambien el default:
+     es la fachada dorada sobre azul noche con la que nacio la escena. */
+  --pal-construccion-accent: #cf9f3d;
+  --pal-construccion-facade: #101c33;
+  --pal-construccion-facade-2: #0c1626;
+  --pal-construccion-glow: #fff6e0;
+
+  --pal-restaurante-accent: #e2703a;
+  --pal-restaurante-facade: #2b1b1a;
+  --pal-restaurante-facade-2: #1a1010;
+  --pal-restaurante-glow: #ffe6d2;
+
+  --pal-retail-accent: #ec4899;
+  --pal-retail-facade: #271636;
+  --pal-retail-facade-2: #170d21;
+  --pal-retail-glow: #ffe2f2;
+
+  --pal-servicios-accent: #7aa2e3;
+  --pal-servicios-facade: #16213a;
+  --pal-servicios-facade-2: #0e1626;
+  --pal-servicios-glow: #e6eeff;
+
+  --pal-salud-accent: #2dd4bf;
+  --pal-salud-facade: #0d2733;
+  --pal-salud-facade-2: #081a22;
+  --pal-salud-glow: #d8fffa;
+
+  --pal-tecnologia-accent: #8b6dff;
+  --pal-tecnologia-facade: #171334;
+  --pal-tecnologia-facade-2: #0e0b20;
+  --pal-tecnologia-glow: #ece7ff;
+
+  --pal-manufactura-accent: #f97316;
+  --pal-manufactura-facade: #201f26;
+  --pal-manufactura-facade-2: #141318;
+  --pal-manufactura-glow: #ffeddc;
+
   --dept-planeacion: #d72b2e;
   --dept-soluciones: #136ecc;
   --dept-imaginacion: #e4bb05;

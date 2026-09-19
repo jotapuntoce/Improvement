@@ -1,5 +1,10 @@
 // Lógica pura de layout del edificio — sin acceso a datos (mismo patrón que
-// server/scene/sceneGraph.ts). server/building/loadBuilding.ts alimenta esto con datos reales.
+// server/employees/teamStatus.ts). server/building/loadBuilding.ts alimenta esto con datos reales.
+import {
+  buildingPalette,
+  type BuildingPalette,
+} from "@jotapuntoce/ui/building/palettes.ts";
+import { buildingShape } from "@jotapuntoce/ui/building/shapes.ts";
 export type SilhouetteKind = "plan" | "sol" | "imag" | "valor" | "brand" | "pres" | "generica";
 
 export interface BuildingAreaInput {
@@ -27,8 +32,14 @@ export interface BuildingArea {
 export interface BuildingGraph {
   companyName: string;
   slogan: string | null;
-  accentColor: string | null;
   industry: string | null;
+  /**
+   * Los colores de ESTE edificio. Se derivan del giro de la empresa, con accent_color pisando el
+   * acento cuando la organización tiene uno propio — ver packages/ui/src/building/palettes.ts.
+   * Van en el grafo y no en el componente para que el edificio y la recepción no puedan pintarse
+   * distinto: los dos heredan del mismo wrapper.
+   */
+  palette: BuildingPalette;
   areas: BuildingArea[];
   /**
    * En qué etapa del mapa de construcción va la empresa, 1 a 8 — derivado de org_build_stage, la
@@ -45,8 +56,6 @@ export interface BuildingGraph {
 const TOTAL_STAGES = 8;
 
 const WINDOWS_PER_AREA = 3;
-const BUILDING_ROWS = 8;
-const BUILDING_COLS = 9;
 
 // mulberry32 — mismo PRNG determinista ya usado en apps/admin/components/building/JotaPuntoCeBuilding.js
 // para las estrellas y el parpadeo ambiente. Necesario aquí por el mismo motivo: server y cliente
@@ -153,10 +162,14 @@ export function buildBuildingGraph(
   areas: BuildingAreaInput[],
   stages: { status: string; stageName: string; stageOrder: number }[] = [],
 ): BuildingGraph {
+  // La MISMA forma que va a dibujar Building.tsx, derivada del mismo giro. Si aquí se repartieran
+  // las ventanas sobre una cuadrícula de 9×8 y allá se dibujara una de 10×3, las áreas de un giro
+  // chaparro caerían en pisos que no existen y simplemente no se verían.
+  const shape = buildingShape(org.industry);
   const distributed = distributeCells(
     areas.map((a) => a.id),
-    BUILDING_ROWS,
-    BUILDING_COLS,
+    shape.rows,
+    shape.cols,
     WINDOWS_PER_AREA,
     hashSeed(org.name),
   );
@@ -167,8 +180,8 @@ export function buildBuildingGraph(
   return {
     companyName: org.name,
     slogan: org.slogan,
-    accentColor: org.accentColor,
     industry: org.industry,
+    palette: buildingPalette(org.industry, org.accentColor),
     stageOrder: etapa.order,
     stageLabel: etapa.name,
     areas: areas.map((a) => ({

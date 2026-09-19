@@ -176,7 +176,7 @@ describe("loadOrgKpis", () => {
   it(
     "WHEN un platform admin tiene membership en el org THE SYSTEM SHALL excluirlo del indicador de " +
       "equipo — cuarto lugar que cuenta personas para el cliente, igual que listTeamForOwner y " +
-      "loadDashboardScene",
+      "loadTeamStatus",
     async () => {
       const org = await newOrg("Test Org Equipo");
       await addMember(org.id, "owner");

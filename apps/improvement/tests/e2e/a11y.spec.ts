@@ -10,6 +10,9 @@ import { db } from "@jotapuntoce/db";
 import { organization, profile, membership, area, objective, orgBuildStage } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
+// El nombre va en una constante porque el test lo usa dos veces: para crear la empresa y para
+// encontrar su puerta ("Entrar a <empresa>") cuando entra a la recepción.
+const ORG_NAME = "a11y E2E";
 const OWNER_EMAIL = `a11y-owner-${Date.now()}@example.com`;
 const OWNER_PASSWORD = crypto.randomUUID();
 
@@ -22,7 +25,7 @@ test.beforeAll(async () => {
 
   const [org] = await db
     .insert(organization)
-    .values({ name: "a11y E2E", slug: `a11y-e2e-${Date.now()}` })
+    .values({ name: ORG_NAME, slug: `a11y-e2e-${Date.now()}` })
     .returning();
   if (!org) throw new Error("insert de organization no devolvió fila");
   orgId = org.id;
@@ -75,13 +78,14 @@ test.beforeEach(async ({ context, baseURL }) => {
   ]);
 });
 
-const ROUTES: { label: string; path: () => string }[] = [
+const ROUTES: { label: string; path: () => string; entrar?: boolean }[] = [
   { label: "/login", path: () => "/login" },
   { label: "/empresas", path: () => "/empresas" },
   { label: "/empresas/[orgId]", path: () => `/empresas/${orgId}` },
-  // ?fallback=1 fuerza SceneListFallback — axe-core no puede auditar un <canvas> WebGL de forma
-  // significativa (ver apps/improvement/app/[org]/dashboard/Scene3D.tsx).
-  { label: "/[org]/dashboard", path: () => `/${orgId}/dashboard?fallback=1` },
+  // La recepción no tiene ruta propia: se abre desde el edificio, de un clic. Sin ese clic axe
+  // auditaría la fachada y nunca los muebles — que es donde vive hoy todo lo que antes eran las
+  // pantallas del panel. `entrar` lo da antes de auditar.
+  { label: "/empresas/[orgId] (recepción)", path: () => `/empresas/${orgId}`, entrar: true },
   { label: "/[org]/objetivos", path: () => `/${orgId}/objetivos` },
   { label: "/[org]/mapa", path: () => `/${orgId}/mapa` },
 ];
@@ -93,6 +97,12 @@ for (const route of ROUTES) {
     async ({ page }) => {
       await page.goto(route.path());
       await page.waitForLoadState("networkidle");
+
+      if (route.entrar) {
+        await page.getByRole("button", { name: `Entrar a ${ORG_NAME}` }).click();
+        // El edificio corre una animación antes de montar la recepción.
+        await page.locator(".jpc-lobby").waitFor();
+      }
 
       const results = await new AxeBuilder({ page }).analyze();
       const seriousOrCritical = results.violations.filter(

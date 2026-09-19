@@ -31,7 +31,7 @@ export async function loadVisibleSections(userId: string, orgId: string): Promis
   const overrides = (org?.sectionLabels ?? {}) as Record<string, SectionOverride>;
 
   // Los grants se resuelven UNA sola vez aquí, no una por sección: resolveSection haría la misma
-  // consulta a membership+permission_type cinco veces por carga del dashboard, todas preguntando lo
+  // consulta a membership+permission_type cinco veces por carga de la recepción, todas preguntando lo
   // mismo. scopeFor es pura (server/permissions/sections.ts) — aquí solo se le da de comer, las dos
   // reglas no negociables (dueño ve todo, sin tipo no ve nada) siguen viviendo únicamente ahí.
   let grants: unknown = null;

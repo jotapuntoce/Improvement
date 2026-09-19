@@ -2,7 +2,7 @@
 // manejadores de clic: no existe (ni debe existir) un Server Action que mute org_build_stage desde
 // esta app — la edita a mano Jose Carlos desde apps/admin (Non-Goals: sin comentarios/chat).
 import { requireSection } from "@/server/auth/guard";
-import { getBuildMap } from "@/server/scene/buildMap";
+import { getBuildMap } from "@/server/buildMap/loadBuildMap";
 
 const STATUS_LABEL: Record<string, string> = {
   bloqueada: "Bloqueada",

@@ -1,10 +1,13 @@
-// Integración real contra el proyecto Supabase de desarrollo — a diferencia de scene-graph.test.ts,
-// que prueba las funciones puras, aquí se prueba el puente a datos (loadDashboardScene).
+// Integración real contra el proyecto Supabase de desarrollo — a diferencia de team-status.test.ts,
+// que prueba la función pura, aquí se prueba el puente a datos (loadTeamStatus).
+//
+// Lo que se cuida es quién sale en la lista: el muro de retratos de la recepción enseña caras, y
+// una cara de más es una fuga.
 import { afterEach, describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, profile, membership, area, permissionType } from "@jotapuntoce/db/schema";
-import { loadDashboardScene } from "../server/scene/loadDashboardScene.ts";
+import { loadTeamStatus } from "../server/employees/loadTeamStatus.ts";
 
 const createdOrgIds: string[] = [];
 const createdProfileIds: string[] = [];
@@ -55,10 +58,10 @@ async function makeMember(
   return userId;
 }
 
-describe("loadDashboardScene", () => {
+describe("loadTeamStatus", () => {
   it(
-    "WHEN un platform admin tiene membership en el org THE SYSTEM SHALL excluirlo de los avatares " +
-      "del dashboard, igual que de /[org]/equipo",
+    "WHEN un platform admin tiene membership en el org THE SYSTEM SHALL excluirlo del muro de retratos " +
+      "de la recepción, igual que de /[org]/equipo",
     async () => {
       const org = await makeOrg("admin-oculto");
       const ownerId = await makeMember(org.id, "owner");
@@ -70,34 +73,33 @@ describe("loadDashboardScene", () => {
       if (!admin) throw new Error("este entorno no tiene ningún profile con is_platform_admin=true");
       await db.insert(membership).values({ userId: admin.id, orgId: org.id, role: "owner", acceptedAt: new Date() });
 
-      const graph = await loadDashboardScene(ownerId, org.id);
+      const equipo = await loadTeamStatus(ownerId, org.id);
 
-      expect(graph.avatars.map((a) => a.id)).toEqual([ownerId]);
-      expect(JSON.stringify(graph)).not.toContain(admin.email);
+      expect(equipo.map((p) => p.id)).toEqual([ownerId]);
+      expect(JSON.stringify(equipo)).not.toContain(admin.email);
     },
   );
 
-  // CRITICAL 1 de la revisión de rama: loadDashboardScene solo llamaba assertMembership, así que
-  // cualquier miembro con sesión veía a todo el equipo en /[org]/dashboard sin importar su tipo de
-  // permiso. El alcance ahora se resuelve adentro con resolveSection("equipo"), mismo patrón que
+  // CRITICAL 1 de la revisión de rama: este loader solo llamaba assertMembership, así que
+  // cualquier miembro con sesión veía a todo el equipo sin importar su tipo de permiso. El alcance ahora se resuelve adentro con resolveSection("equipo"), mismo patrón que
   // listTeammates.
   it(
-    "WHEN un empleado tiene alcance ninguno en equipo THE SYSTEM SHALL devolver cero avatares",
+    "WHEN un empleado tiene alcance ninguno en equipo THE SYSTEM SHALL devolver a nadie",
     async () => {
       const org = await makeOrg("scope-ninguno");
       await makeMember(org.id, "owner");
       // Sin permissionTypeId → resolveSection devuelve "ninguno" (default niega).
       const employeeId = await makeMember(org.id, "employee");
 
-      const graph = await loadDashboardScene(employeeId, org.id);
+      const equipo = await loadTeamStatus(employeeId, org.id);
 
-      expect(graph.avatars).toEqual([]);
+      expect(equipo).toEqual([]);
     },
   );
 
   it(
     "WHEN un empleado tiene alcance area y sí tiene área asignada THE SYSTEM SHALL devolver solo " +
-      "los avatares de su propia área",
+      "a la gente de su propia área",
     async () => {
       const org = await makeOrg("scope-area-con-area");
       const pt = await makePermissionType(org.id, { equipo: "area" });
@@ -110,9 +112,9 @@ describe("loadDashboardScene", () => {
       });
       await makeMember(org.id, "employee", { areaId: areaB.id });
 
-      const graph = await loadDashboardScene(employeeInA, org.id);
+      const equipo = await loadTeamStatus(employeeInA, org.id);
 
-      expect(graph.avatars.map((a) => a.id)).toEqual([employeeInA]);
+      expect(equipo.map((p) => p.id)).toEqual([employeeInA]);
     },
   );
 
@@ -129,14 +131,14 @@ describe("loadDashboardScene", () => {
       const employeeSinArea = await makeMember(org.id, "employee", { permissionTypeId: pt.id });
       await makeMember(org.id, "employee", { areaId: areaA.id });
 
-      const graph = await loadDashboardScene(employeeSinArea, org.id);
+      const equipo = await loadTeamStatus(employeeSinArea, org.id);
 
-      expect(graph.avatars).toEqual([]);
+      expect(equipo).toEqual([]);
     },
   );
 
   it(
-    "WHEN un empleado tiene alcance empresa THE SYSTEM SHALL devolver los avatares de todo el " +
+    "WHEN un empleado tiene alcance empresa THE SYSTEM SHALL devolver a todo el " +
       "equipo, sin importar el área de cada quien",
     async () => {
       const org = await makeOrg("scope-empresa");
@@ -146,9 +148,9 @@ describe("loadDashboardScene", () => {
       const employeeWithScope = await makeMember(org.id, "employee", { permissionTypeId: pt.id });
       const employeeInA = await makeMember(org.id, "employee", { areaId: areaA.id });
 
-      const graph = await loadDashboardScene(employeeWithScope, org.id);
+      const equipo = await loadTeamStatus(employeeWithScope, org.id);
 
-      expect(new Set(graph.avatars.map((a) => a.id))).toEqual(
+      expect(new Set(equipo.map((p) => p.id))).toEqual(
         new Set([ownerId, employeeWithScope, employeeInA]),
       );
     },
@@ -164,9 +166,9 @@ describe("loadDashboardScene", () => {
       const employeeInA = await makeMember(org.id, "employee", { areaId: areaA.id });
       const employeeSinTipo = await makeMember(org.id, "employee");
 
-      const graph = await loadDashboardScene(ownerId, org.id);
+      const equipo = await loadTeamStatus(ownerId, org.id);
 
-      expect(new Set(graph.avatars.map((a) => a.id))).toEqual(
+      expect(new Set(equipo.map((p) => p.id))).toEqual(
         new Set([ownerId, employeeInA, employeeSinTipo]),
       );
     },

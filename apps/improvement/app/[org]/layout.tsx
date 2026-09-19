@@ -1,4 +1,4 @@
-// Un layout para las 7 rutas de [org] (dashboard, mapa, objetivos, equipo, powerups, clientes,
+// Un layout para las 6 rutas de [org] (mapa, objetivos, equipo, powerups, clientes,
 // planos) en vez de repetir el enlace en cada page.tsx. No autentica: cada página ya llama a
 // requireOrgMembership() y ese sigue siendo el único guard — esto solo arma un href.
 import { BackLink } from "@/components/BackLink.tsx";

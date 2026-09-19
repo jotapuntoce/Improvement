@@ -11,7 +11,7 @@ export type BuildStage = typeof orgBuildStage.$inferSelect;
 // como la etapa actual (criterio #3). La implementación vive en server/companies/companyList.ts,
 // junto a deriveStageLabel, que aplica exactamente la misma regla de prioridad — el panel del dueño
 // necesitaba la misma derivación y tenerla escrita dos veces era garantizar que una se quedara
-// atrás. Se reexporta para no romper a quien ya la importaba de aquí (tests/build-map.test.ts).
+// atrás. Se reexporta para no romper a quien ya la importaba de aquí (tests/load-build-map.test.ts).
 import { deriveCurrentStageIndex } from "../companies/companyList.ts";
 export { deriveCurrentStageIndex };
 

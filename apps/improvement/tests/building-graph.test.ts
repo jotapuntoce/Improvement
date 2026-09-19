@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { INDUSTRIES } from "@jotapuntoce/ui/building/industries.ts";
+import { buildingShape } from "@jotapuntoce/ui/building/shapes.ts";
 import { buildBuildingGraph, currentStage, distributeCells } from "../server/building/buildingGraph.ts";
 
 describe("distributeCells", () => {
@@ -53,6 +55,35 @@ describe("buildBuildingGraph", () => {
       expect(graph.areas).toHaveLength(2);
       expect(graph.areas[0]).toMatchObject({ id: "area-1", name: "Ventas", color: "#22d3ee" });
       expect(graph.areas[0]!.cells.length).toBeGreaterThan(0);
+    },
+  );
+
+  it(
+    "WHEN la empresa es de cualquier giro THE SYSTEM SHALL repartir las ventanas dentro de la " +
+      "cuadrícula de ESE giro — una celda fuera de rango es un área que el dueño nunca ve, porque " +
+      "Building.tsx solo dibuja las filas y columnas que su forma tiene",
+    () => {
+      const areas = [
+        { id: "a", name: "Ventas", color: "#22d3ee" },
+        { id: "b", name: "Obra", color: "#f59e0b" },
+        { id: "c", name: "Admin", color: "#a78bfa" },
+      ];
+
+      for (const giro of INDUSTRIES) {
+        const forma = buildingShape(giro.id);
+        const graph = buildBuildingGraph(
+          { name: "Camibel", slogan: null, accentColor: null, industry: giro.id },
+          areas,
+        );
+
+        for (const area of graph.areas) {
+          expect(area.cells.length, giro.id).toBeGreaterThan(0);
+          for (const [row, col] of area.cells) {
+            expect(row, giro.id).toBeLessThan(forma.rows);
+            expect(col, giro.id).toBeLessThan(forma.cols);
+          }
+        }
+      }
     },
   );
 

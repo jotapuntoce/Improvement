@@ -114,7 +114,7 @@ export const KPI_SOURCES: KpiSource[] = [
     label: "Personas en el equipo",
     describe: () => "Personas con acceso a la empresa, sin contar al equipo de Improvement",
     // Cuarto lugar que cuenta personas para el cliente, después de listTeamForOwner,
-    // loadDashboardScene y el KPI equipo del catálogo anterior: lleva el mismo filtro. Los platform
+    // loadTeamStatus y el KPI equipo del catálogo anterior: lleva el mismo filtro. Los platform
     // admins entran por rol a dar soporte y no son parte del equipo del cliente — sin esto el
     // indicador diría 2 donde el dueño trabaja solo.
     load: async (orgIds) =>

@@ -1,5 +1,5 @@
 // Puente entre datos reales y buildBuildingGraph — apps/*/app/** nunca importa @jotapuntoce/db
-// directo (boundaries, CLAUDE.md). Mismo patrón que server/scene/loadDashboardScene.ts.
+// directo (boundaries, CLAUDE.md). Mismo patrón que server/employees/loadTeamStatus.ts.
 import { asc, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, organization, orgBuildStage } from "@jotapuntoce/db/schema";

@@ -20,7 +20,7 @@ export function CompanyPicker({ companies }: { companies: CompanySummary[] }) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       // Hidrata estado que solo existe en el navegador (prefers-reduced-motion) — no hay forma de
       // leerlo durante el render del servidor, así que este setState síncrono es intencional
-      // (mismo patrón ya usado en apps/improvement/app/[org]/dashboard/Scene3D.tsx).
+      // (mismo patrón ya usado en packages/ui/src/building/Building.tsx).
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIntroDone(true);
       return;

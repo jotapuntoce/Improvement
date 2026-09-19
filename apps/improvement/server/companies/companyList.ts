@@ -52,7 +52,7 @@ export function deriveStageLabel(stages: StageRow[]): string {
  * terminado); si no, -1: nada que marcar todavía.
  *
  * Vive aquí, junto a deriveStageLabel, porque las dos aplican exactamente la misma regla: tenerla
- * dos veces era garantizar que una cambiara sin la otra. server/scene/buildMap.ts la reexporta para
+ * dos veces era garantizar que una cambiara sin la otra. server/buildMap/loadBuildMap.ts la reexporta para
  * sus callers.
  */
 // El parámetro pide `{ status: string }` y no el union estrecho de StageRow a propósito: el otro

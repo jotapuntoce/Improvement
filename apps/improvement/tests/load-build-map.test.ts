@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, orgBuildStage, profile, membership } from "@jotapuntoce/db/schema";
-import { deriveCurrentStageIndex, getBuildMap } from "../server/scene/buildMap.ts";
+import { deriveCurrentStageIndex, getBuildMap } from "../server/buildMap/loadBuildMap.ts";
 
 async function makeOrg(nameSuffix: string) {
   const [org] = await db
