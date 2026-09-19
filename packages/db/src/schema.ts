@@ -261,6 +261,44 @@ export const orgNeed = pgTable(
 );
 
 /**
+ * Los proyectos vivos de la empresa del cliente: lo que su equipo está sacando adelante ahora.
+ *
+ * Distinto de `objective`: un objetivo es una meta con puntos que alguien completa y cobra. Un
+ * proyecto es el trabajo que dura semanas y por el que el dueño pregunta "¿cómo va?". Un proyecto
+ * puede tener muchos objetivos colgando; un objetivo no es un proyecto chiquito.
+ *
+ * Distinto de `assembly` (Planos): eso es la herramienta con la que Jose Carlos dibuja cómo se
+ * arma un producto. Esto es la cartera de trabajo del cliente.
+ */
+export const project = pgTable(
+  "project",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // A quién se le entrega. Opcional: hay proyectos internos que no son de ningún cliente.
+    clientId: uuid("client_id").references(() => client.id, { onDelete: "set null" }),
+    // Qué área lo lleva. set null y no cascade: borrar un área no borra el trabajo que hizo.
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    detail: text("detail"),
+    status: text("status").notNull().default("activo"),
+    // 0 a 100, capturado a mano. No se deriva de los objetivos: un proyecto puede ir al 80% con
+    // cero objetivos cerrados, y un porcentaje calculado mentiría con cara de dato duro.
+    progress: integer("progress").notNull().default(0),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_project_org_id").on(t.orgId),
+    index("idx_project_org_status").on(t.orgId, t.status),
+    check("project_status_check", sql`${t.status} in ('activo','pausado','terminado')`),
+    check("project_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+  ],
+);
+/**
  * Lo que Improvement sabe del dueño de ESTA empresa: cómo trabaja, piensa, ejecuta, delega y
  * visualiza. Es la materia prima del Director General.
  *
