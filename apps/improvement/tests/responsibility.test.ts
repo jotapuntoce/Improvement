@@ -2,7 +2,7 @@
 // tests/objectives.test.ts. Cada test limpia sus propias filas en afterEach vía cascade de
 // organization, nunca depende del orden.
 import { afterEach, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, profile, membership, objective } from "@jotapuntoce/db/schema";
 import { getResponsibilityLevel, listTeamForOwner, responsibilityLevel } from "../server/employees/responsibility.ts";
@@ -133,6 +133,30 @@ describe("listTeamForOwner", () => {
 
       expect(team.length).toBe(2);
       expect(JSON.stringify(team)).not.toContain("responsibility");
+    },
+  );
+
+  it(
+    "WHEN un platform admin tiene membership en el org THE SYSTEM SHALL excluirlo de la lista, " +
+      "para que el dueño no vea su correo personal como un miembro más de su equipo",
+    async () => {
+      const org = await makeOrg("admin-oculto");
+      createdOrgIds.push(org.id);
+      const ownerId = await makeMember(org.id, "owner");
+      createdProfileIds.push(ownerId);
+
+      // Reutiliza el platform admin real en vez de crear uno temporal: insertar y borrar un profile
+      // con is_platform_admin=true compite contra apps/admin, que en otro proceso lee "todos los
+      // platform admins" y actúa sobre esa lista contra esta misma base (mismo motivo documentado en
+      // tests/auth/guard.test.ts). El membership sí es temporal — se va por cascade con la org.
+      const [admin] = await db.select().from(profile).where(eq(profile.isPlatformAdmin, true)).limit(1);
+      if (!admin) throw new Error("este entorno no tiene ningún profile con is_platform_admin=true");
+      await db.insert(membership).values({ userId: admin.id, orgId: org.id, role: "owner", acceptedAt: new Date() });
+
+      const team = await listTeamForOwner(org.id);
+
+      expect(team.map((m) => m.userId)).toEqual([ownerId]);
+      expect(JSON.stringify(team)).not.toContain(admin.email);
     },
   );
 });

@@ -7,7 +7,20 @@
     "./building.css": "./src/building.css",
     "./building/Building.tsx": "./src/building/Building.tsx",
     "./building/Reception.tsx": "./src/building/Reception.tsx",
-    "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx"
+    "./building/Lobby.tsx": "./src/building/Lobby.tsx",
+    "./building/AppIconLarge.tsx": "./src/building/AppIconLarge.tsx",
+    "./building/AvatarIcon.tsx": "./src/building/AvatarIcon.tsx",
+    "./building/lobbyPlano.ts": "./src/building/lobbyPlano.ts",
+    "./building/greeting.ts": "./src/building/greeting.ts",
+    "./building/industries.ts": "./src/building/industries.ts",
+    "./building/palettes.ts": "./src/building/palettes.ts",
+    "./building/shapes.ts": "./src/building/shapes.ts",
+    "./building/buildStages.ts": "./src/building/buildStages.ts",
+    "./building/evolutionLevels.ts": "./src/building/evolutionLevels.ts",
+    "./building/ownerLabels.ts": "./src/building/ownerLabels.ts",
+    "./building/kpis.ts": "./src/building/kpis.ts",
+    "./assembly/layout.ts": "./src/assembly/layout.ts",
+    "./assembly/AssemblyMap.tsx": "./src/assembly/AssemblyMap.tsx"
   },
   "peerDependencies": {
     "react": "^19.2.0"

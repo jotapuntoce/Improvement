@@ -7,7 +7,13 @@ import { buildCompanyList, type CompanySummary, type StageRow } from "./companyL
 
 export async function loadCompanies(userId: string): Promise<CompanySummary[]> {
   const orgs = await db
-    .select({ id: organization.id, name: organization.name })
+    .select({
+      id: organization.id,
+      name: organization.name,
+      industry: organization.industry,
+      sectionLabels: organization.sectionLabels,
+      role: membership.role,
+    })
     .from(membership)
     .innerJoin(organization, eq(organization.id, membership.orgId))
     .where(eq(membership.userId, userId))
@@ -25,7 +31,11 @@ export async function loadCompanies(userId: string): Promise<CompanySummary[]> {
   const stagesByOrgId = new Map<string, StageRow[]>();
   for (const stage of stages) {
     const list = stagesByOrgId.get(stage.orgId) ?? [];
-    list.push({ stageName: stage.stageName, status: stage.status as StageRow["status"] });
+    list.push({
+      stageOrder: stage.stageOrder,
+      stageName: stage.stageName,
+      status: stage.status as StageRow["status"],
+    });
     stagesByOrgId.set(stage.orgId, list);
   }
 

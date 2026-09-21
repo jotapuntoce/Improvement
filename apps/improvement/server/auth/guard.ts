@@ -6,8 +6,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization } from "@jotapuntoce/db/schema";
+import { membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
+import { scopeFor, type Scope, type SectionSlug } from "../permissions/sections.ts";
 
 /**
  * Consulta directa a `membership` — separada de la resolución de sesión para poder probarla sin
@@ -29,13 +30,24 @@ export async function findMembership(userId: string, orgId: string) {
 export async function getSessionUserId(): Promise<string | null> {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get("sb-access-token")?.value;
+  const accessToken = cookieStore.get("imp-access-token")?.value;
   if (!accessToken) return null;
 
   const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const { data, error } = await supabase.auth.getUser(accessToken);
   if (error || !data.user) return null;
   return data.user.id;
+}
+
+/**
+ * El access token crudo de la sesión, para las pocas operaciones que hablan con Supabase COMO EL
+ * USUARIO y no con el cliente `db` (que usa el rol postgres y bypasea RLS) — hoy solo la subida de
+ * la foto de perfil a Storage, donde la política del bucket exige que la carpeta sea auth.uid().
+ * Vive aquí para que el nombre de la cookie siga escrito en un solo lugar.
+ */
+export async function getSessionAccessToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get("imp-access-token")?.value ?? null;
 }
 
 /**
@@ -61,4 +73,98 @@ export async function requireOrgMembership(orgId: string) {
   if (!userId) notFound();
 
   return assertMembership(userId, orgId);
+}
+
+async function fetchIsPlatformAdmin(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isPlatformAdmin: profile.isPlatformAdmin })
+    .from(profile)
+    .where(eq(profile.id, userId))
+    .limit(1);
+  return row?.isPlatformAdmin ?? false;
+}
+
+/**
+ * WHEN userId corresponde a un profile con is_platform_admin=true THE SYSTEM SHALL devolver true
+ * (criterio #1); WHEN no existe ese profile, o existe con is_platform_admin=false, THE SYSTEM SHALL
+ * devolver false, nunca lanzar (criterio #2) — usado para decidir qué renderizar en /empresas, no
+ * para bloquear acceso (eso es requirePlatformAdminSession, abajo).
+ */
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
+  return fetchIsPlatformAdmin(userId);
+}
+
+/**
+ * Guard de tenencia para rutas exclusivas de platform admin dentro de apps/improvement (ej.
+ * /empresas/clientes/[clientUserId]) — mismo criterio 404-nunca-403 que requireOrgMembership: WHEN
+ * no hay sesión, o la sesión no es platform admin, THE SYSTEM SHALL responder 404. Devuelve el
+ * userId cuando sí lo es.
+ */
+export async function requirePlatformAdminSession(): Promise<string> {
+  const userId = await getSessionUserId();
+  if (!userId) notFound();
+
+  const admin = await fetchIsPlatformAdmin(userId);
+  if (!admin) notFound();
+
+  return userId;
+}
+
+/**
+ * El usuario de la sesión con su correo — lo necesita la aceptación de invitación, que tiene que
+ * comprobar que quien acaba de registrarse es el correo al que el dueño invitó, y no otro.
+ */
+export async function getSessionUser(): Promise<{ id: string; email: string } | null> {
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
+  const accessToken = await getSessionAccessToken();
+  if (!accessToken) return null;
+
+  const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data.user?.email) return null;
+  return { id: data.user.id, email: data.user.email };
+}
+
+/** La fila si es dueño; null si es miembro pero no dueño. 404 si no es miembro (assertMembership). */
+export async function findOwnerMembership(userId: string, orgId: string) {
+  const row = await assertMembership(userId, orgId);
+  return row.role === "owner" ? row : null;
+}
+
+/**
+ * El alcance de una persona en una sección, junto con su membresía. Devuelve `ninguno` sin lanzar:
+ * el menú necesita saberlo para NO dibujar la sección, y una ruta que lanzara aquí impediría eso.
+ * Quien protege una ruta usa requireSection().
+ */
+export async function resolveSection(
+  userId: string,
+  orgId: string,
+  section: SectionSlug,
+): Promise<{ membership: Awaited<ReturnType<typeof assertMembership>>; scope: Scope }> {
+  const row = await assertMembership(userId, orgId);
+  // Dueño, o miembro sin tipo asignado: scopeFor ya resuelve ambos casos con grants=null (owner
+  // siempre "empresa", sin tipo siempre "ninguno") — se evita la consulta a permission_type, pero
+  // el valor lo decide scopeFor, nunca un literal repetido aquí.
+  if (row.role === "owner" || !row.permissionTypeId) {
+    return { membership: row, scope: scopeFor(row.role, null, section) };
+  }
+
+  const [type] = await db
+    .select({ grants: permissionType.grants })
+    .from(permissionType)
+    .where(and(eq(permissionType.id, row.permissionTypeId), eq(permissionType.orgId, orgId)))
+    .limit(1);
+
+  return { membership: row, scope: scopeFor(row.role, type?.grants ?? null, section) };
+}
+
+/**
+ * WHEN el tipo de permiso de la persona no concede esta sección THE SYSTEM SHALL responder 404,
+ * nunca 403 — mismo criterio que requireOrgMembership: un 403 le confirma que la sección existe.
+ */
+export async function requireSection(orgId: string, section: SectionSlug) {
+  const row = await requireOrgMembership(orgId);
+  const resolved = await resolveSection(row.userId, orgId, section);
+  if (resolved.scope === "ninguno") notFound();
+  return resolved;
 }

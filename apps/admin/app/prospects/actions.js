@@ -13,21 +13,16 @@ import {
   profile,
   membership,
   orgBuildStage,
+  orgKpi,
   prospectClient,
   prospectCompany,
 } from "@jotapuntoce/db/schema";
+import { initialBuildStages } from "@jotapuntoce/ui/building/buildStages.ts";
+import { defaultOrgKpis } from "@jotapuntoce/ui/building/kpis.ts";
 import { db, supabaseAdmin } from "../../lib/db.js";
 import { requirePlatformAdmin } from "../../lib/auth.js";
 import { sendWhatsAppMessage } from "../../lib/whatsapp.js";
-
-function slugify(name) {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+import { slugify } from "../../lib/slugify.js";
 
 // 12 caracteres url-safe — nunca se guarda en la base de datos, solo vive en memoria durante esta
 // llamada y viaja al cliente por WhatsApp. No hay pantalla de "cambiar contraseña" en
@@ -228,15 +223,19 @@ export async function provisionOrganization(prospectId) {
         .values({ userId: admin.id, orgId: newOrg.id, role: "owner", acceptedAt: new Date() });
     }
 
-    // Primera etapa del Mapa de Construcción — Jose Carlos agrega las siguientes a mano desde
-    // apps/admin conforme avanza (paso 14, backlog de prospectos y detalle de organización).
-    await tx.insert(orgBuildStage).values({
-      orgId: newOrg.id,
-      stageOrder: 1,
-      stageName: "Análisis",
-      description: "Primer levantamiento de la empresa — áreas, roles y objetivos iniciales.",
-      status: "en_progreso",
-    });
+    // Las 8 fases del Mapa de Construcción, completas desde el principio: el tracker del panel del
+    // dueño enseña el camino entero y marca en cuál va (packages/ui/src/building/buildStages.ts).
+    // Jose Carlos ya no captura la lista desde apps/admin, solo mueve el estado de cada fase.
+    await tx
+      .insert(orgBuildStage)
+      .values(initialBuildStages().map((stage) => ({ ...stage, orgId: newOrg.id })));
+
+    // Los indicadores por defecto en el mismo tx que las fases: una empresa sin filas en org_kpi
+    // dibuja una tarjeta sin un solo numero, y el dueno no tendria forma de saber que le falta
+    // configurarlos. Son un punto de partida, no un catalogo — los cambia desde configuracion.
+    await tx
+      .insert(orgKpi)
+      .values(defaultOrgKpis().map((kpi) => ({ ...kpi, orgId: newOrg.id })));
     await tx
       .update(prospectCompany)
       .set({ status: "en_construcción", orgId: newOrg.id })

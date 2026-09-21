@@ -1,5 +1,10 @@
 // Lógica pura de layout del edificio — sin acceso a datos (mismo patrón que
-// server/scene/sceneGraph.ts). server/building/loadBuilding.ts alimenta esto con datos reales.
+// server/employees/teamStatus.ts). server/building/loadBuilding.ts alimenta esto con datos reales.
+import {
+  buildingPalette,
+  type BuildingPalette,
+} from "@jotapuntoce/ui/building/palettes.ts";
+import { buildingShape } from "@jotapuntoce/ui/building/shapes.ts";
 export type SilhouetteKind = "plan" | "sol" | "imag" | "valor" | "brand" | "pres" | "generica";
 
 export interface BuildingAreaInput {
@@ -13,6 +18,7 @@ export interface BuildingOrgInput {
   name: string;
   slogan: string | null;
   accentColor: string | null;
+  industry: string | null;
 }
 
 export interface BuildingArea {
@@ -26,13 +32,30 @@ export interface BuildingArea {
 export interface BuildingGraph {
   companyName: string;
   slogan: string | null;
-  accentColor: string | null;
+  industry: string | null;
+  /**
+   * Los colores de ESTE edificio. Se derivan del giro de la empresa, con accent_color pisando el
+   * acento cuando la organización tiene uno propio — ver packages/ui/src/building/palettes.ts.
+   * Van en el grafo y no en el componente para que el edificio y la recepción no puedan pintarse
+   * distinto: los dos heredan del mismo wrapper.
+   */
+  palette: BuildingPalette;
   areas: BuildingArea[];
+  /**
+   * En qué etapa del mapa de construcción va la empresa, 1 a 8 — derivado de org_build_stage, la
+   * MISMA fuente que el tracker del panel. El edificio dibuja la escena de esta etapa (ver
+   * ESCENAS en packages/ui/src/building/Building.tsx): los dos no pueden decir cosas distintas
+   * porque leen la misma fila.
+   */
+  stageOrder: number;
+  /** El nombre de la etapa en curso, o null si el mapa de construcción todavía no arranca. */
+  stageLabel: string | null;
 }
 
+/** Las 8 fases de BUILD_STAGES. Solo se usa como default cuando una empresa no tiene mapa. */
+const TOTAL_STAGES = 8;
+
 const WINDOWS_PER_AREA = 3;
-const BUILDING_ROWS = 8;
-const BUILDING_COLS = 9;
 
 // mulberry32 — mismo PRNG determinista ya usado en apps/admin/components/building/JotaPuntoCeBuilding.js
 // para las estrellas y el parpadeo ambiente. Necesario aquí por el mismo motivo: server y cliente
@@ -100,20 +123,67 @@ export function distributeCells(
  * de cells (criterio #1) — mismo layout en llamadas repetidas para la misma organización
  * (criterio #2, vía hashSeed determinista sobre el nombre).
  */
-export function buildBuildingGraph(org: BuildingOrgInput, areas: BuildingAreaInput[]): BuildingGraph {
+export interface CurrentStage {
+  order: number;
+  name: string | null;
+}
+
+/**
+ * En qué etapa va la empresa, como el número de etapa (1 a 8) y su nombre.
+ *
+ * Misma prioridad que deriveStageLabel y deriveCurrentStageIndex en companies/companyList.ts —
+ * la primera en_progreso manda; si no hay ninguna, la última completada. Sin etapas devuelve la
+ * última: una empresa sin mapa se dibuja terminada, como se dibujaba antes de que el edificio
+ * supiera del tracker.
+ *
+ * Discreto y no un porcentaje: cada etapa tiene su propia escena en el edificio. Interpolar
+ * entre dos etapas dibujaría algo que no corresponde a ninguna.
+ */
+export function currentStage(
+  stages: { status: string; stageName: string; stageOrder: number }[],
+): CurrentStage {
+  if (stages.length === 0) return { order: TOTAL_STAGES, name: null };
+
+  const enCurso = stages.find((s) => s.status === "en_progreso");
+  if (enCurso) return { order: enCurso.stageOrder, name: enCurso.stageName };
+
+  const completadas = stages.filter((s) => s.status === "completada");
+  const ultima = completadas[completadas.length - 1];
+  if (ultima) return { order: ultima.stageOrder, name: ultima.stageName };
+
+  // Ninguna empezó todavía: va en la primera, no en ninguna. Un dueño recién dado de alta ve su
+  // terreno, que es exactamente donde está.
+  const primera = stages[0]!;
+  return { order: primera.stageOrder, name: primera.stageName };
+}
+
+export function buildBuildingGraph(
+  org: BuildingOrgInput,
+  areas: BuildingAreaInput[],
+  stages: { status: string; stageName: string; stageOrder: number }[] = [],
+): BuildingGraph {
+  // La MISMA forma que va a dibujar Building.tsx, derivada del mismo giro. Si aquí se repartieran
+  // las ventanas sobre una cuadrícula de 9×8 y allá se dibujara una de 10×3, las áreas de un giro
+  // chaparro caerían en pisos que no existen y simplemente no se verían.
+  const shape = buildingShape(org.industry);
   const distributed = distributeCells(
     areas.map((a) => a.id),
-    BUILDING_ROWS,
-    BUILDING_COLS,
+    shape.rows,
+    shape.cols,
     WINDOWS_PER_AREA,
     hashSeed(org.name),
   );
   const cellsById = new Map(distributed.map((d) => [d.id, d.cells] as const));
 
+  const etapa = currentStage(stages);
+
   return {
     companyName: org.name,
     slogan: org.slogan,
-    accentColor: org.accentColor,
+    industry: org.industry,
+    palette: buildingPalette(org.industry, org.accentColor),
+    stageOrder: etapa.order,
+    stageLabel: etapa.name,
     areas: areas.map((a) => ({
       id: a.id,
       name: a.name,

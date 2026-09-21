@@ -1,10 +1,10 @@
 // Integración real contra el proyecto Supabase de desarrollo (blueprint §13 — sin base de datos de
 // test aislada en v1). Cada test limpia sus propias filas en afterEach, nunca depende del orden.
 import { afterEach, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { organization, profile, membership, objective, employeePointsLedger } from "@jotapuntoce/db/schema";
-import { findMembership } from "../../server/auth/guard.ts";
+import { findMembership, isPlatformAdmin } from "../../server/auth/guard.ts";
 
 async function makeOrg(nameSuffix: string) {
   const [org] = await db
@@ -117,4 +117,22 @@ describe("RLS — employee_points_ledger", () => {
       expect(rowsAsOwner.length).toBe(0);
     },
   );
+});
+
+describe("isPlatformAdmin", () => {
+  it("WHEN el profile tiene is_platform_admin=true THE SYSTEM SHALL devolver true", async () => {
+    // Reutiliza un platform admin real ya existente en vez de crear uno temporal: insertar y luego
+    // borrar una fila con is_platform_admin=true aquí competiría contra apps/admin (approve de
+    // company_request, provisionOrganization), que en otro proceso lee "todos los platform admins"
+    // y actúa sobre esa lista — contra la misma base real, en paralelo. Mismo motivo que
+    // tests/company-requests.test.js (apps/admin) nunca crea uno temporal tampoco.
+    const [admin] = await db.select().from(profile).where(eq(profile.isPlatformAdmin, true)).limit(1);
+    if (!admin) throw new Error("este entorno no tiene ningún profile con is_platform_admin=true");
+
+    expect(await isPlatformAdmin(admin.id)).toBe(true);
+  });
+
+  it("WHEN el profile tiene is_platform_admin=false o no existe THE SYSTEM SHALL devolver false", async () => {
+    expect(await isPlatformAdmin("00000000-0000-0000-0000-000000000000")).toBe(false);
+  });
 });

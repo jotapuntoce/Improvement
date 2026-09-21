@@ -1,0 +1,94 @@
+// Lo poco que el dueño puede cambiar de su propia empresa desde apps/improvement. Todo lo demás de
+// `organization` (nombre, slug, fases de construcción) lo mueve Jose Carlos desde apps/admin.
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { db } from "@jotapuntoce/db";
+import { organization } from "@jotapuntoce/db/schema";
+import { isIndustry } from "@jotapuntoce/ui/building/industries.ts";
+import { findOwnerMembership } from "../auth/guard.ts";
+import { SECTIONS } from "../permissions/sections.ts";
+
+/**
+ * El giro decide el ícono de la empresa en el panel (AppIconLarge elige su glyph con este valor),
+ * así que "personalizar el ícono" y "decir a qué se dedica" son la misma acción.
+ *
+ * WHEN el giro no es uno de los ids de INDUSTRIES THE SYSTEM SHALL rechazarlo sin escribir: un
+ * valor libre caería al glyph default y el dueño vería su cambio guardado sin efecto visible.
+ * findOwnerMembership primero, no solo assertMembership: es una escritura visible para toda la
+ * empresa (el ícono en /empresas), y un empleado no decide a qué se dedica la empresa de su jefe.
+ */
+export async function updateCompanyIndustry(userId: string, orgId: string, industry: string) {
+  if (!(await findOwnerMembership(userId, orgId))) {
+    return {
+      ok: false as const,
+      error: { code: "FORBIDDEN" as const, message: "Solo el dueño personaliza su empresa." },
+    };
+  }
+
+  if (!isIndustry(industry)) {
+    return {
+      ok: false as const,
+      error: { code: "VALIDATION_ERROR" as const, message: "Ese giro no existe." },
+    };
+  }
+
+  const [row] = await db
+    .update(organization)
+    .set({ industry, updatedAt: new Date() })
+    .where(eq(organization.id, orgId))
+    .returning();
+  if (!row) {
+    return {
+      ok: false as const,
+      error: { code: "NOT_FOUND" as const, message: "La empresa no existe." },
+    };
+  }
+
+  return { ok: true as const, data: row };
+}
+
+const sectionLabelsInputSchema = z.record(
+  z.string(),
+  z.object({ label: z.string().optional(), hidden: z.boolean().optional() }),
+);
+
+/**
+ * Cómo llama el dueño a cada sección de SU empresa, y cuáles apaga. Solo las secciones conocidas se
+ * guardan: una llave inventada en el formulario no entra a la fila.
+ */
+export async function setSectionLabels(
+  userId: string,
+  orgId: string,
+  labels: Record<string, { label?: string; hidden?: boolean }>,
+): Promise<{ ok: true } | { ok: false; error: { code: string; message: string } }> {
+  if (!(await findOwnerMembership(userId, orgId))) {
+    return {
+      ok: false,
+      error: { code: "FORBIDDEN", message: "Solo el dueño personaliza su empresa." },
+    };
+  }
+
+  const parsed = sectionLabelsInputSchema.safeParse(labels);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: "Formato de secciones inválido." },
+    };
+  }
+
+  const limpio: Record<string, { label?: string; hidden?: boolean }> = {};
+  for (const section of SECTIONS) {
+    const entrada = parsed.data[section.slug];
+    if (!entrada) continue;
+    const nombre = entrada.label?.trim();
+    // Solo se guarda lo que cambia: un nombre igual al default no ensucia la fila.
+    if (nombre && nombre !== section.label) limpio[section.slug] = { label: nombre };
+    if (entrada.hidden) limpio[section.slug] = { ...(limpio[section.slug] ?? {}), hidden: true };
+  }
+
+  await db
+    .update(organization)
+    .set({ sectionLabels: limpio, updatedAt: new Date() })
+    .where(eq(organization.id, orgId));
+  return { ok: true };
+}

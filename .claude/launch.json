@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "improvement",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:improvement"],
+      "port": 3200
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:admin"],
+      "port": 3100
+    }
+  ]
+}

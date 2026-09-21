@@ -20,7 +20,7 @@ export function CompanyPicker({ companies }: { companies: CompanySummary[] }) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       // Hidrata estado que solo existe en el navegador (prefers-reduced-motion) — no hay forma de
       // leerlo durante el render del servidor, así que este setState síncrono es intencional
-      // (mismo patrón ya usado en apps/improvement/app/[org]/dashboard/Scene3D.tsx).
+      // (mismo patrón ya usado en packages/ui/src/building/Building.tsx).
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIntroDone(true);
       return;
@@ -56,7 +56,7 @@ export function CompanyPicker({ companies }: { companies: CompanySummary[] }) {
     <div className="empresas-grid">
       {companies.map((c) => (
         <button key={c.orgId} type="button" className="empresas-tile" onClick={() => router.push(`/empresas/${c.orgId}`)}>
-          <AppIconLarge label={c.name} stageLabel={c.stageLabel} />
+          <AppIconLarge label={c.name} stageLabel={c.stageLabel} industry={c.industry} />
         </button>
       ))}
     </div>

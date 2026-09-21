@@ -1,8 +1,8 @@
 // Mapa de Construcción — de solo lectura, mapa de niveles tipo videojuego. Sin formularios ni
 // manejadores de clic: no existe (ni debe existir) un Server Action que mute org_build_stage desde
 // esta app — la edita a mano Jose Carlos desde apps/admin (Non-Goals: sin comentarios/chat).
-import { requireOrgMembership } from "@/server/auth/guard";
-import { getBuildMap } from "@/server/scene/buildMap";
+import { requireSection } from "@/server/auth/guard";
+import { getBuildMap } from "@/server/buildMap/loadBuildMap";
 
 const STATUS_LABEL: Record<string, string> = {
   bloqueada: "Bloqueada",
@@ -36,7 +36,7 @@ function stageStyle(status: string) {
 
 export default async function MapaPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: orgId } = await params;
-  const memberRow = await requireOrgMembership(orgId);
+  const { membership: memberRow } = await requireSection(orgId, "mapa");
   const { stages, currentIndex } = await getBuildMap(memberRow.userId, orgId);
 
   return (

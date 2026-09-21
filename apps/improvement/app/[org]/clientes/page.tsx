@@ -2,7 +2,7 @@
 // forms nativos con Server Action ya funcionan sin JS (crear, cambiar health_status, eliminar), así
 // que no hay hoja interactiva que envolver — a diferencia de /[org]/objetivos y /[org]/powerups.
 import { revalidatePath } from "next/cache";
-import { requireOrgMembership } from "@/server/auth/guard";
+import { requireOrgMembership, requireSection } from "@/server/auth/guard";
 import {
   createClient as createClientRow,
   deleteClient,
@@ -41,7 +41,7 @@ export default async function ClientesPage({
 }) {
   const { org: orgId } = await params;
   const { cursor, health } = await searchParams;
-  const memberRow = await requireOrgMembership(orgId);
+  const { membership: memberRow } = await requireSection(orgId, "clientes");
 
   const healthFilter = isHealthStatus(health) ? health : undefined;
   const { data } = await listClients(memberRow.userId, orgId, {

@@ -1,6 +1,6 @@
 name: CI
 
-# Tier 1 (blueprint §12): en cada PR corre lint+typecheck+test; en push a main además build. Las
+# Tier 1 (blueprint §12): en cada PR corre lint+typecheck+test+build, igual que en main. Las
 # pruebas de integración de este repo corren contra el proyecto Supabase real de desarrollo (sin
 # base de datos de test aislada, blueprint §13) — por eso este workflow reconstruye los mismos
 # .env.local/.env.test que usa cada app en local, a partir de GitHub Secrets, antes de correr nada.
@@ -75,6 +75,8 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # En cada PR también, no solo en main. `next build` evalúa los módulos al recolectar datos de
+      # página y `next dev` no, así que hay errores que solo existen aquí: una env var que falta, un
+      # import que explota al cargarse. Correrlo nada más al mergear los guardaba para el final.
       - name: Build
-        if: github.ref == 'refs/heads/main'
         run: pnpm build

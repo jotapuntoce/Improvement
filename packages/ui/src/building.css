@@ -256,6 +256,39 @@
   color: var(--text-secondary);
 }
 
+/* Variante de navegación jerárquica (components/BackLink.tsx, apps/improvement): despegada del
+   flujo para quedar sobre cualquier pantalla — la escena 3D del dashboard ocupa 100vh y no deja
+   lugar para un encabezado, y las páginas con padding normal tampoco tienen uno.
+   A la derecha, no a la izquierda: las páginas de [org] (objetivos, equipo, powerups…) abren con su
+   <h1> pegado al margen izquierdo y con el padding declarado inline, que gana sobre cualquier regla
+   de aquí — el chip quedaba encima del título. La columna derecha está libre en las 8 rutas. */
+.jpc-back-link--fixed {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  margin-top: 0;
+  width: fit-content;
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.jpc-back-link--fixed:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-2);
+}
+.jpc-back-link--fixed:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jpc-back-link--fixed { transition: none; }
+}
+
 /* Reception.tsx (packages/ui) acepta cualquier children — cuando es un <form> (caso de
    apps/admin, login real), display:contents lo "aplana" para que sus campos hereden el
    flex/gap de .jpc-reception-card directo, igual que antes de generalizar el componente. */
@@ -264,13 +297,38 @@
 }
 
 /* ===== Panel de empresas (/empresas, apps/improvement) ===== */
+/* column, no la fila por default: con un solo hijo (el grid de empresas) la diferencia no se veía,
+   pero al sumar el formulario de "solicitar empresa" quedaba sentado AL LADO del portafolio en vez
+   de debajo. El gap sustituye al margin-top que el form traía inline y que en fila no hacía nada. */
 .empresas-page {
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 28px;
   background: linear-gradient(180deg, var(--sky-top), var(--sky-bot) 70%);
   padding: 40px 20px;
+}
+
+.empresas-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+}
+/* Separador suave entre el portafolio y la zona de "pedir otra empresa": sin él las dos partes se
+   leen como una sola lista revuelta. */
+.empresas-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  width: min(100%, 560px);
 }
 
 .empresas-intro {
@@ -386,4 +444,388 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .app-icon-large { transition: none; }
+}
+
+/* ---- recepción real (apps/improvement) ----
+   Solo cuando Reception recibe `scene`: apps/admin usa la misma recepción como antesala de su
+   login y ahí el mobiliario le quitaría aire al formulario. */
+.jpc-reception--scene { width: min(94vw, 460px); }
+.jpc-reception-scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 18px 0 -26px;
+}
+.jpc-reception-doors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.jpc-reception-door {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 28%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.jpc-reception-door:hover { border-color: var(--building-accent); background: rgba(255, 255, 255, 0.07); }
+.jpc-reception-door:focus-visible { outline: 2px solid var(--building-accent); outline-offset: 2px; }
+
+.jpc-scene-note { color: var(--text-muted); text-align: center; }
+
+/* Los pisos que todavía no se entregan. La grúa respira; con reduced-motion se queda quieta. */
+.jpc-obra { animation: jpc-obra-breathe 4s ease-in-out infinite; }
+@keyframes jpc-obra-breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jpc-obra { animation: none; }
+}
+
+/* ---- el corte del listón (etapa Entrega) ----
+   Las dos mitades se abren y se apagan. Es la única animación del producto que existe nada más
+   porque se siente bien: el dueño cortando el listón de su propia empresa. */
+.jpc-liston-izq,
+.jpc-liston-der {
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
+}
+/* El origen de giro lo pone MonoListon inline, en el punto exacto del corte. Las dos mitades
+   caen desde ahí en vez de deslizarse: 28px de un viewBox de 660 eran cinco pixeles en pantalla y
+   no se notaba que algo hubiera pasado. */
+.jpc-liston--cortado .jpc-liston-izq { transform: rotate(-22deg) translateY(14px); opacity: 0.4; }
+.jpc-liston--cortado .jpc-liston-der { transform: rotate(22deg) translateY(14px); opacity: 0.4; }
+@media (prefers-reduced-motion: reduce) {
+  .jpc-liston-izq,
+  .jpc-liston-der { transition: none; }
+}
+
+/* El rótulo del letrero de obra: mismo tratamiento que .jpc-reception-eyebrow. */
+.jpc-obra-sign {
+  font-family: var(--font-geist-mono), monospace;
+  letter-spacing: 0.18em;
+}
+
+/* La recepción como oficina (packages/ui/src/building/Lobby.tsx). Hereda la paleta del wrapper
+   .jpc-scene, igual que el edificio: la oficina de cada cliente es del color de su giro.
+
+   El SVG es escenografía y la capa de encima son los enlaces reales. Dos modos:
+
+   - De 1080px para arriba (PC): cada mueble se posiciona en porcentaje sobre su sitio exacto en la
+     oficina, y el texto se mide en cqw, así que todo escala junto como una foto que se agranda.
+   - Abajo de 1080 (iPad, teléfono): a esa escala un rótulo de 13px cae a 7 y no se lee. La oficina
+     deja de ser un plano fijo y pasa a ser el fondo —recortada, no encogida— con los muebles
+     encima en rejilla. La información sigue DENTRO de la oficina, que era la condición; lo que
+     cambia es cómo se acomoda. */
+.jpc-lobby {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.jpc-lobby-sala {
+  position: relative;
+  container-type: inline-size;
+  aspect-ratio: 1400 / 760;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 22%, transparent);
+  overflow: hidden;
+}
+.jpc-lobby-sala > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.jpc-lobby-capa { position: absolute; inset: 0; }
+.jpc-lobby-word {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Un mueble. Cada uno es un enlace de verdad con su nombre accesible y su anillo de foco: el SVG
+   de abajo va aria-hidden, así que esta capa ES la navegación. */
+.jpc-lobby-zona {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15cqw;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0.3cqw;
+  border-radius: 4px;
+  color: var(--text-primary);
+  text-decoration: none;
+  overflow: hidden;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+a.jpc-lobby-zona:hover {
+  background: color-mix(in srgb, var(--building-accent) 13%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--building-accent) 45%, transparent);
+}
+a.jpc-lobby-zona:focus-visible {
+  outline: 2px solid var(--building-accent);
+  outline-offset: 3px;
+}
+.jpc-lobby-zona--muda { opacity: 0.45; }
+
+.jpc-lobby-rotulo {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.86cqw;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--building-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Que no lo encoja el flex: si la caja se queda corta quiero verlo, no que el rótulo
+     desaparezca en silencio para que quepa lo demás. */
+  flex: none;
+}
+/* La cifra y lo que cuenta, en el mismo renglón y sobre la misma línea de base. Apilados dejaban
+   media caja vacía a la derecha; así el mueble mide dos renglones y no le sobra nada. */
+.jpc-lobby-dato {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5cqw;
+}
+.jpc-lobby-cifra {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 2.6cqw;
+  line-height: 1;
+  color: var(--sign-glow);
+}
+.jpc-lobby-pie { font-size: 0.9cqw; color: var(--text-secondary); }
+
+/* Las áreas, en planta: cada una es un cubículo visto desde arriba —su silla y su escritorio con el
+   nombre encima—, alineados sobre la banca de madera que dibuja el SVG. El rótulo va a la izquierda
+   y no arriba: en una sola fila la banda mide lo que mide un escritorio, y ahí es donde cabe. */
+.jpc-lobby-zona--banda {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.9cqw;
+}
+.jpc-lobby-areas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  gap: 0.3cqw 0.7cqw;
+}
+.jpc-lobby-areas li {
+  display: flex;
+  align-items: center;
+  font-size: 0.9cqw;
+  white-space: nowrap;
+}
+/* La silla, desde arriba: respaldo redondo del lado de afuera, asiento pegado al escritorio. */
+.jpc-lobby-silla {
+  width: 1.1cqw;
+  height: 1.5cqw;
+  min-width: 10px;
+  min-height: 14px;
+  border-radius: 45% 12% 12% 45% / 50% 18% 18% 50%;
+  margin-right: -0.15cqw;
+  flex: none;
+}
+/* El escritorio: tapa clara con el nombre del área impreso, y su sombra sobre el piso. */
+.jpc-lobby-escritorio {
+  padding: 0.42cqw 0.7cqw;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--sign-glow) 90%, transparent);
+  color: #15171d;
+  font-weight: 600;
+  box-shadow: 0.2cqw 0.3cqw 0.45cqw rgba(0, 0, 0, 0.45);
+}
+
+/* El muro de retratos. Sin foto va la inicial sobre el color de la persona — nunca una cara
+   inventada, que es peor que no tener foto. */
+.jpc-lobby-retratos {
+  margin-top: 0.55cqw;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  gap: 0.6cqw;
+}
+.jpc-lobby-retratos figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2cqw;
+}
+/* Retrato enmarcado, no avatar: vertical, con marco y paspartú, como las fotos que se cuelgan. */
+.jpc-lobby-retratos figure > img,
+.jpc-lobby-retratos figure > span {
+  width: 2.4cqw;
+  height: 2.9cqw;
+  min-width: 24px;
+  min-height: 29px;
+  border-radius: 1px;
+  border: 0.14cqw solid currentColor;
+  box-shadow: 0 0 0 0.1cqw color-mix(in srgb, var(--sign-glow) 45%, transparent);
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9cqw;
+  background: var(--bg-reception-bot);
+}
+/* La plaquita grabada debajo de cada retrato. */
+.jpc-lobby-retratos figcaption {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72cqw;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  max-width: 3.4cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La pantalla de la iMac. El mueble es fijo, así que los renglones se reparten en el alto que
+   hay: con tres quedan holgados y con uno queda uno solo, centrado, en vez de un hueco abajo. */
+.jpc-lobby-proyectos {
+  list-style: none;
+  margin: 0.3cqw 0 0;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 0.35cqw;
+}
+.jpc-lobby-proyectos li { display: flex; flex-direction: column; gap: 0.15cqw; }
+.jpc-lobby-proyectos span {
+  font-size: 0.92cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jpc-lobby-proyectos i {
+  display: block;
+  height: 0.35cqw;
+  min-height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.jpc-lobby-proyectos b { display: block; height: 100%; border-radius: 2px; }
+
+/* Lo que dice quien atiende. Encima de su cabeza y con el pico hacia abajo, apuntándole: el
+   mensaje sale de la recepcionista, no de la app. La caja (left/top/width) la manda GLOBO en
+   Lobby.tsx, igual que los muebles; aquí solo cómo se ve. */
+.jpc-lobby-globo {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.7cqw 1cqw;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--sky-top) 88%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-size: 1cqw;
+  line-height: 1.45;
+}
+.jpc-lobby-globo::after {
+  content: "";
+  position: absolute;
+  /* --pico lo calcula Lobby.tsx: el pico cae sobre la recepcionista, no en el centro del globo. */
+  left: var(--pico, 50%);
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: color-mix(in srgb, var(--sky-top) 88%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--building-accent) 34%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--building-accent) 34%, transparent);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* iPad y teléfono: la oficina se recorta en vez de encogerse, y los muebles se acomodan encima. */
+@media (max-width: 1079px) {
+  /* La sala la mide su propio contenido y el SVG se estira detrás, recortado. Sin esto la capa
+     tenía scroll propio dentro de la página y cortaba el último proyecto de la lista. */
+  .jpc-lobby-sala {
+    aspect-ratio: auto;
+    min-height: min(72vh, 620px);
+  }
+  .jpc-lobby-capa {
+    position: relative;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    align-content: start;
+    gap: 10px;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(5, 6, 11, 0.62), rgba(5, 6, 11, 0.82));
+  }
+  .jpc-lobby-zona {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 60px;
+    overflow: visible;
+    gap: 3px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--building-accent) 28%, transparent);
+    border-left: 3px solid var(--building-accent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--sky-top) 78%, transparent);
+    backdrop-filter: blur(3px);
+  }
+  .jpc-lobby-zona--banda { grid-column: 1 / -1; }
+  .jpc-lobby-rotulo { font-size: 10.5px; }
+  .jpc-lobby-cifra { font-size: 30px; }
+  .jpc-lobby-pie { font-size: 12px; }
+  .jpc-lobby-zona--banda { flex-direction: column; align-items: stretch; gap: 0; }
+  .jpc-lobby-areas { justify-content: flex-start; margin-top: 8px; gap: 8px 12px; }
+  .jpc-lobby-areas li { font-size: 13px; }
+  .jpc-lobby-silla { width: 10px; height: 16px; margin-right: -2px; }
+  .jpc-lobby-escritorio { padding: 4px 8px; box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.45); }
+  .jpc-lobby-retratos { margin-top: 8px; gap: 10px; justify-content: flex-start; }
+  .jpc-lobby-retratos figure > img,
+  .jpc-lobby-retratos figure > span {
+    width: 34px;
+    height: 42px;
+    font-size: 12px;
+    border-width: 2px;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--sign-glow) 45%, transparent);
+  }
+  .jpc-lobby-retratos figcaption { font-size: 10px; max-width: 42px; }
+  .jpc-lobby-proyectos { margin-top: 8px; gap: 7px; }
+  .jpc-lobby-proyectos span { font-size: 13px; }
+  .jpc-lobby-proyectos i { height: 4px; }
+  /* !important porque la caja del globo viene en el atributo style, como la de cada mueble: aquí
+     ya no hay plano de oficina que respetar y ocupa el ancho de la rejilla. */
+  .jpc-lobby-globo {
+    position: static;
+    grid-column: 1 / -1;
+    width: auto !important;
+    height: auto !important;
+    padding: 11px 14px;
+    font-size: 13.5px;
+  }
+  .jpc-lobby-globo::after { display: none; }
+}
+
+@media (max-width: 560px) {
+  .jpc-lobby-capa { grid-template-columns: 1fr; padding: 12px; }
+  .jpc-lobby-sala { min-height: min(88vh, 680px); }
 }
