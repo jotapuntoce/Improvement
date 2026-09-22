@@ -18,6 +18,15 @@ import {
   reviewSchema,
   REVIEW_SYSTEM_PROMPT,
 } from "./prompts/review.ts";
+import type { SystemPrompt } from "./prompts/burbuja.ts";
+import {
+  buildDirectorPrompt,
+  DIRECTOR_SCHEMAS,
+  DIRECTOR_SYSTEM_PROMPT,
+  type DirectorContext,
+  type DirectorOutput,
+  type DirectorPhase,
+} from "./prompts/director.ts";
 
 // claude-opus-5, confirmado vigente vía la skill claude-api el 2026-08-31 — $5.00 / $25.00 por
 // 1M tokens input/output (PRICING_USD_PER_MTOK abajo). Nunca hardcodear un id de memoria.
@@ -55,6 +64,55 @@ export interface SuggestionCompletion {
   finishReason: string;
 }
 
+/** Una herramienta ofrecida al modelo. `inputSchema` es JSON Schema, no zod: el proveedor no
+ *  conoce zod, y el catálogo lo traduce con z.toJSONSchema() al registrarse. */
+export interface ToolSpec {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** El modelo pidió usar una herramienta. `input` llega sin validar — lo valida el catálogo. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+/**
+ * Un turno del hilo, en los términos de esta casa y no en los del SDK.
+ *
+ * "results" es un turno de usuario que solo lleva resultados de herramienta. Existe como rol
+ * propio porque mezclarlo con "user" obligaría a cada llamador a saber cómo el proveedor empaqueta
+ * un tool_result, que es justo lo que este archivo existe para esconder.
+ */
+export type ConversationMessage =
+  | { role: "user"; text: string }
+  | { role: "assistant"; text: string; toolCalls: ToolCall[] }
+  | { role: "results"; results: { id: string; content: string; isError?: boolean }[] };
+
+export interface ConversationTurn {
+  text: string;
+  toolCalls: ToolCall[];
+  usage: SuggestionUsage;
+  finishReason: string;
+}
+
+/**
+ * Frontera para la burbuja, hermana de SuggestionProvider.
+ *
+ * Va aparte y no como un método opcional de aquella porque son dos formas distintas de hablar: una
+ * pide un JSON de una sola vuelta, la otra sostiene un hilo con herramientas. Un test de la
+ * burbuja implementa esta y nada más.
+ */
+export interface ConversationProvider {
+  converse(
+    system: SystemPrompt,
+    messages: ConversationMessage[],
+    tools: ToolSpec[],
+  ): Promise<ConversationTurn>;
+}
+
 /**
  * Frontera entre este gateway y el proveedor real — la única razón de que exista es poder
  * inyectar un proveedor simulado en tests/ai-gateway.test.ts sin tocar la red ni una API key real
@@ -70,11 +128,16 @@ export interface SuggestionProvider {
  * surfacear ProviderRateLimitError (reintentable), distinto de ProviderRequestError para un 400
  * (no reintentable) — criterio #1.
  */
-export class AnthropicSuggestionProvider implements SuggestionProvider {
+export class AnthropicSuggestionProvider implements SuggestionProvider, ConversationProvider {
   private readonly client: Anthropic;
+  private readonly maxTokens: number;
 
-  constructor(apiKey: string) {
+  // El tope de salida entra por constructor y no por el call site: el revisor contesta un
+  // veredicto de dos líneas y el Director General un análisis, y pagarle a los dos el techo del
+  // más largo es tirar presupuesto en cada revisión.
+  constructor(apiKey: string, maxTokens = MAX_OUTPUT_TOKENS) {
     this.client = new Anthropic({ apiKey });
+    this.maxTokens = maxTokens;
   }
 
   async complete(system: string, prompt: string): Promise<SuggestionCompletion> {
@@ -82,7 +145,7 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
     try {
       response = await this.client.messages.create({
         model: MODEL_ID,
-        max_tokens: MAX_OUTPUT_TOKENS,
+        max_tokens: this.maxTokens,
         system,
         messages: [{ role: "user", content: prompt }],
       });
@@ -106,11 +169,109 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
       finishReason: response.stop_reason ?? "unknown",
     };
   }
+
+  /**
+   * Un turno del hilo de la burbuja, con herramientas.
+   *
+   * Traduce en las dos direcciones para que el resto del repo no vea un tipo del SDK: los
+   * ConversationMessage de la casa entran como bloques de Anthropic, y los bloques de vuelta
+   * salen como texto + toolCalls. Las excepciones se mapean igual que en `complete`.
+   */
+  async converse(
+    system: SystemPrompt,
+    messages: ConversationMessage[],
+    tools: ToolSpec[],
+  ): Promise<ConversationTurn> {
+    let response: Anthropic.Message;
+    try {
+      response = await this.client.messages.create({
+        model: MODEL_ID,
+        max_tokens: this.maxTokens,
+        // UN solo punto de corte del caché, al final del bloque estable. El proveedor cachea todo
+        // lo que va ANTES en el orden de la request —las herramientas primero, luego el system—,
+        // así que este único marcador cubre los ~5.500 tokens fijos. El bloque volátil queda
+        // fuera a propósito: cambia al navegar, y meterlo adentro invalidaría el caché en cada
+        // cambio de pantalla, que es justo lo que más pasa aquí.
+        system: [
+          { type: "text", text: system.estable, cache_control: { type: "ephemeral" } },
+          { type: "text", text: system.volatil },
+        ],
+        tools: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+        })),
+        messages: messages.map(aBloques),
+      });
+    } catch (err) {
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderRateLimitError();
+      if (err instanceof Anthropic.BadRequestError) throw new ProviderRequestError(err.message);
+      throw err;
+    }
+
+    return {
+      text: response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim(),
+      toolCalls: response.content
+        .filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")
+        .map((b) => ({ id: b.id, name: b.name, input: b.input })),
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
+      finishReason: response.stop_reason ?? "unknown",
+    };
+  }
 }
 
+/** Un mensaje de la casa, en bloques del SDK. Única función que conoce las dos formas. */
+function aBloques(m: ConversationMessage): Anthropic.MessageParam {
+  if (m.role === "user") return { role: "user", content: m.text };
+
+  if (m.role === "results") {
+    return {
+      role: "user",
+      content: m.results.map((r) => ({
+        type: "tool_result" as const,
+        tool_use_id: r.id,
+        content: r.content,
+        ...(r.isError ? { is_error: true } : {}),
+      })),
+    };
+  }
+
+  const content: Anthropic.ContentBlockParam[] = [];
+  if (m.text) content.push({ type: "text", text: m.text });
+  for (const c of m.toolCalls) {
+    content.push({ type: "tool_use", id: c.id, name: c.name, input: c.input ?? {} });
+  }
+  // Un turno de asistente vacío hace fallar la request entera con 400. Puede pasar si el modelo
+  // contestó solo herramientas y ninguna se pudo leer: mandamos un punto en vez de nada.
+  return { role: "assistant", content: content.length > 0 ? content : "." };
+}
+
+/**
+ * Los tokens cacheados NO cuestan lo mismo que los normales, y desde que la burbuja activa el
+ * caché esto dejó de ser un detalle: leer de caché vale 0.1x y escribirlo 1.25x. Cobrarlos a
+ * precio de entrada haría que llm_calls reportara hasta diez veces el gasto real justo en el
+ * camino que más se usa — y un tablero de costos que exagera se deja de mirar igual que uno que
+ * miente para abajo.
+ */
+const CACHE_READ_MULTIPLIER = 0.1;
+const CACHE_WRITE_MULTIPLIER = 1.25;
+
 function estimateCostUsd(usage: SuggestionUsage): number {
+  const entrada =
+    usage.inputTokens +
+    usage.cacheReadTokens * CACHE_READ_MULTIPLIER +
+    usage.cacheWriteTokens * CACHE_WRITE_MULTIPLIER;
   return (
-    (usage.inputTokens * PRICING_USD_PER_MTOK.input) / 1_000_000 +
+    (entrada * PRICING_USD_PER_MTOK.input) / 1_000_000 +
     (usage.outputTokens * PRICING_USD_PER_MTOK.output) / 1_000_000
   );
 }
@@ -123,7 +284,43 @@ function parseCompletion(text: string): unknown {
   }
 }
 
-type GatewayErrorCode = "RATE_LIMITED" | "PROVIDER_RATE_LIMIT" | "VALIDATION_ERROR" | "INTERNAL";
+type GatewayErrorCode =
+  | "RATE_LIMITED"
+  | "PROVIDER_RATE_LIMIT"
+  | "VALIDATION_ERROR"
+  | "INTERNAL"
+  /** Falta una variable de entorno. No es culpa de quien preguntó y no se arregla reintentando. */
+  | "CONFIG_ERROR";
+
+/**
+ * Resuelve el proveedor sin dejar que `requireEnv` tumbe la request.
+ *
+ * Existe porque los tres caminos del gateway construían el adaptador FUERA de su try, así que una
+ * `ANTHROPIC_API_KEY` vacía salía como excepción cruda: Next contestaba un 500 con HTML, el
+ * `res.json()` del navegador fallaba, y la pantalla terminaba diciendo "se cayó la conexión" — que
+ * es mentira, el servidor contestó. El error se perdía justo cuando era el más fácil de arreglar.
+ *
+ * Que el mensaje de `requireEnv` viaje al cliente es deliberado: nombra la variable que falta, no
+ * su valor, y es exactamente lo que necesita ver quien está configurando el proyecto.
+ */
+export function resolverProveedor<T>(
+  inyectado: T | undefined,
+  crear: () => T,
+): { ok: true; provider: T } | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } } {
+  if (inyectado) return { ok: true, provider: inyectado };
+  try {
+    return { ok: true, provider: crear() };
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        code: "CONFIG_ERROR",
+        retryable: false,
+        message: err instanceof Error ? err.message : "Falta configurar el proveedor de IA.",
+      },
+    };
+  }
+}
 export type GatewayResult =
   | { ok: true; data: typeof aiSuggestion.$inferSelect }
   | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
@@ -133,7 +330,11 @@ export type GatewayResult =
  * llamar al proveedor (criterio #4) — el conteo corre ANTES de resolver el proveedor o tocar áreas
  * /objetivos/clientes, para que un org bloqueado nunca dispare ni una query de más.
  */
-async function hasReachedHourlyLimit(orgId: string): Promise<boolean> {
+async function hasReachedHourlyLimit(
+  orgId: string,
+  purpose = "suggestion",
+  max = MAX_SUGGESTIONS_PER_HOUR,
+): Promise<boolean> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const rows = await db
     .select({ id: llmCalls.id })
@@ -141,11 +342,11 @@ async function hasReachedHourlyLimit(orgId: string): Promise<boolean> {
     .where(
       and(
         eq(llmCalls.orgId, orgId),
-        eq(llmCalls.purpose, "suggestion"),
+        eq(llmCalls.purpose, purpose),
         gte(llmCalls.createdAt, oneHourAgo),
       ),
     );
-  return rows.length >= MAX_SUGGESTIONS_PER_HOUR;
+  return rows.length >= max;
 }
 
 /**
@@ -170,7 +371,12 @@ export async function generateSuggestion(
     };
   }
 
-  const resolvedProvider = provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  const elegido = resolverProveedor(
+    provider,
+    () => new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY")),
+  );
+  if (!elegido.ok) return elegido;
+  const resolvedProvider = elegido.provider;
 
   const [areas, objectives, clients] = await Promise.all([
     db.select().from(area).where(eq(area.orgId, orgId)),
@@ -299,7 +505,8 @@ export async function reviewObjective(
   if (!obj || obj.status !== "completed" || !obj.evidenceValue) return null;
   if (obj.reviewStatus !== "sin_revisar") return null;
 
-  const resolved = provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  const resolved =
+    provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"), MAX_REVIEW_OUTPUT_TOKENS);
   const prompt = buildReviewPrompt({
     title: obj.title,
     description: obj.description,
@@ -388,4 +595,206 @@ export async function reviewPendingObjectives(
   }
 
   return { reviewed: approved + rejected, approved, rejected };
+}
+
+// ─── El Director General ───────────────────────────────────────────────────────────────────────
+//
+// La tercera clase de llamada que pasa por este gateway, junto con las sugerencias sueltas y el
+// revisor. La diferencia no es el modelo: es que esta trae contexto acumulado (lo que el dueño le
+// contó, cómo salieron las vueltas anteriores) y que su salida mueve una máquina de estados en
+// vez de escribir una tarjeta.
+//
+// Mismo contrato que las otras dos, y a propósito: mismo proveedor inyectable, mismo tope por
+// hora antes de tocar la red, misma validación con zod y un solo reintento, mismo renglón en
+// llm_calls. Que las tres se comporten igual es lo que hace que el costo de IA de una empresa se
+// pueda leer de una sola tabla.
+
+/** Tope de llamadas del motor por empresa por hora. Un ciclo completo son cinco llamadas; con 20
+ *  caben cuatro vueltas por hora, muy por encima de lo que un cron de seis horas puede pedir. El
+ *  tope existe para el caso en que algo se cicle, no para racionar el uso normal. */
+const MAX_DIRECTOR_CALLS_PER_HOUR = 20;
+/**
+ * Sube a 3072 desde que la inferencia corre el Análisis de Causa Raíz.
+ *
+ * Esa fase ya no devuelve un párrafo: devuelve la cadena de hasta siete porqués, la raíz, su
+ * categoría, los factores contribuyentes y la evidencia. Con 2048 el peor caso se trunca a media
+ * llave, el JSON no parsea y la fase no avanza — seguro, pero deja el ciclo dando vueltas contra
+ * el mismo límite cada día y gastando la llamada igual. El techo se mide contra el esquema, no
+ * contra lo que el modelo suele escribir.
+ */
+const MAX_DIRECTOR_OUTPUT_TOKENS = 3072;
+
+export type DirectorResult<P extends DirectorPhase> =
+  | { ok: true; data: DirectorOutput<P> }
+  | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
+
+/**
+ * Corre UNA fase del motor contra el modelo y devuelve su salida ya validada.
+ *
+ * No escribe en improvement_cycle: eso lo hace phases.ts, que es quien sabe qué columna le toca a
+ * cada fase y qué transición sigue. Este gateway hace lo suyo —hablar con el proveedor, validar,
+ * cobrar el renglón de costo— y nada más. Si escribiera el ciclo, una falla del proveedor dejaría
+ * el estado a medias en dos módulos distintos.
+ */
+export async function runDirectorPhase<P extends DirectorPhase>(
+  orgId: string,
+  context: DirectorContext & { phase: P },
+  provider?: SuggestionProvider,
+): Promise<DirectorResult<P>> {
+  if (await hasReachedHourlyLimit(orgId, "director", MAX_DIRECTOR_CALLS_PER_HOUR)) {
+    return {
+      ok: false,
+      error: {
+        code: "RATE_LIMITED",
+        retryable: false,
+        message: `El motor ya hizo ${MAX_DIRECTOR_CALLS_PER_HOUR} llamadas en la última hora.`,
+      },
+    };
+  }
+
+  const elegido = resolverProveedor(
+    provider,
+    () => new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"), MAX_DIRECTOR_OUTPUT_TOKENS),
+  );
+  if (!elegido.ok) return elegido;
+  const resolved = elegido.provider;
+  const prompt = buildDirectorPrompt(context);
+  const schema = DIRECTOR_SCHEMAS[context.phase];
+
+  const startedAt = Date.now();
+  let completion: SuggestionCompletion;
+  try {
+    completion = await resolved.complete(DIRECTOR_SYSTEM_PROMPT, prompt);
+  } catch (err) {
+    if (err instanceof ProviderRateLimitError) {
+      return { ok: false, error: { code: "PROVIDER_RATE_LIMIT", retryable: true, message: err.message } };
+    }
+    if (err instanceof ProviderRequestError) {
+      return { ok: false, error: { code: "VALIDATION_ERROR", retryable: false, message: err.message } };
+    }
+    return {
+      ok: false,
+      error: { code: "INTERNAL", retryable: false, message: "Error inesperado del proveedor de IA." },
+    };
+  }
+
+  let parsed = schema.safeParse(parseCompletion(completion.text));
+  if (!parsed.success) {
+    // Un solo reintento en fallo de validación (regla ia-gateway.md), después falla explícito.
+    // La fase se queda donde estaba y la siguiente corrida del cron la vuelve a intentar: el
+    // ciclo no avanza a ciegas con una salida que no se pudo leer.
+    try {
+      completion = await resolved.complete(DIRECTOR_SYSTEM_PROMPT, prompt);
+    } catch {
+      return {
+        ok: false,
+        error: { code: "INTERNAL", retryable: false, message: "El reintento tras un fallo de validación también falló." },
+      };
+    }
+    parsed = schema.safeParse(parseCompletion(completion.text));
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          retryable: false,
+          message: "La respuesta del modelo no cumplió el esquema de la fase tras un reintento.",
+        },
+      };
+    }
+  }
+
+  // El renglón de costo se escribe aunque el ciclo después falle al guardar: la llamada ya se
+  // pagó, y un gasto que no aparece en llm_calls es un gasto que nadie va a encontrar.
+  await db.insert(llmCalls).values({
+    orgId,
+    purpose: "director",
+    modelId: MODEL_ID,
+    inputTokens: completion.usage.inputTokens,
+    outputTokens: completion.usage.outputTokens,
+    cacheReadTokens: completion.usage.cacheReadTokens,
+    cacheWriteTokens: completion.usage.cacheWriteTokens,
+    latencyMs: Date.now() - startedAt,
+    finishReason: completion.finishReason,
+    costUsd: estimateCostUsd(completion.usage).toFixed(6),
+  });
+
+  return { ok: true, data: parsed.data as DirectorOutput<P> };
+}
+
+/** La burbuja contesta en prosa, no en JSON, y puede pedir varias herramientas en un turno: le
+ *  toca su propio techo, más alto que el del revisor y más bajo que el de una fase del motor. */
+const MAX_BURBUJA_OUTPUT_TOKENS = 2048;
+/** Por org y por hora. Una conversación normal gasta entre dos y cuatro turnos; 60 deja hablar
+ *  toda la tarde y corta una pestaña que se quedó girando sola. */
+const MAX_BURBUJA_CALLS_PER_HOUR = 60;
+
+export type ConversationResult =
+  | { ok: true; data: ConversationTurn }
+  | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
+
+/**
+ * Un turno de la burbuja: cobra, llama y deja el renglón de costo.
+ *
+ * No trae el bucle de herramientas — ese vive en conversation.ts, que es quien sabe qué hace cada
+ * una. Aquí solo pasa lo que ya hacía `runDirectorPhase`: límite por hora ANTES de llamar, mapeo
+ * de errores del proveedor y una fila en llm_calls por llamada pagada. El bucle llama a esto una
+ * vez por vuelta, así que cada vuelta se cobra por separado y una conversación cara se ve.
+ */
+export async function runConversationTurn(
+  orgId: string,
+  system: SystemPrompt,
+  messages: ConversationMessage[],
+  tools: ToolSpec[],
+  provider?: ConversationProvider,
+): Promise<ConversationResult> {
+  if (await hasReachedHourlyLimit(orgId, "burbuja", MAX_BURBUJA_CALLS_PER_HOUR)) {
+    return {
+      ok: false,
+      error: {
+        code: "RATE_LIMITED",
+        retryable: false,
+        message: "Hablamos mucho esta hora. Dame unos minutos y seguimos.",
+      },
+    };
+  }
+
+  const elegido = resolverProveedor(
+    provider,
+    () => new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"), MAX_BURBUJA_OUTPUT_TOKENS),
+  );
+  if (!elegido.ok) return elegido;
+  const resolved = elegido.provider;
+
+  const startedAt = Date.now();
+  let turn: ConversationTurn;
+  try {
+    turn = await resolved.converse(system, messages, tools);
+  } catch (err) {
+    if (err instanceof ProviderRateLimitError) {
+      return { ok: false, error: { code: "PROVIDER_RATE_LIMIT", retryable: true, message: err.message } };
+    }
+    if (err instanceof ProviderRequestError) {
+      return { ok: false, error: { code: "VALIDATION_ERROR", retryable: false, message: err.message } };
+    }
+    return {
+      ok: false,
+      error: { code: "INTERNAL", retryable: false, message: "Error inesperado del proveedor de IA." },
+    };
+  }
+
+  await db.insert(llmCalls).values({
+    orgId,
+    purpose: "burbuja",
+    modelId: MODEL_ID,
+    inputTokens: turn.usage.inputTokens,
+    outputTokens: turn.usage.outputTokens,
+    cacheReadTokens: turn.usage.cacheReadTokens,
+    cacheWriteTokens: turn.usage.cacheWriteTokens,
+    latencyMs: Date.now() - startedAt,
+    finishReason: turn.finishReason,
+    costUsd: estimateCostUsd(turn.usage).toFixed(6),
+  });
+
+  return { ok: true, data: turn };
 }

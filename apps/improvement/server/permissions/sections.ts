@@ -9,7 +9,7 @@ import { z } from "zod";
 export const SCOPES = ["empresa", "area", "propio", "ninguno"] as const;
 export type Scope = (typeof SCOPES)[number];
 
-export const SECTION_SLUGS = ["mapa", "objetivos", "equipo", "clientes", "powerups"] as const;
+export const SECTION_SLUGS = ["mapa", "objetivos", "equipo", "clientes", "proyectos", "powerups"] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
 
 export interface Section {
@@ -28,6 +28,9 @@ export const SECTIONS: Section[] = [
   { slug: "objetivos", label: "Objetivos", hint: "Las metas del equipo y sus puntos", scopes: ["empresa", "area", "propio"] },
   { slug: "equipo", label: "Equipo", hint: "Quién trabaja contigo", scopes: ["empresa", "area"] },
   { slug: "clientes", label: "Clientes", hint: "Tu cartera y cómo va cada cuenta", scopes: ["empresa"] },
+  // Alcance solo `empresa`, como Clientes: un proyecto cruza áreas por definición (para eso
+  // tiene dependencias), y recortarlo por área enseñaría medio grafo — peor que no enseñarlo.
+  { slug: "proyectos", label: "Proyectos", hint: "Qué se está construyendo y qué lo frena", scopes: ["empresa"] },
   { slug: "powerups", label: "PowerUps", hint: "Canjea los puntos que acumula tu equipo", scopes: ["empresa"] },
 ];
 

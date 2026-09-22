@@ -23,7 +23,13 @@ export async function loadBuilding(userId: string, orgId: string): Promise<Build
 
   const [areas, stages] = await Promise.all([
     db
-      .select({ id: area.id, name: area.name, color: area.color })
+      .select({
+        id: area.id,
+        name: area.name,
+        color: area.color,
+        description: area.description,
+        icon: area.icon,
+      })
       .from(area)
       .where(eq(area.orgId, orgId))
       .orderBy(asc(area.createdAt)),

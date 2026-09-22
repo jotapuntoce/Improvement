@@ -14,7 +14,8 @@ export type LobbyZona =
   | "equipo"
   | "proyectos"
   | "clientes"
-  | "powerups";
+  | "powerups"
+  | "improvement";
 
 export interface Caja {
   x: number;
@@ -41,6 +42,8 @@ export interface Marco {
 
 export const MARCOS: Record<LobbyZona, Marco> = {
   areas: { t: 10, r: 10, b: 10, l: 10 },
+  // El marco de la pantalla del Director y su luz de estado debajo.
+  improvement: { t: 12, r: 12, b: 12, l: 12 },
   // 13 del marco de aluminio, 3 del canto, y abajo además la charola de los plumones.
   objetivos: { t: 16, r: 16, b: 28, l: 16 },
   equipo: { t: 14, r: 14, b: 14, l: 14 },
@@ -52,6 +55,19 @@ export const MARCOS: Record<LobbyZona, Marco> = {
 
 /** El globo de quien atiende: no es un mueble, pero tampoco puede taparle nada a los demás. */
 export const GLOBO: Caja = { x: 436, y: 206, w: 410, h: 66 };
+/**
+ * La placa del mostrador que dice hasta dónde alcanza a ver quien entró: "Toda la empresa", "Tu
+ * área", "Tu trabajo".
+ *
+ * No es un mueble —no se abre, no lleva a ninguna pantalla— pero ocupa lugar, así que entra en la
+ * misma revisión de encimes que los demás (tests/lobby-plano.test.ts). Va sobre la cara del
+ * mostrador, que es la única superficie de la recepción que estaba vacía.
+ *
+ * Existe porque un número recortado que se lee como total es peor que no enseñarlo: alguien con
+ * alcance de área tiene derecho a saber que "12 objetivos abiertos" son los de su área y no los
+ * de la empresa.
+ */
+export const ALCANCE: Caja = { x: 946, y: 438, w: 214, h: 30 };
 /** Dónde cae quien atiende, y a dónde apunta el pico del globo. */
 export const RECEPCION_CX = 700;
 /** Alto de su cabeza. */
@@ -110,6 +126,10 @@ const ORILLA_IZQ = 248;
 
 export const ZONAS: Record<LobbyZona, Caja> = {
   areas: { x: 250, y: 74, w: 914, h: 40 },
+  // La pantalla del Director General: en la pared del fondo, centrada entre el pizarrón y el muro
+  // de retratos, justo encima del globo de quien atiende. Ahí y no en el mostrador porque no es
+  // una herramienta que se toma: es quien dirige la empresa, y en una oficina eso cuelga arriba.
+  improvement: { x: 470, y: 142, w: 340, h: 50 },
   objetivos: { x: ORILLA_IZQ + 8, y: 168, w: 148, h: 66 },
   equipo: { x: ORILLA_DER - 281, y: 160, w: 281, h: 96 },
   proyectos: { x: ORILLA_IZQ, y: APOYO_Y - 123, w: 236, h: 123 },

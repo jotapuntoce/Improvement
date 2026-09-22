@@ -1,10 +1,11 @@
 // Los compañeros que una persona puede ver. NUNCA incluye responsibility_level: el Non-negotiable #4
 // dice que un empleado jamás lee el de otro, y la forma más segura de cumplirlo es que ese campo no
 // exista en el dato que sale de aquí (mismo criterio que listTeamForOwner).
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, profile } from "@jotapuntoce/db/schema";
 import { resolveSection } from "../auth/guard.ts";
+import { areaScopeFilter } from "../permissions/areaScope.ts";
 
 export interface Teammate {
   userId: string;
@@ -23,10 +24,15 @@ export async function listTeammates(userId: string, orgId: string): Promise<Team
   const { membership: member, scope } = await resolveSection(userId, orgId, "equipo");
   if (scope === "ninguno") return [];
 
-  const conditions = [eq(membership.orgId, orgId), eq(profile.isPlatformAdmin, false)];
-  if (scope === "area") {
-    conditions.push(member.areaId ? eq(membership.areaId, member.areaId) : sql`false`);
-  }
+  const conditions = [
+    eq(membership.orgId, orgId),
+    eq(profile.isPlatformAdmin, false),
+    // La misma regla de alcance que usa listObjectives, escrita una sola vez (areaScope.ts).
+    areaScopeFilter(scope, { areaId: member.areaId, userId }, {
+      areaId: membership.areaId,
+      ownerId: membership.userId,
+    }),
+  ];
 
   return db
     .select({

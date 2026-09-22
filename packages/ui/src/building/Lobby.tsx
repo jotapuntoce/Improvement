@@ -36,7 +36,9 @@
 import type { CSSProperties, ReactNode } from "react";
 import { IndustryGlyph } from "./AppIconLarge.tsx";
 import type { Industry } from "./industries.ts";
+import { areaIcon } from "./areaIcons.ts";
 import {
+  ALCANCE,
   APOYO_Y,
   type Caja,
   ESCENA,
@@ -78,6 +80,14 @@ export interface LobbyArea {
   id: string;
   name: string;
   color: string;
+  /** Qué responde el área. Se enseña bajo el nombre cuando el dueño la escribió. */
+  description?: string | null;
+  /** Id de AREA_ICONS. Sin él —o con uno que ya no existe— va el glifo neutro. */
+  icon?: string | null;
+  /** Lo que cuelga del área. `undefined` = no se pudo contar, y entonces no se dibuja nada. */
+  members?: number;
+  objectivesOpen?: number;
+  projects?: number;
 }
 
 export interface LobbyPerson {
@@ -129,8 +139,46 @@ export interface LobbyProps {
    * desde el app. Sin entrada, el mueble usa su nombre de fábrica.
    */
   labels?: Partial<Record<LobbyZona, string>>;
+  /**
+   * Lo que trae el Director General ahora mismo, para su pantalla de la pared. `undefined` cuando
+   * quien entró no es el dueño: el mueble no se dibuja, porque Improvement conversa solo con él
+   * (decisión de diseño #1 del plan) y una pantalla apagada que no lleva a ningún lado sería un
+   * mueble de adorno.
+   */
+  director?: LobbyDirector;
+  /**
+   * Hasta dónde alcanza a ver quien entró: "Toda la empresa", "Tu área", "Tu trabajo". Va en la
+   * placa del mostrador. Sin él, la placa no se dibuja.
+   */
+  alcance?: string;
   puertas: LobbyPuerta[];
   footer?: ReactNode;
+}
+
+/** El estado de la vuelta de mejora en curso, tal como lo enseña la pantalla de la pared. */
+export interface LobbyDirector {
+  /** Cómo se llama la fase, ya traducida por el servidor (PHASE_LABEL). */
+  phase: string;
+  /** El título de la vuelta viva, o null si no hay ninguna abierta. */
+  title: string | null;
+  /** true cuando la pelota está del lado del dueño: hay una propuesta esperando su respuesta. */
+  esperandoDecision: boolean;
+  /** Cuántas tareas siguen abiertas de esta vuelta. */
+  tareasAbiertas: number;
+}
+
+/**
+ * El nombre accesible de la banda de áreas.
+ *
+ * Enumera las áreas en vez de decir solo cuántas hay: "Áreas de trabajo: 4" no le sirve a quien
+ * navega con lector de pantalla, porque los nombres están en <li> decorativos dentro del enlace y
+ * se leerían como una lista sin contexto. Aquí van dichos de corrido, con su descripción.
+ */
+function areaAria(rotulo: string, areas: LobbyArea[]): string {
+  if (areas.length === 0) return `${rotulo}: todavía ninguna`;
+  return `${rotulo}: ${areas
+    .map((a) => (a.description ? `${a.name} — ${a.description}` : a.name))
+    .join(", ")}`;
 }
 
 function iniciales(nombre: string): string {
@@ -212,6 +260,47 @@ function PlantaCubiculos({ z }: { z: Caja }) {
     <g>
       <rect x={x} y={y} width={w} height={h} rx="6" fill="var(--sky-top)" stroke="var(--building-accent)" strokeWidth="1.4" opacity=".92" />
       <rect x={x + 10} y={y + h - 13} width={w - 20} height="9" rx="2" fill="var(--desk-top)" opacity=".55" />
+    </g>
+  );
+}
+
+/**
+ * Improvement: la pantalla del Director General, colgada en la pared del fondo.
+ *
+ * Un monitor delgado con una luz de estado abajo. La luz es lo único del mueble que cambia con los
+ * datos —se enciende cuando hay una propuesta esperando al dueño— y es a propósito: el mueble no
+ * se mueve nunca (esa es la regla del plano), pero algo tiene que distinguir "todo tranquilo" de
+ * "te está esperando" desde el otro lado de la recepción.
+ */
+function PantallaDirector({ z, alerta }: { z: Caja; alerta: boolean }) {
+  const pad = MARCOS.improvement.l;
+  const x = z.x - pad;
+  const y = z.y - pad;
+  const w = z.w + pad * 2;
+  const h = z.h + pad * 2;
+  return (
+    <g>
+      <rect x={x - 2} y={y - 2} width={w + 4} height={h + 4} rx="8" fill="var(--desk-top)" opacity=".5" />
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx="6"
+        fill="var(--bg-reception-top)"
+        stroke="var(--building-accent)"
+        strokeWidth="1.4"
+        opacity=".96"
+      />
+      {/* La luz de estado: encendida y con resplandor cuando le toca al dueño, apagada si no. */}
+      <circle
+        cx={x + w - 14}
+        cy={y + h - 11}
+        r="4"
+        fill={alerta ? "var(--sign-glow)" : "var(--building-accent)"}
+        opacity={alerta ? 1 : 0.35}
+        {...(alerta ? { filter: "url(#jpc-lb-glow)" } : {})}
+      />
     </g>
   );
 }
@@ -357,6 +446,8 @@ export function Lobby({
   clientsCount,
   powerupsCount,
   labels,
+  director,
+  alcance,
   puertas,
   footer,
 }: LobbyProps) {
@@ -469,6 +560,9 @@ export function Lobby({
           </text>
 
           <PlantaCubiculos z={ZONAS.areas} />
+          {director && (
+            <PantallaDirector z={ZONAS.improvement} alerta={director.esperandoDecision} />
+          )}
           <Pizarron z={ZONAS.objetivos} />
           <MuroRetratos z={ZONAS.equipo} />
           <Verificador z={ZONAS.powerups} />
@@ -529,15 +623,70 @@ export function Lobby({
               <span className="jpc-lobby-rotulo">{rot("areas", "Áreas de trabajo")}</span>
               <ul className="jpc-lobby-areas">
                 {areas.map((a) => (
-                  <li key={a.id}>
+                  // La descripción va en el title y no visible: en la banda caben los nombres de
+                  // ocho áreas o la descripción de dos, y el nombre es lo que se busca al entrar.
+                  // Completa se lee en la pantalla de Equipo, que sí tiene lugar.
+                  <li key={a.id} title={a.description ?? undefined}>
+                    {/* La silla sigue siendo escenografía pura: el glifo va impreso en la tapa del
+                        escritorio, que es donde en una oficina de verdad está la placa. */}
                     <i className="jpc-lobby-silla" style={{ background: a.color }} />
-                    <span className="jpc-lobby-escritorio">{a.name}</span>
+                    <span className="jpc-lobby-escritorio">
+                      <svg
+                        className="jpc-lobby-glifo"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path
+                          d={areaIcon(a.icon).path}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      {a.name}
+                      {a.members !== undefined && (
+                        <b className="jpc-lobby-area-n">{a.members}</b>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
             </>,
-            `${rot("areas", "Áreas de trabajo")}: ${areas.length}`,
+            areaAria(rot("areas", "Áreas de trabajo"), areas),
             "jpc-lobby-zona--banda",
+          )}
+
+          {/* La pantalla del Director General. Solo cuando hay uno que mirar: ver la prop. */}
+          {director &&
+            mueble(
+              "improvement",
+              <>
+                <span className="jpc-lobby-rotulo">{rot("improvement", "Improvement")}</span>
+                <p className="jpc-lobby-director">
+                  <strong>{director.title ?? "Sin vuelta abierta"}</strong>
+                  <span className="jpc-lobby-pie">
+                    {director.phase}
+                    {director.tareasAbiertas > 0 &&
+                      ` · ${director.tareasAbiertas} ${director.tareasAbiertas === 1 ? "tarea" : "tareas"}`}
+                  </span>
+                </p>
+              </>,
+              director.esperandoDecision
+                ? `${rot("improvement", "Improvement")}: te está esperando una propuesta`
+                : `${rot("improvement", "Improvement")}: ${director.title ?? "sin vuelta abierta"}, ${director.phase}`,
+              director.esperandoDecision ? "jpc-lobby-zona--espera" : "",
+            )}
+
+          {/* La placa del mostrador: hasta dónde ve quien entró. No es un mueble —no se abre— así
+              que va suelta en la capa, con su caja del plano para no encimarse con nadie. */}
+          {alcance && (
+            <p className="jpc-lobby-alcance" style={caja(ALCANCE)}>
+              <span className="jpc-lobby-pie">Estás viendo</span>
+              <strong>{alcance}</strong>
+            </p>
           )}
 
           {mueble(

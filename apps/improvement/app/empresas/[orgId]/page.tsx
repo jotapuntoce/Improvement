@@ -10,6 +10,7 @@
 import { requireOrgMembership } from "@/server/auth/guard.ts";
 import { loadBuilding } from "@/server/building/loadBuilding.ts";
 import { loadLobby } from "@/server/lobby/loadLobby.ts";
+import { DirectorBubble } from "@/components/DirectorBubble.tsx";
 import { BuildingExperience } from "./BuildingExperience.tsx";
 
 export default async function EmpresaBuildingPage({ params }: { params: Promise<{ orgId: string }> }) {
@@ -24,11 +25,16 @@ export default async function EmpresaBuildingPage({ params }: { params: Promise<
   // /[org]/necesidades). La puerta se decide aquí, en el servidor, y no dentro del componente: que
   // una pantalla ofrezca una puerta que devuelve 404 al tocarla es peor que no ofrecerla.
   return (
-    <BuildingExperience
-      orgId={orgId}
-      graph={graph}
-      lobby={lobby}
-      esDueno={memberRow.role === "owner"}
-    />
+    <>
+      <BuildingExperience
+        orgId={orgId}
+        graph={graph}
+        lobby={lobby}
+        esDueno={memberRow.role === "owner"}
+      />
+      {/* La recepción no cuelga del layout de [org], así que aquí se monta aparte. Es la pantalla
+          donde más falta hace: es por donde se entra, y donde el dueño llega sin saber qué mirar. */}
+      <DirectorBubble orgId={orgId} />
+    </>
   );
 }

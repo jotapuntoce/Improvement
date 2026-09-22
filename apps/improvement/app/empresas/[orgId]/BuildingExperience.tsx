@@ -92,7 +92,13 @@ export function BuildingExperience({
         companyName={graph.companyName}
         industry={graph.industry}
         greeting={lobby.greeting}
-        areas={graph.areas}
+        // Las áreas salen de loadLobby y no de graph.areas: las del grafo traen las celdas de las
+        // ventanas del edificio (que la recepción no usa) y NO traen los conteos ni el recorte
+        // por alcance (que la recepción sí necesita). Dos formas de la misma cosa para dos
+        // dibujos distintos, cada una cargada por quien la va a usar.
+        areas={lobby.areas}
+        director={lobby.director}
+        alcance={lobby.alcance}
         team={lobby.team}
         projects={lobby.projects}
         objectivesOpen={lobby.objectivesOpen}
@@ -108,15 +114,26 @@ export function BuildingExperience({
                   {s.label}
                 </Link>
               ))}
+              {/* Improvement ya no está aquí: desde esta versión tiene su propio mueble en la
+                  pared de la recepción (la pantalla del Director General). Dos puertas a la misma
+                  pantalla en la misma vista es una de más — la misma razón por la que esta
+                  pantalla no tiene dos formas de volver. */}
+              {/* Tu bandeja. No es una sección de las que el dueño enciende y apaga, así que no sale
+                  de lobby.sueltas y va escrita aquí: tu trabajo es tuyo y lo ves siempre, seas
+                  dueño o empleado. */}
+              <Link href={`/${orgId}/tareas`} className="jpc-reception-door">
+                Mi trabajo
+                {lobby.misTareas > 0 && ` · ${lobby.misTareas}`}
+              </Link>
               {esDueno && (
-                <>
-                  <Link href={`/${orgId}/necesidades`} className="jpc-reception-door">
-                    Lo que necesita
-                  </Link>
-                  <Link href={`/${orgId}/improvement`} className="jpc-reception-door">
-                    Improvement
-                  </Link>
-                </>
+                <Link href={`/${orgId}/control`} className="jpc-reception-door">
+                  Control
+                </Link>
+              )}
+              {esDueno && (
+                <Link href={`/${orgId}/necesidades`} className="jpc-reception-door">
+                  Lo que necesita
+                </Link>
               )}
             </div>
             <button type="button" className="jpc-back-link" onClick={() => setAdentro(false)}>

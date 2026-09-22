@@ -20,7 +20,10 @@
     "./building/ownerLabels.ts": "./src/building/ownerLabels.ts",
     "./building/kpis.ts": "./src/building/kpis.ts",
     "./assembly/layout.ts": "./src/assembly/layout.ts",
-    "./assembly/AssemblyMap.tsx": "./src/assembly/AssemblyMap.tsx"
+    "./assembly/AssemblyMap.tsx": "./src/assembly/AssemblyMap.tsx",
+    "./building/areaIcons.ts": "./src/building/areaIcons.ts",
+    "./building/ImprovementPanel.tsx": "./src/building/ImprovementPanel.tsx",
+    "./building/AnalyticsWall.tsx": "./src/building/AnalyticsWall.tsx"
   },
   "peerDependencies": {
     "react": "^19.2.0"

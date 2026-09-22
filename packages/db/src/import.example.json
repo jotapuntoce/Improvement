@@ -1,0 +1,51 @@
+{
+  "areas": [
+    { "name": "Ventas", "color": "#7c5cff", "description": "Quien trae y cierra las cuentas", "icon": "ventas" },
+    { "name": "Operaciones", "color": "#22d3ee", "description": "Quien entrega lo vendido", "icon": "operaciones" },
+    { "name": "Soporte", "color": "#10b981", "description": "Quien sostiene al cliente después", "icon": "soporte" }
+  ],
+  "clients": [
+    {
+      "name": "Constructora del Norte",
+      "area": "Ventas",
+      "healthStatus": "healthy",
+      "dealStage": "ganado",
+      "dealValue": 480000,
+      "lastContactAt": "2026-09-10",
+      "nextFollowUpAt": "2026-10-10",
+      "notes": "Renovación anual firmada en agosto."
+    },
+    {
+      "name": "Grupo Estrada",
+      "area": "Ventas",
+      "healthStatus": "at_risk",
+      "dealStage": "negociacion",
+      "dealValue": 150000,
+      "lastContactAt": "2026-07-28",
+      "riskFactors": ["sin_respuesta", "competencia"],
+      "notes": "No contestan desde la propuesta. Mencionaron que están viendo otra opción."
+    }
+  ],
+  "projects": [
+    {
+      "name": "Portal de clientes",
+      "area": "Operaciones",
+      "detail": "Que cada cliente vea el avance de su obra sin llamar",
+      "status": "activo",
+      "progress": 40,
+      "budget": 250000,
+      "spent": 130000,
+      "startAt": "2026-08-01",
+      "dueAt": "2026-12-15",
+      "risk": "medio"
+    },
+    {
+      "name": "Migración de expedientes",
+      "area": "Soporte",
+      "status": "activo",
+      "progress": 10,
+      "dueAt": "2026-11-01",
+      "risk": "bajo"
+    }
+  ]
+}

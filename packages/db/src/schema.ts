@@ -152,9 +152,23 @@ export const area = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color").notNull(),
+    // Qué responde esta área, en una línea. Lo escribe el dueño y lo lee Improvement: sin esto el
+    // Director General sabe que el área existe pero no de qué se hace cargo, y una sugerencia
+    // dirigida al área equivocada es peor que ninguna.
+    description: text("description"),
+    // Uno de los ids de AREA_ICONS (packages/ui/src/building/areaIcons.ts). null = la recepción
+    // dibuja el glifo neutro, nunca lanza. Categorías genéricas de función, nunca el giro de una
+    // empresa concreta (.claude/rules/motor-generico.md).
+    icon: text("icon"),
     createdAt: createdAt(),
   },
-  (t) => [index("idx_area_org_id").on(t.orgId)],
+  (t) => [
+    index("idx_area_org_id").on(t.orgId),
+    check(
+      "area_icon_check",
+      sql`${t.icon} is null or ${t.icon} in ('ventas','operaciones','ingenieria','soporte','finanzas','personas','marketing','legal','direccion','otro')`,
+    ),
+  ],
 );
 
 export const objective = pgTable(
@@ -287,7 +301,20 @@ export const project = pgTable(
     // 0 a 100, capturado a mano. No se deriva de los objetivos: un proyecto puede ir al 80% con
     // cero objetivos cerrados, y un porcentaje calculado mentiría con cara de dato duro.
     progress: integer("progress").notNull().default(0),
+    startAt: timestamp("start_at", { withTimezone: true }),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    // Presupuesto y gastado. `spent` se captura a mano igual que `progress`: no hay tabla de
+    // gastos de dónde derivarlo, y un número "calculado" a partir de nada mentiría con cara de
+    // dato duro. El día que exista esa tabla, este campo se deriva y el comentario se borra.
+    budget: numeric("budget", { precision: 14, scale: 2 }),
+    spent: numeric("spent", { precision: 14, scale: 2 }),
+    // ids de otros project de LA MISMA empresa que tienen que avanzar antes que este. jsonb y no
+    // tabla puente: es una lista corta que solo se lee entera y nunca se consulta al revés desde
+    // SQL (server/erp/projects.ts arma el grafo en memoria).
+    dependsOn: jsonb("depends_on").notNull().default(sql`'[]'::jsonb`),
+    risk: text("risk").notNull().default("bajo"),
+    // Quién lo lleva. set null: que se vaya la persona no borra el proyecto.
+    leadId: uuid("lead_id").references(() => profile.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -296,6 +323,7 @@ export const project = pgTable(
     index("idx_project_org_status").on(t.orgId, t.status),
     check("project_status_check", sql`${t.status} in ('activo','pausado','terminado')`),
     check("project_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    check("project_risk_check", sql`${t.risk} in ('bajo','medio','alto')`),
   ],
 );
 /**
@@ -399,12 +427,31 @@ export const client = pgTable(
     name: text("name").notNull(),
     healthStatus: text("health_status").notNull().default("neutral"),
     notes: text("notes"),
+    // Qué área lleva la cuenta. set null y no cascade: borrar un área no borra al cliente.
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    // Cuándo se habló con el cliente por última vez y cuándo toca volver. Los dos son la materia
+    // prima de "clientes en riesgo": un cliente sano al que nadie llama en un mes deja de serlo, y
+    // eso no se ve en health_status hasta que ya es tarde.
+    lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
+    nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
+    // El tamaño de la cuenta. numeric y no integer: hay monedas con centavos y hay cuentas de
+    // millones, y un float redondearía dinero.
+    dealValue: numeric("deal_value", { precision: 14, scale: 2 }),
+    dealStage: text("deal_stage").notNull().default("prospecto"),
+    // Etiquetas cortas de por qué esta cuenta preocupa (["pago_tardio","sin_respuesta"]). jsonb y
+    // no tabla aparte: es una lista corta que solo se lee entera, junto con el cliente.
+    riskFactors: jsonb("risk_factors").notNull().default(sql`'[]'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("idx_client_org_id").on(t.orgId),
+    index("idx_client_org_stage").on(t.orgId, t.dealStage),
     check("client_health_status_check", sql`${t.healthStatus} in ('healthy','neutral','at_risk')`),
+    check(
+      "client_deal_stage_check",
+      sql`${t.dealStage} in ('prospecto','calificado','propuesta','negociacion','ganado','perdido')`,
+    ),
   ],
 );
 
@@ -731,5 +778,295 @@ export const orgKpi = pgTable(
       sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
+  ],
+);
+
+// ─── El motor de Improvement: siete fases, una vuelta a la vez ─────────────────────────────────
+//
+// Improvement no es un generador de sugerencias sueltas: dirige. Y dirigir es un ciclo que se
+// repite —observa, infiere, analiza, sugiere, el dueño decide, se prueba, se mide— y del que queda
+// registro para que la siguiente vuelta sepa cómo salió la anterior.
+//
+// Las fases se llaman en español porque el dueño las lee tal cual en su pantalla. Corresponden a
+// las siete del plan: observation, inference, analysis, suggestion, decision, experimentation,
+// measurement.
+//
+// Una fila de improvement_cycle es una vuelta completa. Nunca se borra al cerrarse: un ciclo
+// fallido enseña tanto como uno exitoso, y borrarlo dejaría al motor repitiendo el mismo error
+// cada seis horas.
+export const IMPROVEMENT_PHASES = [
+  "observacion",
+  "inferencia",
+  "analisis",
+  "sugerencia",
+  "decision",
+  "experimentacion",
+  "medicion",
+  "cerrado",
+] as const;
+
+export const improvementCycle = pgTable(
+  "improvement_cycle",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // De quién es el ciclo. El dueño es el único interlocutor del Director General: los empleados
+    // ven las tareas que caen del ciclo, nunca el razonamiento que las produjo.
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    // Sobre qué área gira esta vuelta, si gira sobre una. null = la empresa entera.
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    phase: text("phase").notNull().default("observacion"),
+    title: text("title").notNull(),
+    description: text("description"),
+    // El texto que produjo cada fase. Columnas y no filas de improvement_event porque la pantalla
+    // del dueño enseña la vuelta completa de un jalón, y armarla desde el log sería reconstruir en
+    // cada render lo que ya está decidido. El log queda igual, para el orden y el quién.
+    observation: text("observation"),
+    inference: text("inference"),
+    analysis: text("analysis"),
+    aiSuggestion: text("ai_suggestion"),
+    // Qué tan convencido está de ESTA propuesta: 'alta' | 'media' | 'baja'.
+    //
+    // Columna y no una frase dentro de la sugerencia, porque sirve para dos cosas que solo se
+    // pueden hacer con un dato: que el dueño sepa cuándo le están insistiendo de verdad y cuándo
+    // es una apuesta, y que el propio Director lea su historial de calibración — "dije alta tres
+    // veces y las tres salieron mal" es lo que lo hace madurar en vez de repetir. Un director que
+    // suena igual de seguro siempre no está dando información, está dando ruido.
+    conviction: text("conviction"),
+    // ─── Análisis de Causa Raíz. La habilidad nata del Director General, en columnas y no en la
+    // prosa de `inference`, por una razón concreta: el valor del método no está en una vuelta
+    // sino en diez. "De las últimas diez causas raíz, siete fueron Métodos" es la frase que hace
+    // evolucionar una empresa, y con la causa enterrada en un párrafo no se puede contar. Mismo
+    // criterio que el catálogo cerrado de risk_factors en `client`.
+    //
+    // La condición subyacente que, si se corrige, evita que el problema se repita. NO es la causa
+    // inmediata ("se rompió la máquina") ni una persona: es lo sistémico que lo permitió.
+    rootCause: text("root_cause"),
+    // Una de las 6M de Ishikawa. Cerrada a propósito: con texto libre no se agrupa entre ciclos,
+    // y agrupar es justo para lo que sirve.
+    causeCategory: text("cause_category"),
+    // La cadena de porqués que bajó del síntoma a la raíz: [{ pregunta, respuesta }, ...]. Se
+    // guarda entera y no solo su conclusión porque el dueño tiene que poder discutir el ESLABÓN
+    // en el que no está de acuerdo, no solo el veredicto.
+    whys: jsonb("whys").notNull().default(sql`'[]'::jsonb`),
+    // Lo que contribuyó pero no es la raíz. Separado a propósito: confundir un factor
+    // contribuyente con la causa raíz es el error clásico del método, y produce una solución que
+    // alivia el síntoma y deja el problema vivo.
+    contributingFactors: jsonb("contributing_factors").notNull().default(sql`'[]'::jsonb`),
+    // Cómo se va a saber que de verdad se resolvió: qué indicador y en cuánto tiempo. Es el paso
+    // 6 del método, y se escribe ANTES de proponer para que la medición no se invente su propia
+    // vara después de ver el resultado.
+    verification: text("verification"),
+    // 'acepto' | 'rechazo' | 'modificar'. null mientras el dueño no conteste — y el motor NO avanza
+    // solo desde 'sugerencia': esa espera es el punto entero del producto.
+    ownerDecision: text("owner_decision"),
+    ownerFeedback: text("owner_feedback"),
+    experimentStart: timestamp("experiment_start", { withTimezone: true }),
+    experimentEnd: timestamp("experiment_end", { withTimezone: true }),
+    // { antes: {...}, despues: {...} } — los indicadores al abrir y al cerrar el experimento.
+    metrics: jsonb("metrics").notNull().default(sql`'{}'::jsonb`),
+    result: text("result"),
+    // Etiquetas de tema para que la siguiente vuelta encuentre las anteriores parecidas.
+    tags: jsonb("tags").notNull().default(sql`'[]'::jsonb`),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_improvement_cycle_org_id").on(t.orgId),
+    index("idx_improvement_cycle_org_phase").on(t.orgId, t.phase),
+    check(
+      "improvement_cycle_phase_check",
+      sql`${t.phase} in ('observacion','inferencia','analisis','sugerencia','decision','experimentacion','medicion','cerrado')`,
+    ),
+    check(
+      "improvement_cycle_decision_check",
+      sql`${t.ownerDecision} is null or ${t.ownerDecision} in ('acepto','rechazo','modificar')`,
+    ),
+    check(
+      "improvement_cycle_result_check",
+      sql`${t.result} is null or ${t.result} in ('exitoso','fallido','neutral')`,
+    ),
+    // Tres niveles y no un número del 1 al 10: una escala fina invita a poner 7 siempre. Con tres
+    // hay que comprometerse, y comprometerse es el punto.
+    check(
+      "improvement_cycle_conviction_check",
+      sql`${t.conviction} is null or ${t.conviction} in ('alta','media','baja')`,
+    ),
+    // Las 6M de Ishikawa. El catálogo vive aquí y en DIRECTOR_CAUSE_CATEGORIES
+    // (server/ai/prompts/director.ts) — el check es la última palabra, como con area_icon_check.
+    check(
+      "improvement_cycle_cause_category_check",
+      sql`${t.causeCategory} is null or ${t.causeCategory} in ('personas','metodos','maquinas','materiales','medio_ambiente','medicion')`,
+    ),
+  ],
+);
+
+/**
+ * El log del ciclo: qué pasó, cuándo y quién lo disparó. Append-only.
+ *
+ * Existe aparte de las columnas del ciclo por una razón: el ciclo guarda el ESTADO (dónde va y qué
+ * dice cada fase), el log guarda la HISTORIA (que la fase se corrió dos veces, que el dueño pidió
+ * modificar y volvió a sugerencia). Sin el log, un ciclo que rebota entre sugerencia y decisión se
+ * ve idéntico a uno que pasó a la primera.
+ */
+export const improvementEvent = pgTable(
+  "improvement_event",
+  {
+    id: id(),
+    // org_id aquí y no solo en el ciclo: la política RLS lo necesita sin un join, igual que en
+    // todas las demás tablas org-scoped de este esquema.
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => improvementCycle.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    data: jsonb("data").notNull().default(sql`'{}'::jsonb`),
+    // 'sistema' = lo movió el cron; 'dueno' = lo movió el dueño desde el chat; 'empleado' = cayó
+    // de una tarea delegada que alguien completó.
+    triggeredBy: text("triggered_by").notNull().default("sistema"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_improvement_event_cycle_id").on(t.cycleId),
+    index("idx_improvement_event_org_id").on(t.orgId),
+    check(
+      "improvement_event_type_check",
+      sql`${t.type} in ('observacion','inferencia','analisis','sugerencia','decision','experimentacion','medicion','cerrado')`,
+    ),
+    check(
+      "improvement_event_trigger_check",
+      sql`${t.triggeredBy} in ('sistema','dueno','empleado')`,
+    ),
+  ],
+);
+
+/**
+ * La conversación entre el dueño y su Director General.
+ *
+ * Distinta de owner_memory y no la misma tabla con un campo más: owner_memory es lo que Improvement
+ * SABE del dueño (append-only, se lee entera para armar su retrato), y esto es lo que se DIJERON
+ * (un hilo con orden, que se lee por tramos). Mezclarlas obligaría a filtrar una de las dos en cada
+ * lectura, y el retrato del dueño acabaría contaminado de "ok", "sí", "hazlo".
+ */
+export const ownerMessage = pgTable(
+  "owner_message",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    // 'dueno' | 'improvement'. Quién habla.
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    // El ciclo del que trata este mensaje, si trata de alguno. set null: cerrar un ciclo no borra
+    // lo que se dijo de él.
+    cycleId: uuid("cycle_id").references(() => improvementCycle.id, { onDelete: "set null" }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_owner_message_org_owner").on(t.orgId, t.ownerId),
+    index("idx_owner_message_cycle_id").on(t.cycleId),
+    check("owner_message_role_check", sql`${t.role} in ('dueno','improvement')`),
+  ],
+);
+
+/**
+ * Lo que Improvement le propone a alguien del equipo.
+ *
+ * No es un objective. Un objetivo lo emite el dueño y paga puntos; una tarea delegada la propone el
+ * Director General y todavía no es nada hasta que el dueño la aprueba y la persona la acepta. Si
+ * fueran la misma tabla, una sugerencia sin aprobar ya estaría pagando puntos.
+ *
+ * Cuando se acepta se puede materializar en un objective de verdad (objectiveId), y ahí sí entra al
+ * motor de puntos por el camino normal.
+ */
+export const delegatedTask = pgTable(
+  "delegated_task",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => improvementCycle.id, { onDelete: "cascade" }),
+    assignedTo: uuid("assigned_to").references(() => profile.id, { onDelete: "set null" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    // Qué se espera que cambie si esto funciona. Es contra esto que la fase de medición compara.
+    expectedOutcome: text("expected_outcome"),
+    // Por qué esta tarea toca la CAUSA RAÍZ del ciclo y no su síntoma. El filtro del método
+    // convertido en columna: una tarea que no puede llenar este campo es un parche, y el dueño
+    // está decidiendo justo sobre esa diferencia. Nullable porque una tarea creada a mano por el
+    // dueño no sale de un ACR y no tiene por qué justificarse así.
+    attacksRoot: text("attacks_root"),
+    status: text("status").notNull().default("sugerida"),
+    // Lo que el dueño opinó al revisarla ya terminada.
+    ownerReview: text("owner_review"),
+    result: jsonb("result").notNull().default(sql`'{}'::jsonb`),
+    // El objetivo real que nació de esta tarea al aceptarse, si nació alguno.
+    objectiveId: uuid("objective_id").references(() => objective.id, { onDelete: "set null" }),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_delegated_task_org_id").on(t.orgId),
+    index("idx_delegated_task_cycle_id").on(t.cycleId),
+    index("idx_delegated_task_assigned").on(t.assignedTo, t.status),
+    check(
+      "delegated_task_status_check",
+      sql`${t.status} in ('sugerida','aceptada','rechazada','en_progreso','completada')`,
+    ),
+  ],
+);
+
+/**
+ * Las subtareas de un proyecto. El pedazo de ERP que hacía falta para que Improvement pueda decir
+ * "el proyecto X está atorado" y señalar exactamente en qué.
+ *
+ * org_id además de project_id: la política RLS no puede depender de un join para decidir, y toda
+ * consulta de la casa filtra por org antes que por nada (no negociable #2 de CLAUDE.md).
+ */
+export const projectTask = pgTable(
+  "project_task",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    assignedTo: uuid("assigned_to").references(() => profile.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("pendiente"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    estimatedHours: numeric("estimated_hours", { precision: 7, scale: 2 }),
+    actualHours: numeric("actual_hours", { precision: 7, scale: 2 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_project_task_project_id").on(t.projectId),
+    index("idx_project_task_org_status").on(t.orgId, t.status),
+    check(
+      "project_task_status_check",
+      sql`${t.status} in ('pendiente','por_hacer','en_progreso','revision','hecha')`,
+    ),
   ],
 );

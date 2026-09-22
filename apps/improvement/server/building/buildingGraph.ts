@@ -11,6 +11,10 @@ export interface BuildingAreaInput {
   id: string;
   name: string;
   color: string;
+  /** Qué responde el área, en una línea. La recepción la enseña bajo el nombre. */
+  description?: string | null;
+  /** Id de AREA_ICONS (packages/ui/src/building/areaIcons.ts). null = glifo neutro. */
+  icon?: string | null;
   silhouette?: SilhouetteKind;
 }
 
@@ -25,6 +29,8 @@ export interface BuildingArea {
   id: string;
   name: string;
   color: string;
+  description?: string | null;
+  icon?: string | null;
   cells: [number, number][];
   silhouette?: SilhouetteKind;
 }
@@ -188,6 +194,8 @@ export function buildBuildingGraph(
       id: a.id,
       name: a.name,
       color: a.color,
+      description: a.description ?? null,
+      icon: a.icon ?? null,
       cells: cellsById.get(a.id) ?? [],
       silhouette: a.silhouette,
     })),

@@ -148,6 +148,41 @@
       "when": 1789782849782,
       "tag": "0020_project_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790010519094,
+      "tag": "0021_elite_shriek",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790010527094,
+      "tag": "0022_motor_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790017408493,
+      "tag": "0023_polite_lionheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790018661695,
+      "tag": "0024_lame_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790099208100,
+      "tag": "0025_hard_storm",
+      "breakpoints": true
     }
   ]
 }

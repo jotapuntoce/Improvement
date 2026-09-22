@@ -2,12 +2,13 @@
 // (§9.6) aunque también exponga listObjectives — una lectura server-side, no un segundo archivo.
 // Cada función empieza validando tenencia con assertMembership(userId, orgId): la regla de
 // server/auth/guard.ts es que ninguna query nueva confíe solo en RLS o solo en el guard de la ruta.
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, employeePointsLedger, membership, objective, orgNeed } from "@jotapuntoce/db/schema";
 import { assertMembership, findOwnerMembership, resolveSection } from "../auth/guard.ts";
 import { belongsToOrg } from "../db/belongsToOrg.ts";
+import { areaScopeFilter } from "../permissions/areaScope.ts";
 import { needSeverity } from "../needs/mutations.ts";
 import { validateEvidence, evidenceTypeSchema, type EvidenceType } from "./evidence.ts";
 import { enablementPoints, scoreObjective } from "./points.ts";
@@ -61,16 +62,15 @@ export async function listObjectives(
   const limit = Math.min(Math.max(opts.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const cursor = decodeCursor(opts.cursor);
 
-  const conditions = [eq(objective.orgId, orgId)];
-
-  // Alcance `area` sin área asignada: cero, nunca todo — el caso seguro de un miembro a medio
-  // configurar es que deje de ver, no que vea de más.
-  if (scope === "area") {
-    conditions.push(member.areaId ? eq(objective.areaId, member.areaId) : sql`false`);
-  }
-  if (scope === "propio") {
-    conditions.push(eq(objective.assignedEmployeeId, userId));
-  }
+  // El recorte por alcance lo arma areaScopeFilter, una sola vez para toda la casa — incluido el
+  // caso del miembro sin área, que devuelve cero y nunca la empresa entera (ver areaScope.ts).
+  const conditions = [
+    eq(objective.orgId, orgId),
+    areaScopeFilter(scope, { areaId: member.areaId, userId }, {
+      areaId: objective.areaId,
+      ownerId: objective.assignedEmployeeId,
+    }),
+  ];
 
   if (cursor) {
     const beforeCursor = or(
@@ -93,6 +93,49 @@ export async function listObjectives(
   const nextCursor = hasMore && last ? encodeCursor(last) : null;
 
   return { ok: true as const, data: { objectives: page, nextCursor } };
+}
+
+/**
+ * Los objetivos abiertos de ESTA persona, sin pasar por el alcance de la sección.
+ *
+ * `listObjectives` contesta "qué me dejan ver"; esta contesta "qué me toca". No son la misma
+ * pregunta: al dueño el alcance le concede la empresa entera, y su bandeja de pendientes no son
+ * los objetivos de todos — son los suyos. El filtro es `assigned_employee_id = userId`, así que
+ * nadie puede ver por aquí nada que no sea propio, tenga el alcance que tenga.
+ *
+ * Sin `requireSection`: tu propio trabajo no es una sección que el dueño te pueda apagar, por la
+ * misma razón que /[org]/tareas no la tiene.
+ */
+export async function listMyObjectives(userId: string, orgId: string) {
+  await assertMembership(userId, orgId);
+
+  return db
+    .select()
+    .from(objective)
+    .where(
+      and(
+        eq(objective.orgId, orgId),
+        eq(objective.assignedEmployeeId, userId),
+        ne(objective.status, "completed"),
+      ),
+    )
+    .orderBy(asc(objective.dueDate));
+}
+
+/** Cuántos objetivos abiertos tiene esta persona. Mismo where que `listMyObjectives` — el
+ *  contador y la lista no pueden discrepar, así que se leen uno al lado del otro. */
+export async function countMyOpenObjectives(userId: string, orgId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(objective)
+    .where(
+      and(
+        eq(objective.orgId, orgId),
+        eq(objective.assignedEmployeeId, userId),
+        ne(objective.status, "completed"),
+      ),
+    );
+  return Number(row?.n ?? 0);
 }
 
 /** ¿Esta persona es de esta empresa? Un objetivo se le asigna a alguien de adentro, o a nadie. */

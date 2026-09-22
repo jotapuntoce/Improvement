@@ -3,6 +3,7 @@
 import { and, count, eq, ne } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, membership, objective } from "@jotapuntoce/db/schema";
+import { AREA_ICONS } from "@jotapuntoce/ui/building/areaIcons.ts";
 import { findOwnerMembership } from "../auth/guard.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -30,11 +31,34 @@ async function nameTaken(orgId: string, name: string, excludeAreaId?: string): P
   return (row?.value ?? 0) > 0;
 }
 
+/**
+ * Qué responde el área y con qué glifo se dibuja. Los dos son opcionales: un área sin descripción
+ * sigue siendo un área, y obligar a escribirla al darla de alta convertiría el organigrama en un
+ * trámite. Lo que sí hace la descripción es que Improvement sepa a quién le toca qué — sin ella,
+ * el Director General ve el nombre y nada más.
+ */
+export interface AreaDetalle {
+  description?: string | null;
+  /** Uno de AREA_ICONS. Cualquier otra cosa se guarda como null: el check de la base la rechazaría. */
+  icon?: string | null;
+}
+
+/** Normaliza descripción e icono a lo que la base acepta, sin lanzar por un valor viejo o inventado. */
+function detalle(d: AreaDetalle | undefined): { description: string | null; icon: string | null } {
+  const desc = d?.description?.trim();
+  const icon = d?.icon?.trim();
+  return {
+    description: desc ? desc.slice(0, 300) : null,
+    icon: icon && (AREA_ICONS as readonly string[]).includes(icon) ? icon : null,
+  };
+}
+
 export async function createArea(
   userId: string,
   orgId: string,
   name: string,
   color: string,
+  extra?: AreaDetalle,
 ): Promise<Result<string>> {
   if (!(await findOwnerMembership(userId, orgId))) {
     return fail("Solo el dueño define las áreas.", "FORBIDDEN");
@@ -45,8 +69,39 @@ export async function createArea(
   if (await nameTaken(orgId, nombre)) return fail("Ya tienes un área con ese nombre.", "DUPLICATE_NAME");
   const tono = COLORES.includes(color) ? color : COLORES[0]!;
 
-  const [row] = await db.insert(area).values({ orgId, name: nombre, color: tono }).returning({ id: area.id });
+  const [row] = await db
+    .insert(area)
+    .values({ orgId, name: nombre, color: tono, ...detalle(extra) })
+    .returning({ id: area.id });
   return row ? { ok: true, data: row.id } : fail("No se pudo crear el área.", "NOT_FOUND");
+}
+
+/**
+ * Cambia qué responde un área y con qué glifo se dibuja, sin tocar su nombre ni su color.
+ *
+ * Separado de renameArea a propósito: renombrar un área es un cambio de organigrama que la gente
+ * nota, y describirla es información que el dueño va afinando. Meterlos en la misma función
+ * obligaría a mandar el nombre cada vez que solo se quiere corregir una línea de texto.
+ */
+export async function describeArea(
+  userId: string,
+  orgId: string,
+  areaId: string,
+  extra: AreaDetalle,
+): Promise<Result<true>> {
+  if (!(await findOwnerMembership(userId, orgId))) {
+    return fail("Solo el dueño define las áreas.", "FORBIDDEN");
+  }
+
+  // orgId en el where además del id: un areaId de otra empresa no alcanza para escribir (mismo
+  // criterio que renameArea, abajo).
+  const [row] = await db
+    .update(area)
+    .set(detalle(extra))
+    .where(and(eq(area.id, areaId), eq(area.orgId, orgId)))
+    .returning({ id: area.id });
+
+  return row ? { ok: true, data: true } : fail("Esa área no existe.", "NOT_FOUND");
 }
 
 export async function renameArea(

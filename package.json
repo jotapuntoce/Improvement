@@ -16,7 +16,8 @@
     "db:generate": "pnpm --filter @jotapuntoce/db exec drizzle-kit generate",
     "db:migrate": "pnpm --filter @jotapuntoce/db exec drizzle-kit migrate",
     "db:studio": "pnpm --filter @jotapuntoce/db exec drizzle-kit studio",
-    "db:seed": "node --experimental-strip-types packages/db/src/seed.ts"
+    "db:seed": "node --experimental-strip-types packages/db/src/seed.ts",
+    "db:import": "node --experimental-strip-types packages/db/src/import.ts"
   },
   "devDependencies": {
     "turbo": "2.10.12",

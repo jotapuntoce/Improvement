@@ -646,3 +646,12 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .pendientes-resto { display: flex; flex-direction: column; gap: 8px; }
 .pendientes-resto > summary { cursor: pointer; }
 .pendientes-resto > summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* Los botones de una tarea delegada ([org]/tareas/TaskActions.tsx). Reusa .config-input y
+   .panel-cta/.panel-btn-ghost; lo único nuevo es el apilado. */
+.jpc-tarea-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}

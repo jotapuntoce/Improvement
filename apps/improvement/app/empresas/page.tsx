@@ -12,6 +12,7 @@ import { defaultSelection, loadOwnerPanel } from "@/server/companies/loadOwnerPa
 import { loadOwnerTasks } from "@/server/tasks/loadOwnerTasks.ts";
 import { createCompanyRequest } from "@/server/companyRequests/mutations.ts";
 import { CONSTRUCTION_PRICE, formatMoney } from "@/server/billing/payments.ts";
+import { DirectorBubble } from "@/components/DirectorBubble.tsx";
 import { ClientPicker } from "./ClientPicker.tsx";
 import { OwnerHeader } from "./OwnerHeader.tsx";
 import { BuildTracker } from "./BuildTracker.tsx";
@@ -71,6 +72,10 @@ export default async function EmpresasPage({
   // pantalla vacía por un parámetro obsoleto.
   const selected = companies.find((c) => c.key === empresa) ?? defaultSelection(companies);
 
+  // De qué empresa habla el Director en este panel. El selector puede estar parado en una
+  // solicitud sin aprobar, que no tiene orgId ni nada que dirigir todavía.
+  const orgDeLaBurbuja = selected?.orgId ?? companies.find((c) => c.orgId)?.orgId ?? null;
+
   // El paso actual va escrito en el botón para que el dueño no tenga que abrirlo solo para saber en
   // qué fase va — abrir es para ver el camino completo.
   const stepLabel =
@@ -114,6 +119,13 @@ export default async function EmpresasPage({
       <Link href="/empresas/configuracion" className="panel-settings">
         ⚙ Configuración
       </Link>
+
+      {/* El Director también aquí, sobre la empresa que el dueño tiene seleccionada en el tracker.
+          Si esa es una solicitud sin aprobar (no tiene orgId todavía) cae a la primera empresa
+          real: el dueño que está mirando este panel tiene de qué hablar aunque el selector esté
+          parado en algo que aún no existe. Sin ninguna empresa activa no hay burbuja, y es
+          correcto — no hay nada que dirigir. */}
+      {orgDeLaBurbuja && <DirectorBubble orgId={orgDeLaBurbuja} />}
     </main>
   );
 }

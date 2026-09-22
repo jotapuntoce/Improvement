@@ -9,6 +9,7 @@
 // agrandar el mueble, el contenido se cortaría en silencio y eso ya pasó una vez.
 import { describe, expect, it } from "vitest";
 import {
+  ALCANCE,
   type Caja,
   GLOBO,
   type LobbyZona,
@@ -27,12 +28,16 @@ function seEnciman(a: Caja, b: Caja): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-/** Cada mueble con el marco que el SVG le dibuja alrededor, más el globo, que tampoco puede tapar. */
+/**
+ * Cada mueble con el marco que el SVG le dibuja alrededor, más las dos cosas que no son muebles
+ * pero igual ocupan pared: el globo de quien atiende y la placa de alcance del mostrador.
+ */
 const MUEBLES: [string, Caja][] = [
   ...(Object.keys(ZONAS) as LobbyZona[]).map(
     (k) => [k, conMarco(ZONAS[k], MARCOS[k])] as [string, Caja],
   ),
   ["globo", GLOBO],
+  ["alcance", ALCANCE],
 ];
 
 describe("el plano de la recepción", () => {

@@ -1,0 +1,1 @@
+ALTER TABLE "delegated_task" ADD COLUMN "attacks_root" text;

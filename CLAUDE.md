@@ -21,9 +21,14 @@ compartidos) son consumidos por ambas.
 | DB — aplicar migraciones | `pnpm db:migrate` (usa `DATABASE_URL_DIRECT`, nunca el pooler) |
 | DB — studio | `pnpm db:studio` |
 | DB — seed | `pnpm db:seed` |
+| DB — carga inicial de una empresa real | `pnpm db:import <slug> <archivo.json> [--dry-run]` |
 
 **Gate:** `pnpm lint && pnpm typecheck && pnpm test` debe pasar antes de marcar cualquier tarea como
 hecha.
+
+**Crons** (`apps/improvement/vercel.json`, autenticados con bearer `CRON_SECRET`, nunca con sesión):
+`/api/cron/revisiones` (el agente revisor de entregas) y `/api/cron/ciclos` (el motor de las siete
+fases). Los dos corren una vez al día — ver §Architecture.
 
 Runtime fijado en `.nvmrc` (Node 24). Versiones de dependencias viven en `pnpm-lock.yaml` — léelo,
 nunca adivines una versión.
@@ -64,6 +69,59 @@ Ninguna respalda a la otra. Por eso van las dos: no porque se cubran entre sí, 
 cierra una puerta que la otra deja abierta. Un loader nuevo sin guard fuga por la primera; una tabla
 nueva sin política fuga por la segunda.
 
+**El motor de Improvement: siete fases, una vuelta a la vez.** Improvement no es un generador de
+sugerencias sueltas — dirige, y dirigir es un ciclo que se repite y del que queda registro. Una
+fila de `improvement_cycle` es una vuelta:
+
+| Fase | Quién la mueve | Qué produce |
+|---|---|---|
+| `observacion` | cron (modelo) | qué está pasando que valga la pena mirar |
+| `inferencia` | cron (modelo) | la causa más probable |
+| `analisis` | cron (modelo) | qué mejoraría si se corrigiera |
+| `sugerencia` | cron (modelo), **y ahí se detiene** | la propuesta + hasta 3 `delegated_task` |
+| `decision` | **el dueño**, desde el chat | acepta, rechaza o pide modificar |
+| `experimentacion` | el equipo | las tareas se trabajan |
+| `medicion` | cron (modelo) | resultado vs. predicción, y el aprendizaje |
+
+**El método que corre por dentro de las siete fases: Análisis de Causa Raíz.** Las fases no son
+etiquetas — cada una es un paso del ACR, y el contrato con el modelo lo obliga:
+
+| Paso del ACR | Dónde vive | Qué exige el esquema |
+|---|---|---|
+| Definir el problema con impacto | `observacion` | `impacto` obligatorio (aunque sea "no se puede medir") |
+| Bajar a la raíz con los porqués | `inferencia` | 3 a 7 eslabones, `causaRaiz`, una de las 6M, `evidencia` |
+| Separar raíz de lo que contribuyó | `inferencia` | `factoresContribuyentes` aparte |
+| Acciones que atacan la raíz | `sugerencia` | cada tarea justifica `atacaLaRaiz` o no se crea |
+| Verificar que no se repite | `analisis` → `medicion` | `comoSeVerifica` se fija ANTES de proponer; `laRaizSigueViva` al cerrar |
+
+Tres reglas que este método impone y que no se negocian:
+
+1. **La cadena nunca termina en una persona.** Si un porqué llega a "Fulano se saltó el paso", el
+   siguiente pregunta qué del sistema lo permitió. Es la regla del ACR y el no negociable #4 a la
+   vez: en cuanto el análisis se vuelve culpa, la gente deja de reportar problemas.
+2. **La causa raíz va en columnas, no en prosa.** `root_cause`, `cause_category`, `whys`,
+   `contributing_factors`. El valor del método está en el agregado — "de las últimas diez, siete
+   fueron Métodos" es lo que hace evolucionar una empresa, y eso no se cuenta sobre párrafos.
+3. **`comoSeVerifica` se escribe en el análisis, antes de proponer nada.** Una vara elegida después
+   de ver el resultado siempre dice que salió bien.
+
+El catálogo de las 6M vive en dos lugares que tienen que coincidir: `DIRECTOR_CAUSE_CATEGORIES`
+(`server/ai/prompts/director.ts`) y el check `improvement_cycle_cause_category_check`. El check es
+la última palabra — agregar una categoría sin migrar atora la fase de inferencia.
+
+**De `sugerencia` no se sale solo.** El ciclo espera al dueño para siempre si hace falta. Un
+director que ejecuta sus propias propuestas sin preguntar es un piloto automático, y el dueño deja
+de contarle cosas en cuanto la primera se le va de las manos. Es la regla que sostiene el producto:
+si se toca, se toca a propósito y se documenta aquí.
+
+Dos cosas más que el motor garantiza: una fase que falla **no avanza** el ciclo (se queda y se
+reintenta), y cada corrida avanza **una sola fase por ciclo** — entre fase y fase el dueño puede
+escribir algo que cambie el contexto.
+
+El cron corre **una vez al día**, no cada seis horas: el plan de Vercel de este proyecto solo admite
+cron diario y un `schedule` más frecuente hace fallar el deploy entero (ya pasó, commit `4a5a0d2`).
+El dueño compensa con el botón "Avanza ya", que corre el mismo `advanceCycle`.
+
 **`apps/admin` usa la service-role key** de Supabase (bypasea RLS) porque Jose Carlos opera sobre
 todas las organizaciones a la vez — esa clave solo se importa en `apps/admin/lib/db.js` y en server
 actions, nunca en un archivo `"use client"`.
@@ -92,6 +150,21 @@ código. Detalle completo: `.claude/rules/motor-generico.md`.
 | Sesión/auth | `apps/improvement/server/auth/guard.ts` — un `requireOrgMembership()`, usado en todas partes |
 | Motor de puntos | `apps/improvement/server/objectives/points.ts` — constante `POINTS_PER_WEIGHT_POINT`, nunca repetida |
 | Gateway de IA | `apps/improvement/server/ai/gateway.ts` — único import de `@anthropic-ai/sdk` en todo el repo |
+| Motor de Improvement | `apps/improvement/server/improvement/` — `phases.ts` (qué hace cada fase), `motor.ts` (cuándo corre), `context.ts` (qué sabe), `delegation.ts` (qué reparte), `chat.ts`, `analytics.ts` |
+| Prompt del Director General | `apps/improvement/server/ai/prompts/director.ts` — dinámico, con contexto acumulado (ver `.claude/rules/ia-gateway.md`) |
+| Personalidad del Director | `DIRECTOR_PERSONA` en `director.ts` — voz, registro emocional y convicción; la usan el motor Y la burbuja, nunca se reescribe en el segundo lugar |
+| Lo que llevan juntos | `apps/improvement/server/improvement/relacion.ts` — patrón, rechazos, errores propios y calibración, derivados de las vueltas cerradas; sin tabla propia |
+| Niveles de convicción | `CONVICTION_LEVELS` en `director.ts` — espeja `improvement_cycle_conviction_check` |
+| Catálogo de las 6M (Ishikawa) | `DIRECTOR_CAUSE_CATEGORIES` en `director.ts` — espeja `improvement_cycle_cause_category_check` |
+| Manos del Director (burbuja) | `apps/improvement/server/ai/tools.ts` — qué puede mirar, a dónde lleva, qué propone |
+| Bucle de la burbuja | `apps/improvement/server/ai/conversation.ts` — `askDirector()` propone, `runAccion()` ejecuta lo confirmado |
+| Alcance por área | `apps/improvement/server/permissions/areaScope.ts` — un `areaScopeFilter()`, usado por todos los loaders que recortan |
+| CRM extendido | `apps/improvement/server/crm/client-extensions.ts` — contexto y riesgo; el CRUD sigue en `server/clients/mutations.ts` |
+| ERP básico | `apps/improvement/server/erp/projects.ts` — subtareas, dependencias y riesgo; el alta sigue en `server/projects/mutations.ts` |
+| Glifos de área | `packages/ui/src/building/areaIcons.ts` — el catálogo espeja el check `area_icon_check` |
+| Carga inicial de datos reales | `packages/db/src/import.ts` — áreas, cartera y proyectos; la gente entra por invitación, nunca por aquí |
+| Bandeja del empleado | `apps/improvement/app/[org]/tareas/page.tsx` — tareas delegadas + objetivos propios + subtareas; una sola lista |
+| Tablero del dueño | `apps/improvement/app/[org]/control/page.tsx` — solo lee y navega, no edita nada |
 
 ## Code rules
 

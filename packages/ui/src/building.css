@@ -644,12 +644,81 @@ a.jpc-lobby-zona:focus-visible {
 }
 /* El escritorio: tapa clara con el nombre del área impreso, y su sombra sobre el piso. */
 .jpc-lobby-escritorio {
+  display: inline-flex;
+  align-items: center;
   padding: 0.42cqw 0.7cqw;
   border-radius: 2px;
   background: color-mix(in srgb, var(--sign-glow) 90%, transparent);
   color: #15171d;
   font-weight: 600;
   box-shadow: 0.2cqw 0.3cqw 0.45cqw rgba(0, 0, 0, 0.45);
+}
+
+/* El glifo del área, impreso en la tapa del escritorio junto al nombre. Hereda el color del texto
+   de la tapa (oscuro sobre claro), no el del área: sobre una tapa clara, el color del área
+   desaparecería en los tonos claros de la paleta. El color del área ya lo lleva la silla. */
+.jpc-lobby-glifo {
+  width: 1.1cqw;
+  height: 1.1cqw;
+  min-width: 10px;
+  min-height: 10px;
+  margin-right: 0.35cqw;
+  vertical-align: -0.12cqw;
+  color: inherit;
+  flex: none;
+}
+/* Cuánta gente trae el área. Va al final de la tapa, en mono y en gris: es un dato de apoyo, no
+   el nombre — y en la banda el nombre es lo que se busca. */
+.jpc-lobby-area-n {
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 500;
+  margin-left: 0.5cqw;
+  opacity: 0.55;
+}
+
+/* La pantalla del Director General: el título de la vuelta viva y en qué fase va. Dos renglones,
+   el segundo más chico — es la misma jerarquía que el resto de los muebles (dato y pie). */
+.jpc-lobby-director {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1cqw;
+  min-width: 0;
+}
+.jpc-lobby-director strong {
+  font-size: 1.05cqw;
+  line-height: 1.2;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Cuando hay una propuesta esperando al dueño, el mueble se marca. Es la misma señal que la luz
+   del SVG, del lado del HTML, para que no dependa solo del color (a11y). */
+.jpc-lobby-zona--espera {
+  background: color-mix(in srgb, var(--building-accent) 16%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--sign-glow) 55%, transparent);
+}
+
+/* La placa del mostrador: hasta dónde alcanza a ver quien entró. */
+.jpc-lobby-alcance {
+  position: absolute;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.05cqw;
+  padding: 0 0.5cqw;
+  border-radius: 3px;
+  text-align: right;
+  background: color-mix(in srgb, var(--bg-reception-top) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--building-accent) 35%, transparent);
+}
+.jpc-lobby-alcance strong {
+  font-size: 0.95cqw;
+  line-height: 1;
+  color: var(--text-primary);
 }
 
 /* El muro de retratos. Sin foto va la inicial sobre el color de la persona — nunca una cara
@@ -828,4 +897,714 @@ a.jpc-lobby-zona:focus-visible {
 @media (max-width: 560px) {
   .jpc-lobby-capa { grid-template-columns: 1fr; padding: 12px; }
   .jpc-lobby-sala { min-height: min(88vh, 680px); }
+}
+
+/* ===== El panel del Director General y su pared de resultados =====================================
+   ImprovementPanel.tsx y AnalyticsWall.tsx. No viven dentro de la escena de la recepción (no hay
+   cqw aquí): son la pantalla que se abre al clicar el mueble, y se leen a tamaño de texto normal.
+   Solo nombres de token — sin un hex nuevo (.claude/rules/tokens-de-diseno.md). */
+
+.jpc-dg {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.jpc-dg-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+.jpc-dg-titulo {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.jpc-dg-subtitulo {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.jpc-dg-meta {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.jpc-dg-ciclo,
+.jpc-dg-nueva {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.jpc-dg-nueva input {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+/* Las siete fases. Una fila de pasos que se llena de izquierda a derecha; en pantalla angosta se
+   envuelve en vez de encogerse hasta ser ilegible. El estado NO se cuenta solo con color: la fase
+   en curso lleva además el punto relleno y aria-current (a11y). */
+.jpc-dg-fases {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+.jpc-dg-fases li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+}
+.jpc-dg-fases li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.jpc-dg-fases li.es-hecha { color: var(--success); }
+.jpc-dg-fases li.es-hecha::before { background: currentColor; }
+.jpc-dg-fases li.es-actual {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.jpc-dg-fases li.es-actual::before {
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 25%, transparent);
+}
+
+.jpc-dg-razonamiento {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+.jpc-dg-paso dt {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.jpc-dg-paso dd {
+  margin: 0;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+/* La propuesta es lo único de la vuelta que le pide algo al dueño, así que es lo único que se
+   destaca. Si se destacaran las cuatro, no se destacaría ninguna. */
+.jpc-dg-paso.es-destacado {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent-1);
+  background: var(--bg-card-hover);
+}
+.jpc-dg-paso.es-destacado dd { color: var(--text-primary); }
+
+.jpc-dg-tareas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jpc-dg-tareas li {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.jpc-dg-tareas li p { margin: 4px 0 0; }
+
+.jpc-dg-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.jpc-dg-decision label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.jpc-dg-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* El hilo. Lo del dueño se alinea a la derecha y lo de Improvement a la izquierda — la convención
+   de cualquier chat, que nadie tiene que aprender. */
+.jpc-dg-hilo {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jpc-dg-hilo li {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.jpc-dg-hilo li p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.jpc-dg-hilo li.es-mio {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent-1) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent-1) 40%, transparent);
+}
+.jpc-dg-hilo li time { display: block; margin-top: 4px; }
+
+.jpc-dg-escribir,
+.jpc-dg-decision textarea,
+.jpc-dg-escribir textarea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jpc-dg-escribir textarea,
+.jpc-dg-decision textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font: inherit;
+  resize: vertical;
+}
+.jpc-dg-escribir button { align-self: flex-start; }
+
+/* ===== La pared de resultados ===== */
+.jpc-aw {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.jpc-aw-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.jpc-aw-tarjeta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.jpc-aw-tarjeta strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.jpc-aw-areas,
+.jpc-aw-aprendizajes,
+.jpc-aw-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jpc-aw-areas li,
+.jpc-aw-timeline li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.jpc-aw-aprendizajes li {
+  padding-left: 14px;
+  border-left: 2px solid var(--accent-2);
+  color: var(--text-secondary);
+}
+/* El desenlace de cada vuelta se marca con una barra a la izquierda, no solo con la palabra: es
+   una lista larga y el ojo la recorre por la barra. La palabra sigue ahí para quien no ve color. */
+.jpc-aw-timeline li[data-resultado="exitoso"] { border-left: 3px solid var(--success); }
+.jpc-aw-timeline li[data-resultado="fallido"] { border-left: 3px solid var(--danger); }
+.jpc-aw-timeline li[data-resultado="neutral"] { border-left: 3px solid var(--text-muted); }
+.jpc-aw-timeline li[data-resultado="abierto"] { border-left: 3px solid var(--accent-2); }
+
+/* ===== El Análisis de Causa Raíz ==================================================================
+   La cadena de porqués es una escalera que BAJA, y se dibuja como tal: cada eslabón sangrado un
+   poco más que el anterior, con una línea que los une. El descenso del síntoma a la condición
+   sistémica es el contenido — en una lista plana se lee como cinco frases sueltas.
+   Solo nombres de token (.claude/rules/tokens-de-diseno.md). */
+
+.jpc-dg-acr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.jpc-dg-porques {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  counter-reset: porque;
+}
+.jpc-dg-porques li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 26px;
+  font-size: 13.5px;
+}
+/* El número del eslabón. Va en ::before y no en el marcador de la lista para poder alinearlo con
+   la línea que baja. */
+.jpc-dg-porques li::before {
+  counter-increment: porque;
+  content: counter(porque);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+/* La línea que une un eslabón con el siguiente. El último no la lleva: ahí está la raíz. */
+.jpc-dg-porques li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 20px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--border-strong);
+}
+.jpc-dg-porque-p {
+  color: var(--text-muted);
+}
+.jpc-dg-porque-r {
+  color: var(--text-secondary);
+}
+
+/* La raíz es la conclusión de todo el bloque, así que es lo único que se destaca dentro de él. */
+.jpc-dg-raiz {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-1);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+/* La 6M como etiqueta y no como otra frase: se lee de un vistazo y se repite entre vueltas, que es
+   justo para lo que sirve agruparlas. */
+.jpc-dg-categoria {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+/* Lo que cada tarea le hace a la raíz. Discreto pero presente: es lo que separa una acción
+   correctiva de un parche, y el dueño está decidiendo justo sobre eso. */
+.jpc-dg-raiz-tarea {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent-2);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ── La burbuja del Director General ──────────────────────────────────────────────────────────
+   Flota sobre cualquier panel. Position fixed y no sticky: tiene que seguir ahí aunque la
+   pantalla de abajo mida tres pantallazos, que es el caso normal en Clientes y Proyectos.
+   z-index alto pero por debajo de un modal, si algún día hay uno. */
+
+.jpc-burbuja-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #05060b;
+  font: 700 15px/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: var(--shadow-glow);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.jpc-burbuja-fab:hover {
+  transform: scale(1.06);
+  filter: brightness(1.1);
+}
+
+/* Cuántas acciones te dejó preparadas y no has confirmado. Va en el botón cerrado porque si no,
+   una propuesta que hiciste hace tres pantallas se pierde de vista y nunca se ejecuta. */
+.jpc-burbuja-pin {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #05060b;
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.jpc-burbuja {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(600px, calc(100vh - 40px));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-glow);
+  overflow: hidden;
+}
+
+.jpc-burbuja-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.14), rgba(34, 211, 238, 0.08));
+}
+
+.jpc-burbuja-head strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* Dónde está parado el dueño. Lo pinta la burbuja porque es justo lo que el Director usa para
+   entender "esto" y "aquí" — verlo escrito evita la pregunta de si te está entendiendo. */
+.jpc-burbuja-donde {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.jpc-burbuja-head-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.jpc-burbuja-icono {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.jpc-burbuja-icono:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.jpc-burbuja-icono:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.jpc-burbuja-hilo {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jpc-burbuja-intro p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.jpc-burbuja-intro ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jpc-burbuja-intro button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.jpc-burbuja-intro button:hover {
+  background: var(--bg-card-hover);
+}
+
+.jpc-burbuja-yo,
+.jpc-burbuja-el {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-width: 90%;
+}
+
+.jpc-burbuja-yo {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #05060b;
+  font-weight: 500;
+}
+
+.jpc-burbuja-el {
+  align-self: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.jpc-burbuja-pensando {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Un fallo es un turno más del hilo, no un aviso flotante: se alinea como una respuesta del
+   Director porque ocupa su lugar — es lo que pasó en vez de la respuesta. */
+.jpc-burbuja-error {
+  align-self: flex-start;
+  max-width: 90%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Las acciones preparadas. Se separan del hilo con un borde de acento porque no son conversación:
+   son lo único de esta pantalla que cambia datos, y el dueño tiene que verlas como tales. */
+.jpc-burbuja-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--accent-1);
+  border-radius: var(--radius-md);
+  background: rgba(124, 92, 255, 0.07);
+}
+
+.jpc-burbuja-acciones-titulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.jpc-burbuja-accion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.jpc-burbuja-accion > div {
+  display: flex;
+  gap: 6px;
+}
+
+.jpc-burbuja-hazlo {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #05060b;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.jpc-burbuja-hazlo:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.jpc-burbuja-hazlo:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.jpc-burbuja-pie {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.jpc-burbuja-pie textarea {
+  flex: 1;
+  resize: none;
+  min-height: 38px;
+  max-height: 120px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.jpc-burbuja-pie textarea:focus {
+  outline: none;
+  border-color: var(--accent-1);
+}
+
+.jpc-burbuja-enviar {
+  align-self: flex-end;
+  padding: 9px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #05060b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.jpc-burbuja-enviar:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* En teléfono ocupa el ancho completo y se pega abajo: a 380px fijos se sale de la pantalla. */
+@media (max-width: 460px) {
+  .jpc-burbuja {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: calc(100vh - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jpc-burbuja-fab,
+  .jpc-burbuja-hazlo,
+  .jpc-burbuja-icono,
+  .jpc-burbuja-intro button {
+    transition: none;
+  }
+
+  .jpc-burbuja-fab:hover {
+    transform: none;
+  }
+}
+
+/* Qué tan convencido está de la propuesta. Tres niveles, tres pesos visuales: si los tres se
+   vieran igual, la convicción no estaría informando nada — que es exactamente el problema que
+   este campo existe para resolver. */
+.jpc-dg-conviccion {
+  margin: 10px 0 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.jpc-dg-conviccion.es-alta {
+  border: 1px solid var(--accent-1);
+  background: rgba(124, 92, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.jpc-dg-conviccion.es-media {
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+/* Una apuesta se ve como una apuesta: sin borde, sin peso, casi un susurro. */
+.jpc-dg-conviccion.es-baja {
+  padding-left: 0;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-style: italic;
 }

@@ -21,7 +21,14 @@ import { db } from "@jotapuntoce/db";
 import { client, objective, profile } from "@jotapuntoce/db/schema";
 import { saludo } from "@jotapuntoce/ui/building/greeting.ts";
 import type { LobbyZona } from "@jotapuntoce/ui/building/lobbyPlano.ts";
-import { assertMembership } from "../auth/guard.ts";
+import { assertMembership, findOwnerMembership, resolveSection } from "../auth/guard.ts";
+import { loadAreaBoard, type AreaCard } from "../areas/loadAreaBoard.ts";
+import { countMyOpenDelegations, countOpenDelegations } from "../improvement/delegation.ts";
+import { countMyOpenProjectTasks } from "../erp/projects.ts";
+import { countMyOpenObjectives } from "../objectives/mutations.ts";
+import { activeCycle } from "../improvement/motor.ts";
+import { PHASE_LABEL } from "../improvement/phases.ts";
+import { SCOPE_LABEL } from "../permissions/areaScope.ts";
 import { loadVisibleSections } from "../permissions/loadSections.ts";
 import { listActivePowerups, pointsBalance } from "../powerups/mutations.ts";
 import { listProjects } from "../projects/mutations.ts";
@@ -34,6 +41,15 @@ const ZONA_DE_SECCION: Record<string, LobbyZona> = {
   clientes: "clientes",
   powerups: "powerups",
 };
+
+/**
+ * La pantalla del Director General NO sale de section_labels, a diferencia de los demás muebles.
+ *
+ * Las secciones son las pantallas que el dueño renombra y apaga para su equipo. Improvement no es
+ * una de esas: es con quien él conversa, no se le puede conceder a nadie más y no tendría sentido
+ * apagárselo a sí mismo. Por eso su puerta se arma aparte, abajo, y solo para el dueño.
+ */
+const ZONA_IMPROVEMENT: LobbyZona = "improvement";
 
 /** El color del marco de un retrato: cómo va esa persona con sus objetivos. */
 const COLOR_DE_ESTADO: Record<string, string> = {
@@ -49,7 +65,17 @@ export interface LobbyPuertaInfo {
   label: string;
 }
 
+/** Lo que la recepción enseña de la vuelta de mejora en curso. Solo para el dueño. */
+export interface LobbyDirectorInfo {
+  phase: string;
+  title: string | null;
+  esperandoDecision: boolean;
+  tareasAbiertas: number;
+}
+
 export interface LobbyGraph {
+  /** Las áreas con lo que cuelga de cada una — la Pared de Áreas de la recepción. */
+  areas: AreaCard[];
   team: { id: string; name: string; color: string }[];
   projects: { id: string; name: string; progress: number; areaColor: string | null }[];
   objectivesOpen?: number;
@@ -61,6 +87,17 @@ export interface LobbyGraph {
   puertas: LobbyPuertaInfo[];
   /** Las secciones visibles que no tienen mueble — hoy solo el mapa de construcción. */
   sueltas: { slug: string; label: string }[];
+  /** La vuelta de mejora en curso. `undefined` cuando quien entró no es el dueño. */
+  director?: LobbyDirectorInfo;
+  /** Hasta dónde alcanza a ver quien entró, en palabras. Va en la placa del mostrador. */
+  alcance: string;
+  /** Todo lo que quien entró tiene pendiente — el número del enlace "Mi trabajo": tareas que le
+   *  propuso Improvement, objetivos suyos y subtareas de proyecto. Va para todos, no solo el
+   *  dueño: lo que te tocó a ti lo ves seas quien seas.
+   *
+   *  Una sola cifra y no tres: el enlace avisa que hay algo, y desglosarlo aquí sería dibujar la
+   *  bandeja en la puerta de la bandeja. */
+  misTareas: number;
 }
 
 export async function loadLobby(userId: string, orgId: string): Promise<LobbyGraph> {
@@ -69,7 +106,8 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
   const secciones = await loadVisibleSections(userId, orgId);
   const visible = new Set(secciones.map((s) => s.slug));
 
-  const [equipo, projects, quien, balance, catalogo] = await Promise.all([
+  const [equipo, projects, quien, balance, catalogo, areas, esDueno, delegadas, metasMias, subtareas] =
+    await Promise.all([
     // El equipo sale del loader compartido, con su filtro de platform admins ya puesto: es uno de
     // los tres lugares que listan personas de un org, y no hay un cuarto.
     loadTeamStatus(userId, orgId),
@@ -77,7 +115,16 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
     db.select({ fullName: profile.fullName }).from(profile).where(eq(profile.id, userId)).limit(1),
     pointsBalance(userId),
     listActivePowerups(),
+    // Las áreas ya vienen recortadas por alcance desde su propio loader: a quien solo alcanza su
+    // área le llega la suya sola, sin que esta función tenga que acordarse de filtrar.
+    loadAreaBoard(userId, orgId),
+    findOwnerMembership(userId, orgId),
+    countMyOpenDelegations(userId, orgId),
+    countMyOpenObjectives(userId, orgId),
+    countMyOpenProjectTasks(userId, orgId),
   ]);
+
+  const misTareas = delegadas + metasMias + subtareas;
 
   const [metas, cuentas, entregas] = await Promise.all([
     visible.has("objetivos")
@@ -121,7 +168,38 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
     else sueltas.push({ slug: s.slug, label: s.label });
   }
 
+  // La pantalla del Director General, solo para el dueño (ver ZONA_IMPROVEMENT, arriba).
+  let director: LobbyDirectorInfo | undefined;
+  if (esDueno) {
+    puertas.push({ zona: ZONA_IMPROVEMENT, slug: "improvement", label: "Improvement" });
+
+    const ciclo = await activeCycle(userId, orgId);
+    director = {
+      // El `?? ciclo.phase` no es defensa de más: `phase` es text en la base, y una fila escrita
+      // por una versión futura con una fase que este build no conoce tiene que enseñarse cruda,
+      // no dejar el mueble en blanco.
+      phase: ciclo
+        ? (PHASE_LABEL[ciclo.phase as keyof typeof PHASE_LABEL] ?? ciclo.phase)
+        : "Sin vuelta abierta",
+      title: ciclo?.title ?? null,
+      // La pelota está del lado del dueño cuando la propuesta ya está escrita y él no ha
+      // contestado. Las dos condiciones: en `sugerencia` sin texto, el motor todavía la está
+      // escribiendo y no hay nada que decidir.
+      esperandoDecision: Boolean(ciclo && ciclo.phase === "sugerencia" && ciclo.aiSuggestion),
+      tareasAbiertas: ciclo ? await countOpenDelegations(orgId, ciclo.id) : 0,
+    };
+  }
+
+  // El alcance que se anuncia en la placa es el de Objetivos: es la sección que más gente tiene
+  // abierta y la que más recorta lo que se ve. Anunciar el de cada mueble por separado llenaría la
+  // recepción de letreros; anunciar el más restrictivo mentiría al revés.
+  const { scope } = await resolveSection(userId, orgId, "objetivos");
+
   return {
+    areas,
+    alcance: SCOPE_LABEL[scope],
+    misTareas,
+    director,
     team: equipo.map((p) => ({
       id: p.id,
       name: p.name,

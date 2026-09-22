@@ -1,0 +1,2 @@
+ALTER TABLE "improvement_cycle" ADD COLUMN "conviction" text;--> statement-breakpoint
+ALTER TABLE "improvement_cycle" ADD CONSTRAINT "improvement_cycle_conviction_check" CHECK ("improvement_cycle"."conviction" is null or "improvement_cycle"."conviction" in ('alta','media','baja'));
