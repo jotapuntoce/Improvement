@@ -209,6 +209,7 @@ describe("el contrato con el modelo", () => {
     const r = observationSchema.safeParse({
       observation: "Tres áreas van tarde.",
       impacto: "Tres entregas comprometidas este mes.",
+      aQuienLeDuele: "Los tres clientes que esperan esas entregas.",
     });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.tags).toEqual([]);
@@ -222,6 +223,7 @@ describe("el contrato con el modelo", () => {
         suggestion: "Hagamos todo",
         conviccion: "media" as const,
         siMeDicesQueNo: "Esto vuelve el mes que entra.",
+        comoSeSostiene: "Queda con el líder del área y se revisa en la junta del lunes.",
         tasks: Array.from({ length: 4 }, (_, i) => ({
           title: `T${i}`,
           atacaLaRaiz: "Crea el procedimiento que faltaba.",
@@ -239,6 +241,7 @@ describe("el contrato con el modelo", () => {
       suggestion: "x",
       conviccion: "baja",
       siMeDicesQueNo: "La cuenta se enfría otro mes.",
+      comoSeSostiene: "Queda un recordatorio mensual a nombre de quien lleva la cuenta.",
       tasks: [{ title: "Llamar a la cuenta", atacaLaRaiz: "Reabre el canal que se cerró." }],
     });
     expect(r.success).toBe(true);
@@ -291,6 +294,7 @@ describe("el prompt del Director General", () => {
       whys: [],
       contributingFactors: [],
       verification: null,
+      controlPlan: null,
       ownerDecision: null,
       ownerFeedback: null,
       metrics: {},
@@ -474,6 +478,7 @@ describe("el método de causa raíz", () => {
           suggestion: "s",
           conviccion: "alta",
           siMeDicesQueNo: "Se repite en dos semanas.",
+          comoSeSostiene: "El procedimiento queda escrito y lo revisa Operaciones cada mes.",
           tasks: [tarea],
         }).success,
       ).toBe(false);
@@ -482,6 +487,7 @@ describe("el método de causa raíz", () => {
           suggestion: "s",
           conviccion: "alta",
           siMeDicesQueNo: "Se repite en dos semanas.",
+          comoSeSostiene: "El procedimiento queda escrito y lo revisa Operaciones cada mes.",
           tasks: [{ ...tarea, atacaLaRaiz: "Crea el procedimiento que no existía." }],
         }).success,
       ).toBe(true);
@@ -492,10 +498,32 @@ describe("el método de causa raíz", () => {
     "WHEN se mide THE SYSTEM SHALL exigir decir si la raíz sigue viva, aparte del resultado — " +
       "las tareas pueden completarse con la condición intacta",
     () => {
-      const base = { result: "exitoso", note: "Se hizo todo.", learning: "" };
+      const base = {
+        result: "exitoso",
+        note: "Se hizo todo.",
+        learning: "",
+        controlInstalado: true,
+      };
       expect(DIRECTOR_SCHEMAS.medicion.safeParse(base).success).toBe(false);
       expect(
         DIRECTOR_SCHEMAS.medicion.safeParse({ ...base, laRaizSigueViva: true }).success,
+      ).toBe(true);
+    },
+  );
+
+  it(
+    "WHEN se mide THE SYSTEM SHALL exigir también si quedó instalado el control — una vuelta " +
+      "puede salir exitosa, matar la raíz y no dejar a nadie a cargo, y eso rebota en dos meses",
+    () => {
+      const base = {
+        result: "exitoso",
+        note: "Se hizo todo.",
+        learning: "",
+        laRaizSigueViva: false,
+      };
+      expect(DIRECTOR_SCHEMAS.medicion.safeParse(base).success).toBe(false);
+      expect(
+        DIRECTOR_SCHEMAS.medicion.safeParse({ ...base, controlInstalado: false }).success,
       ).toBe(true);
     },
   );
@@ -506,9 +534,65 @@ describe("el método de causa raíz", () => {
       DIRECTOR_SCHEMAS.observacion.safeParse({
         observation: "Algo pasa",
         impacto: "No se puede medir con estos datos.",
+        aQuienLeDuele: "Es interno, el cliente todavía no lo nota.",
       }).success,
     ).toBe(true);
   });
+
+  it(
+    "WHEN se observa THE SYSTEM SHALL exigir a quién le duele — un problema que el cliente no " +
+      "siente produce mejoras que nadie afuera nota, y esas son las que el dueño deja de pagar",
+    () => {
+      const sinCliente = { observation: "Algo pasa", impacto: "Cuatro horas al mes." };
+      expect(DIRECTOR_SCHEMAS.observacion.safeParse(sinCliente).success).toBe(false);
+      expect(
+        DIRECTOR_SCHEMAS.observacion.safeParse({
+          ...sinCliente,
+          // "Es interno" también es una respuesta válida: lo que no se acepta es no contestarla.
+          aQuienLeDuele: "Al cliente que tiene que repetir su pedido.",
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it(
+    "WHEN se analiza THE SYSTEM SHALL exigir la línea base — sin un número contra el que " +
+      "comparar, cualquier resultado se puede contar como éxito",
+    () => {
+      const sinBase = {
+        analysis: "Mejoraría el tiempo de entrega.",
+        siNoSeCorrige: "Se repite el mes que entra.",
+        comoSeVerifica: "Entregas a tiempo en 30 días.",
+      };
+      expect(DIRECTOR_SCHEMAS.analisis.safeParse(sinBase).success).toBe(false);
+      expect(
+        DIRECTOR_SCHEMAS.analisis.safeParse({
+          ...sinBase,
+          lineaBase: "Hoy 8 de cada 100 pedidos se reprocesan; el dato sale del log de entregas.",
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it(
+    "WHEN se propone THE SYSTEM SHALL exigir cómo se sostiene — la fase de control es la que " +
+      "todo el mundo se salta, y por eso las mejoras duran seis semanas",
+    () => {
+      const sinControl = {
+        suggestion: "Estandaricemos el paso de revisión.",
+        conviccion: "alta",
+        siMeDicesQueNo: "Vuelve en un mes.",
+        tasks: [],
+      };
+      expect(DIRECTOR_SCHEMAS.sugerencia.safeParse(sinControl).success).toBe(false);
+      expect(
+        DIRECTOR_SCHEMAS.sugerencia.safeParse({
+          ...sinControl,
+          comoSeSostiene: "Queda con el líder de Operaciones y se mira en la junta del lunes.",
+        }).success,
+      ).toBe(true);
+    },
+  );
 
   it("el prompt le prohíbe terminar la cadena en una persona", () => {
     // La regla de oro del método y el no negociable #4 del producto son la misma frase aquí: si
@@ -517,4 +601,50 @@ describe("el método de causa raíz", () => {
     expect(DIRECTOR_SYSTEM_PROMPT).toContain("nunca juicios sobre");
   });
 });
+});
+
+// Pruebas de texto, que normalmente no valen la pena — aquí sí. La personalidad y el método son
+// prosa dentro de una constante: nada falla si un refactor se lleva media sección por delante, y
+// el síntoma aparece meses después como "ya no piensa igual", que es imposible de rastrear. Estas
+// no cuidan la redacción, cuidan que las decisiones que se tomaron sigan estando.
+describe("el método de Six Sigma", () => {
+  it("las cinco fases de DMAIC están en el prompt, mapeadas a las fases de la vuelta", () => {
+    for (const paso of ["DEFINIR", "MEDIR", "ANALIZAR", "MEJORAR", "CONTROLAR"]) {
+      expect(DIRECTOR_SYSTEM_PROMPT).toContain(paso);
+    }
+  });
+
+  it("persigue la variación, no el promedio", () => {
+    // Es la diferencia entre Six Sigma y "mejorar un poco": el cliente no vive el promedio.
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("VARIACIÓN");
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("no vive el promedio");
+  });
+
+  it("exige línea base antes de proponer", () => {
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("SIN LÍNEA BASE NO HAY MEJORA");
+  });
+
+  it("carga la fase que todo el mundo se salta", () => {
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("CASI NADIE HACE");
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("sobrevive a que se vaya la persona");
+  });
+
+  it("pilotea antes de escalar", () => {
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("EN CHICO ANTES QUE EN GRANDE");
+  });
+
+  it("el ACR sigue dentro del método, no aparte", () => {
+    // Si alguien vuelve a escribir el ACR como bloque suelto, el prompt diría dos cosas del mismo
+    // paso. La prueba amarra que viva bajo ANALIZAR.
+    const analizar = DIRECTOR_SYSTEM_PROMPT.indexOf("ANALIZAR: LOS POCOS VITALES");
+    const raiz = DIRECTOR_SYSTEM_PROMPT.indexOf("JAMÁS es una persona");
+    expect(analizar).toBeGreaterThan(-1);
+    expect(raiz).toBeGreaterThan(analizar);
+  });
+
+  it("no le enseña a decir el vocabulario en voz alta", () => {
+    // El método se nota en las preguntas. Un Director que anuncia DMAIC es un consultor.
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("NUNCA anuncias");
+    expect(DIRECTOR_SYSTEM_PROMPT).toContain("para tu cabeza");
+  });
 });

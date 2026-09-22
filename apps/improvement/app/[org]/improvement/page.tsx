@@ -218,6 +218,7 @@ export default async function ImprovementPage({
                   ? (ciclo.contributingFactors as string[])
                   : [],
                 verification: ciclo.verification,
+                controlPlan: ciclo.controlPlan,
                 conviccion: ciclo.conviction,
                 // La etiqueta se traduce AQUÍ, como la 6M: packages/ui no conoce el catálogo.
                 conviccionLabel: esConviccion(ciclo.conviction)

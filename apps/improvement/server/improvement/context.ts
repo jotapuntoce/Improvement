@@ -152,6 +152,7 @@ export async function buildContext(
         ? (cycle.contributingFactors as string[])
         : [],
       verification: cycle.verification,
+      controlPlan: cycle.controlPlan,
       ownerDecision: cycle.ownerDecision,
       ownerFeedback: cycle.ownerFeedback,
       metrics: (cycle.metrics ?? {}) as Record<string, unknown>,

@@ -861,6 +861,15 @@ export const improvementCycle = pgTable(
     // 6 del método, y se escribe ANTES de proponer para que la medición no se invente su propia
     // vara después de ver el resultado.
     verification: text("verification"),
+    // La fase Controlar de Six Sigma: qué queda instalado para que la mejora no se deshaga —
+    // quién se hace cargo del nuevo modo de trabajar, dónde queda escrito, qué indicador se mira
+    // y qué se hace cuando ese indicador se sale de rango.
+    //
+    // Columna propia y no un párrafo dentro de `ai_suggestion` porque se escribe al PROPONER y se
+    // relee semanas después, en la medición, para contestar si de verdad quedó puesto. Enterrado
+    // en la prosa de la propuesta no se podría consultar — y esta es justo la fase que todo el
+    // mundo se salta: se celebra el resultado y seis semanas después se volvió a lo viejo.
+    controlPlan: text("control_plan"),
     // 'acepto' | 'rechazo' | 'modificar'. null mientras el dueño no conteste — y el motor NO avanza
     // solo desde 'sugerencia': esa espera es el punto entero del producto.
     ownerDecision: text("owner_decision"),

@@ -83,18 +83,34 @@ fila de `improvement_cycle` es una vuelta:
 | `experimentacion` | el equipo | las tareas se trabajan |
 | `medicion` | cron (modelo) | resultado vs. predicción, y el aprendizaje |
 
-**El método que corre por dentro de las siete fases: Análisis de Causa Raíz.** Las fases no son
-etiquetas — cada una es un paso del ACR, y el contrato con el modelo lo obliga:
+**El método que corre por dentro de las siete fases: Six Sigma, con el Análisis de Causa Raíz en
+su centro.** No son dos métodos: el ACR *es* la fase Analizar de DMAIC, y por eso viven en un solo
+texto (`SEIS_SIGMA_METODO` en `server/ai/prompts/seisSigma.ts`) y no en dos. Las fases no son
+etiquetas — cada una es un paso, y el contrato con el modelo lo obliga:
 
-| Paso del ACR | Dónde vive | Qué exige el esquema |
+| Paso (DMAIC) | Dónde vive | Qué exige el esquema |
 |---|---|---|
-| Definir el problema con impacto | `observacion` | `impacto` obligatorio (aunque sea "no se puede medir") |
-| Bajar a la raíz con los porqués | `inferencia` | 3 a 7 eslabones, `causaRaiz`, una de las 6M, `evidencia` |
-| Separar raíz de lo que contribuyó | `inferencia` | `factoresContribuyentes` aparte |
-| Acciones que atacan la raíz | `sugerencia` | cada tarea justifica `atacaLaRaiz` o no se crea |
+| **D** — definir el problema con impacto | `observacion` | `impacto` obligatorio (aunque sea "no se puede medir") |
+| **D** — a quién le duele (lo crítico para el cliente) | `observacion` | `aQuienLeDuele` obligatorio; "es interno" es respuesta válida |
+| **M** — línea base y confianza en el dato | `analisis` | `lineaBase` obligatorio; "no hay dato" es respuesta válida |
+| **A** — bajar a la raíz con los porqués | `inferencia` | 3 a 7 eslabones, `causaRaiz`, una de las 6M, `evidencia` |
+| **A** — separar raíz de lo que contribuyó | `inferencia` | `factoresContribuyentes` aparte |
+| **I** — acciones que atacan la raíz | `sugerencia` | cada tarea justifica `atacaLaRaiz` o no se crea |
+| **C** — qué sostiene la mejora | `sugerencia` → `medicion` | `comoSeSostiene` se escribe al proponer (columna `control_plan`); `controlInstalado` al cerrar |
 | Verificar que no se repite | `analisis` → `medicion` | `comoSeVerifica` se fija ANTES de proponer; `laRaizSigueViva` al cerrar |
 
-Tres reglas que este método impone y que no se negocian:
+Lo que Six Sigma trae y el ACR solo no traía: **perseguir la variación, no el promedio** (el
+cliente no vive la media, vive el peor caso), **línea base antes de proponer**, **los pocos
+vitales antes de los porqués**, **pilotear antes de escalar** y, sobre todo, **Controlar** — la
+fase que todo el mundo se salta y por la que las mejoras duran seis semanas.
+
+Lo que se dejó fuera a propósito: Minitab, DOE factorial, pruebas de hipótesis, Cp/Cpk, gráficos
+SPC y los cinturones. Una empresa de doce personas no tiene el volumen que esas herramientas
+necesitan ni a nadie que las lea; lo que sobrevive de cada una es su pregunta, y esas sí están.
+Y el método **nunca se nombra hacia afuera**: el Director dice "contra qué lo comparamos", no
+"establezcamos la línea base" (hay pruebas de regresión sobre eso en `improvement-director.test.ts`).
+
+Cuatro reglas que este método impone y que no se negocian:
 
 1. **La cadena nunca termina en una persona.** Si un porqué llega a "Fulano se saltó el paso", el
    siguiente pregunta qué del sistema lo permitió. Es la regla del ACR y el no negociable #4 a la
@@ -104,6 +120,9 @@ Tres reglas que este método impone y que no se negocian:
    fueron Métodos" es lo que hace evolucionar una empresa, y eso no se cuenta sobre párrafos.
 3. **`comoSeVerifica` se escribe en el análisis, antes de proponer nada.** Una vara elegida después
    de ver el resultado siempre dice que salió bien.
+4. **`comoSeSostiene` se escribe al proponer, no al medir.** Por lo mismo: un plan de control
+   inventado después de ver el resultado es teatro. Va a columna (`control_plan`) porque la
+   medición lo relee semanas más tarde para contestar si de verdad quedó puesto.
 
 El catálogo de las 6M vive en dos lugares que tienen que coincidir: `DIRECTOR_CAUSE_CATEGORIES`
 (`server/ai/prompts/director.ts`) y el check `improvement_cycle_cause_category_check`. El check es
@@ -153,6 +172,7 @@ código. Detalle completo: `.claude/rules/motor-generico.md`.
 | Motor de Improvement | `apps/improvement/server/improvement/` — `phases.ts` (qué hace cada fase), `motor.ts` (cuándo corre), `context.ts` (qué sabe), `delegation.ts` (qué reparte), `chat.ts`, `analytics.ts` |
 | Prompt del Director General | `apps/improvement/server/ai/prompts/director.ts` — dinámico, con contexto acumulado (ver `.claude/rules/ia-gateway.md`) |
 | Personalidad del Director | `DIRECTOR_PERSONA` en `director.ts` — voz, registro emocional y convicción; la usan el motor Y la burbuja, nunca se reescribe en el segundo lugar |
+| Método del Director | `apps/improvement/server/ai/prompts/seisSigma.ts` — Six Sigma con el ACR dentro de su fase Analizar; `SEIS_SIGMA_METODO` para el motor, `SEIS_SIGMA_EN_CONVERSACION` para la burbuja. Nunca se escribe el método en un segundo lugar |
 | Lo que llevan juntos | `apps/improvement/server/improvement/relacion.ts` — patrón, rechazos, errores propios y calibración, derivados de las vueltas cerradas; sin tabla propia |
 | Niveles de convicción | `CONVICTION_LEVELS` en `director.ts` — espeja `improvement_cycle_conviction_check` |
 | Catálogo de las 6M (Ishikawa) | `DIRECTOR_CAUSE_CATEGORIES` en `director.ts` — espeja `improvement_cycle_cause_category_check` |

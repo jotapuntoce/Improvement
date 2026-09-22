@@ -183,6 +183,7 @@ describe("el avance de las fases", () => {
       observacion: {
         observation: "Tres objetivos del área van tarde.",
         impacto: "Tres entregas comprometidas.",
+        aQuienLeDuele: "A los tres clientes que esperan esas entregas.",
         tags: ["entregas"],
       },
     });
@@ -217,7 +218,7 @@ describe("el avance de las fases", () => {
       await startCycle(ownerId, org.id, { title: "Vuelta que espera" });
 
       const provider = proveedorFalso({
-        observacion: { observation: "Algo pasa.", impacto: "No medible aún.", tags: [] },
+        observacion: { observation: "Algo pasa.", impacto: "No medible aún.", aQuienLeDuele: "al cliente que espera", tags: [] },
         inferencia: {
         inference: "Probablemente esto.",
         porques: [
@@ -230,11 +231,12 @@ describe("el avance de las fases", () => {
         factoresContribuyentes: [],
         evidencia: "Tres objetivos vencidos",
       },
-        analisis: { analysis: "Si se corrige, mejora.", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
+        analisis: { analysis: "Si se corrige, mejora.", lineaBase: "Hoy 8 de cada 100 entregas salen tarde.", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
         sugerencia: {
           suggestion: "Te propongo esto.",
           conviccion: "media",
           siMeDicesQueNo: "Lo mismo vuelve en un mes.",
+          comoSeSostiene: "Queda con el líder del área y se revisa cada mes.",
           tasks: [],
         },
       });
@@ -258,7 +260,7 @@ describe("el avance de las fases", () => {
     await startCycle(ownerId, org.id, { title: "Vuelta que avisa" });
 
     const provider = proveedorFalso({
-      observacion: { observation: "o", impacto: "i", tags: [] },
+      observacion: { observation: "o", impacto: "i", aQuienLeDuele: "al cliente que espera", tags: [] },
       inferencia: {
         inference: "i",
         porques: [
@@ -271,11 +273,12 @@ describe("el avance de las fases", () => {
         factoresContribuyentes: [],
         evidencia: "Tres objetivos vencidos",
       },
-      analisis: { analysis: "a", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
+      analisis: { analysis: "a", lineaBase: "Hoy 8 de cada 100 entregas salen tarde.", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
       sugerencia: {
         suggestion: "Contrata a alguien de medio tiempo.",
         conviccion: "alta",
         siMeDicesQueNo: "La carga sigue cayendo en la misma área.",
+          comoSeSostiene: "Queda con el líder del área y se revisa cada mes.",
         tasks: [],
       },
     });
@@ -491,7 +494,7 @@ describe("la delegación", () => {
 
       await startCycle(ownerId, org.id, { title: "Vuelta con tareas" });
       const provider = proveedorFalso({
-        observacion: { observation: "o", impacto: "i", tags: [] },
+        observacion: { observation: "o", impacto: "i", aQuienLeDuele: "al cliente que espera", tags: [] },
         inferencia: {
         inference: "i",
         porques: [
@@ -504,11 +507,12 @@ describe("la delegación", () => {
         factoresContribuyentes: [],
         evidencia: "Tres objetivos vencidos",
       },
-        analisis: { analysis: "a", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
+        analisis: { analysis: "a", lineaBase: "Hoy 8 de cada 100 entregas salen tarde.", siNoSeCorrige: "Se repite el mes que entra.", comoSeVerifica: "Entregas a tiempo en 30 días." },
         sugerencia: {
           suggestion: "Hay que contestar más rápido.",
           conviccion: "alta",
           siMeDicesQueNo: "Las quejas suben otra vez en dos semanas.",
+          comoSeSostiene: "Queda con el líder del área y se revisa cada mes.",
           // El nombre del área llega sin acentos ni mayúsculas exactas a propósito: así se
           // comprueba que resuelve igual, que es lo que evita que el modelo tenga que acertarle.
           tasks: [
@@ -983,7 +987,7 @@ describe("la causa raíz", () => {
       if (!abierta.ok) throw new Error("no se abrió");
 
       const provider = proveedorFalso({
-        observacion: { observation: "o", impacto: "i", tags: [] },
+        observacion: { observation: "o", impacto: "i", aQuienLeDuele: "al cliente que espera", tags: [] },
         inferencia: {
           inference: "La causa es el proceso.",
           porques: [
@@ -1022,7 +1026,7 @@ describe("la causa raíz", () => {
       if (!abierta.ok) throw new Error("no se abrió");
 
       const provider = proveedorFalso({
-        observacion: { observation: "o", impacto: "i", tags: [] },
+        observacion: { observation: "o", impacto: "i", aQuienLeDuele: "al cliente que espera", tags: [] },
         inferencia: {
           inference: "x",
           porques: [
@@ -1066,6 +1070,7 @@ describe("la causa raíz", () => {
           result: "exitoso",
           note: "Se hicieron las tres tareas.",
           laRaizSigueViva: true,
+          controlInstalado: true,
           learning: "Faltó documentar el procedimiento.",
         },
       });

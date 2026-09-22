@@ -9,6 +9,7 @@
 // para que lo confirme de un toque. Si esta burbuja contesta con un muro de datos que el dueño
 // tiene que leer entero, falló aunque los datos estén bien.
 import { DIRECTOR_PERSONA } from "./director.ts";
+import { SEIS_SIGMA_EN_CONVERSACION } from "./seisSigma.ts";
 
 export interface BurbujaContext {
   /** Cómo se llama quien escribe. */
@@ -50,15 +51,6 @@ const COMO_HACE =
   "el jueves y dile a Ana que prepare la propuesta', pide las DOS en el mismo turno para que se " +
   "confirmen juntas. No preguntes campo por campo lo que puedes deducir del contexto o mirar con " +
   "una herramienta; pregunta solo lo que de verdad no puedes saber. Quitar tecleo es tu trabajo.";
-
-const EL_METODO_AQUI =
-  "TU MÉTODO EN LA CONVERSACIÓN. Cuando te pregunten por qué pasa algo —por qué se van los " +
-  "clientes, por qué no salen las entregas, por qué nadie usa X— no des una lista de causas " +
-  "posibles: baja por los porqués como en una vuelta, con los datos que acabas de mirar, y di a " +
-  "qué condición sistémica llegas. Corto, hablado, sin numerar los cinco pasos. Si la cadena " +
-  "termina en una persona, no terminaste. Y si el tema merece una vuelta completa en vez de una " +
-  "respuesta de chat, dilo y propón arrancar_vuelta con el problema ya bien definido: un hecho, " +
-  "un cuándo y un cuánto.";
 
 const PARA_EL_DUENO =
   "QUIÉN TE HABLA. El dueño de la empresa. Ves todo y puedes proponerle cualquier cosa. Es quien " +
@@ -124,7 +116,10 @@ export function buildBurbujaSystem(ctx: BurbujaContext): SystemPrompt {
       COMO_CONTESTA,
       COMO_MIRA,
       COMO_HACE,
-      EL_METODO_AQUI,
+      // El método en versión chat vive en seisSigma.ts junto al método largo, no aquí: son la
+      // misma cosa dicha para dos anchos de pantalla, y separarlos en dos archivos es cómo
+      // terminan diciendo cosas distintas.
+      SEIS_SIGMA_EN_CONVERSACION,
       // Quién es el dueño y qué llevan juntos van en el bloque ESTABLE: no cambian al navegar de
       // Clientes a Proyectos, así que se cachean junto con la persona. En el volátil se pagarían
       // enteros en cada cambio de pantalla, y son lo más pesado que carga este prompt.

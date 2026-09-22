@@ -24,6 +24,7 @@
 // Este archivo es motor (.claude/rules/motor-generico.md): ningún org, empresa o empleado aparece
 // por id o nombre literal. Todo entra por parámetro.
 import { z } from "zod";
+import { SEIS_SIGMA_METODO } from "./seisSigma.ts";
 
 export const DIRECTOR_PHASES = [
   "observacion",
@@ -75,6 +76,16 @@ export const observationSchema = z.object({
    * justifica cualquier propuesta, porque ninguna se puede comparar contra él.
    */
   impacto: z.string().min(1).max(400),
+  /**
+   * Definir, de Six Sigma: a quién le duele esto y cómo lo nota. Lo crítico para el cliente, sin
+   * llamarlo CTQ.
+   *
+   * Obligatorio por la misma razón que `impacto`: un problema definido solo desde adentro ("el
+   * proceso es ineficiente") produce mejoras que nadie afuera nota, y ese es el tipo de mejora
+   * que el dueño deja de pagar. "Es interno, el cliente no lo percibe" es una respuesta válida y
+   * cambia la prioridad — lo que no se acepta es que el campo no exista.
+   */
+  aQuienLeDuele: z.string().min(1).max(400),
   tags: z.array(z.string().min(1).max(40)).max(6).default([]),
 });
 
@@ -104,6 +115,15 @@ export const analysisSchema = z.object({
   analysis: z.string().min(1).max(1200),
   /** Qué pasa si NO se corrige. El costo de no hacer nada, que casi nunca se escribe. */
   siNoSeCorrige: z.string().min(1).max(600),
+  /**
+   * Medir, de Six Sigma: dónde está hoy, en número, y qué tan confiable es ese número.
+   *
+   * Sin línea base no hay mejora, hay opinión — el "después" no se puede comparar contra nada y
+   * cualquier resultado se puede contar como éxito. Cuando no hay dato, lo correcto es escribir
+   * que no lo hay: eso convierte "empezar a contarlo" en una propuesta legítima de la vuelta, en
+   * vez de empujar al modelo a inventarse una cifra para llenar el campo.
+   */
+  lineaBase: z.string().min(1).max(600),
   /**
    * Paso 6 del método, escrito ANTES de proponer: qué indicador y en cuánto tiempo dirá si de
    * verdad se resolvió. Va aquí y no en la medición para que la vara no se invente después de
@@ -152,6 +172,18 @@ export const directorSuggestionSchema = z.object({
   conviccion: z.enum(CONVICTION_LEVELS),
   /** Qué pasa si el dueño dice que no. Es su opinión sostenida, en una línea, dicha una vez. */
   siMeDicesQueNo: z.string().min(1).max(400),
+  /**
+   * Controlar, de Six Sigma: qué deja instalado para que esto no se deshaga.
+   *
+   * Es la fase que todo el mundo se salta —se celebra el resultado y seis semanas después se
+   * volvió a lo viejo— y por eso va como campo obligatorio de la propuesta y no como un consejo
+   * del prompt. Se escribe AL PROPONER y no al medir, por el mismo motivo que `comoSeVerifica`:
+   * un plan de control inventado después de ver el resultado es teatro.
+   *
+   * Va a columna (`control_plan`) porque la medición lo lee semanas más tarde para contestar si
+   * de verdad quedó instalado. En prosa dentro de la sugerencia no se podría consultar.
+   */
+  comoSeSostiene: z.string().min(1).max(600),
   // Tope de tres: una vuelta del ciclo propone un cambio, no un plan de reestructura. Diez tareas
   // de golpe no se aceptan, se ignoran.
   tasks: z.array(suggestionTaskSchema).max(3).default([]),
@@ -168,6 +200,16 @@ export const measurementSchema = z.object({
    * sigue viva, la vuelta se cerró pero el problema no, y la siguiente tiene que saberlo.
    */
   laRaizSigueViva: z.boolean(),
+  /**
+   * Si lo que se propuso para sostener la mejora quedó realmente puesto.
+   *
+   * Tercera pregunta distinta de las otras dos, y las tres pueden no coincidir: el resultado
+   * puede ser exitoso, la raíz puede estar muerta, y el nuevo modo de trabajar no haber quedado
+   * en manos de nadie — ese caso se ve idéntico a un éxito el día del cierre y rebota en dos
+   * meses. Es observable hoy, a diferencia de "¿se sostuvo?", que solo el tiempo contesta: lo
+   * que se verifica es si quedó el responsable, el indicador y la respuesta cuando se desvíe.
+   */
+  controlInstalado: z.boolean(),
   /** Qué aprender de esta vuelta, en una línea, para las siguientes. */
   learning: z.string().max(300).default(""),
 });
@@ -242,6 +284,8 @@ export interface DirectorContext {
     whys: { pregunta: string; respuesta: string }[];
     contributingFactors: string[];
     verification: string | null;
+    /** Lo que dejó instalado para sostener la mejora. La medición lo relee semanas después. */
+    controlPlan: string | null;
     ownerDecision: string | null;
     ownerFeedback: string | null;
     /** { antes, despues } cuando la medición ya tiene con qué comparar. */
@@ -323,16 +367,18 @@ export const DIRECTOR_PERSONA =
   "preséntaselo en esos términos. Si te contó cómo tomó su decisión más difícil, propónle usando " +
   "esa misma forma de decidir. Si te dijo de dónde le salen las ideas, entra por ahí. Dirigir " +
   "como dirigiría él es literal, no una metáfora.\n\n" +
-  "TU MÉTODO ES EL ANÁLISIS DE CAUSA RAÍZ, y no lo abandonas nunca. La causa raíz es la condición " +
-  "SISTÉMICA que, si se elimina, hace que el problema deje de repetirse. No es la causa inmediata " +
-  "('se rompió la máquina') y JAMÁS es una persona: si tu cadena de porqués termina en alguien, " +
-  "no terminaste — pregunta qué del sistema permitió que eso pasara (procedimiento inexistente, " +
-  "nadie entrenado, herramienta que falta, control que no existe). Atender síntomas da alivios " +
-  "temporales; atacar la raíz da mejoras permanentes, y tú solo propones de las segundas.\n\n" +
-  "Las siete fases de una vuelta son ese método: defines el problema con su impacto (1), " +
-  "reconstruyes con evidencia (2), bajas por los porqués y clasificas la causa en una de las 6M " +
-  "(3), separas la raíz de lo que solo contribuyó (4), propones acciones que atacan la raíz (5), " +
-  "y verificas con un indicador que no se repitió (6-7).\n\n" +
+  // ─── EL MÉTODO ─────────────────────────────────────────────────────────────────────────────
+  // Importado, no escrito aquí. El Análisis de Causa Raíz que el Director siempre tuvo no es un
+  // método rival de Six Sigma: es su fase Analizar. Mantenerlos como dos textos separados era la
+  // forma segura de que en tres meses dijeran cosas distintas del mismo paso. Ver seisSigma.ts.
+  SEIS_SIGMA_METODO +
+  "\n\nAtender síntomas da alivios temporales; atacar la raíz da mejoras permanentes, y tú solo " +
+  "propones de las segundas.\n\n" +
+  "Las siete fases de una vuelta son ese método puesto en marcha: defines el problema con su " +
+  "impacto y a quién le duele (1), reconstruyes con evidencia (2), bajas por los porqués y " +
+  "clasificas la causa en una de las 6M (3), separas la raíz de lo que solo contribuyó (4), " +
+  "propones acciones que atacan la raíz y dejas instalado cómo se sostiene (5), y verificas con " +
+  "un indicador que no se repitió (6-7).\n\n" +
   "Reglas que no rompes: (1) propones cambios al TRABAJO y al PROCESO —mover un objetivo, " +
   "estandarizar un paso, repartir una carga, hablar con una cuenta—, nunca juicios sobre " +
   "personas, ni sobre su esfuerzo, ni comparaciones entre ellas; el foco está en causas, no en " +
@@ -357,11 +403,17 @@ const INSTRUCCION: Record<DirectorPhase, string> = {
     "bajaron' — di qué bajó, cuánto y contra qué. No propongas nada todavía y no expliques " +
     "causas: describe. En `impacto` pon qué está costando esto (tiempo, dinero, cuentas, " +
     "entregas); si con estos datos no se puede medir, escríbelo tal cual en vez de inventar una " +
-    "cifra. Si nada destaca, dilo, que es una respuesta válida. " +
-    'Formato: {"observation": string, "impacto": string, "tags": string[]} — las tags son una a ' +
-    "tres palabras sueltas del tema (área, clientes, entregas, carga, cobranza).",
+    "cifra. En `aQuienLeDuele` di a quién le pega esto y cómo lo nota —el cliente que espera de " +
+    "más, el que tiene que repetir su pedido, la persona que rehace el trabajo—; si es un " +
+    "problema interno que el cliente no percibe, escribe eso mismo. Si nada destaca, dilo, que es " +
+    "una respuesta válida. " +
+    'Formato: {"observation": string, "impacto": string, "aQuienLeDuele": string, "tags": ' +
+    "string[]} — las tags son una a tres palabras sueltas del tema (área, clientes, entregas, " +
+    "carga, cobranza).",
   inferencia:
-    "FASE 2 — BAJAR A LA CAUSA RAÍZ. Ya observaste. Ahora aplica los porqués: parte del problema " +
+    "FASE 2 — BAJAR A LA CAUSA RAÍZ. Ya observaste. Si hay varias causas posibles, empieza por la " +
+    "que más pesa: atacar la tercera en importancia cuesta el mismo esfuerzo y devuelve una " +
+    "fracción. Sobre esa aplica los porqués: parte del problema " +
     "y pregunta '¿por qué?' sobre cada respuesta, bajando de la causa inmediata a la condición " +
     "sistémica. Entre 3 y 7 eslabones, los que hagan falta. Si un eslabón termina en una persona " +
     "('el operario se saltó el paso'), NO pares ahí: el siguiente porqué es qué del sistema lo " +
@@ -375,13 +427,18 @@ const INSTRUCCION: Record<DirectorPhase, string> = {
     '"causaRaiz": string, "categoria": "personas"|"metodos"|"maquinas"|"materiales"|' +
     '"medio_ambiente"|"medicion", "factoresContribuyentes": string[], "evidencia": string}.',
   analisis:
-    "FASE 3 — MEDIR EL IMPACTO DE CORREGIRLA. Con la causa raíz identificada, estima qué " +
-    "mejoraría si se eliminara: qué se mueve, cuánto y en cuánto tiempo. Di también qué pasa si " +
+    "FASE 3 — LÍNEA BASE Y IMPACTO DE CORREGIRLA. Empieza por dónde está hoy: en `lineaBase` " +
+    "escribe el número contra el que se va a comparar todo lo demás —cuántas de cada cien salen " +
+    "mal, cuántos días tarda, cuántas horas al mes se van— y di qué tan confiable es ese dato y " +
+    "de dónde sale. Si no existe el dato, escribe que no existe: eso convierte 'empezar a medirlo' " +
+    "en una propuesta válida de esta vuelta, y es mucho mejor que una cifra inventada. Con eso " +
+    "encima, estima qué mejoraría si la causa raíz se eliminara: qué se mueve, cuánto y en cuánto " +
+    "tiempo. Di también qué pasa si " +
     "NO se corrige — el costo de no hacer nada casi nunca se escribe y es la mitad de la " +
     "decisión. Y define desde ya CÓMO se va a verificar: qué indicador mirar y en cuánto tiempo " +
     "para saber que el problema dejó de repetirse. Si no tienes datos para estimar una magnitud, " +
-    'dilo en vez de inventar un porcentaje. Formato: {"analysis": string, "siNoSeCorrige": ' +
-    'string, "comoSeVerifica": string}.',
+    'dilo en vez de inventar un porcentaje. Formato: {"analysis": string, "lineaBase": string, ' +
+    '"siNoSeCorrige": string, "comoSeVerifica": string}.',
   sugerencia:
     "FASE 4 — PROPONER ACCIONES QUE ATACAN LA RAÍZ. Propón UN cambio concreto, en una o dos " +
     "frases dirigidas al dueño, y hasta tres tareas para ejecutarlo. Las acciones típicas de este " +
@@ -395,20 +452,31 @@ const INSTRUCCION: Record<DirectorPhase, string> = {
     "estás apostando y quieres que te corrijan. La mayoría no son alta; si arriba te dicen que tu " +
     "'alta' no ha estado acertando, bájale. En `siMeDicesQueNo` escribe en UNA línea qué esperas " +
     "que pase si esto no se hace y para cuándo — es tu opinión sostenida, dicha una sola vez, sin " +
-    "insistir y sin amenazar. " +
+    "insistir y sin amenazar.\n\nY en `comoSeSostiene` deja instalado el control, que es la parte " +
+    "que casi nadie hace: quién queda a cargo del nuevo modo de trabajar, dónde queda escrito " +
+    "para que otro lo haga igual, qué indicador se mira y cada cuánto, y qué se hace cuando ese " +
+    "indicador se salga de rango. Escríbelo en términos del negocio, sin llamarlo plan de " +
+    "control. Si el cambio es tan chico que no necesita nada de eso, dilo en una línea y explica " +
+    "por qué. Si conviene probarlo primero con un cliente, un área o una semana antes de " +
+    "cambiárselo a todos, que eso sea la primera tarea. " +
     'Formato: {"suggestion": string, "conviccion": "alta"|"media"|"baja", "siMeDicesQueNo": ' +
-    'string, "tasks": [{"title": string, "description": string, "expectedOutcome": string, ' +
-    '"areaName": string|null, "atacaLaRaiz": string}]}.',
+    'string, "comoSeSostiene": string, "tasks": [{"title": string, "description": string, ' +
+    '"expectedOutcome": string, "areaName": string|null, "atacaLaRaiz": string}]}.',
   medicion:
     "FASE 7 — VERIFICAR Y DOCUMENTAR. Compara lo que esperabas con lo que pasó: mira las tareas y " +
     "sus estados, las métricas de antes y después, y sobre todo la verificación que tú mismo " +
     "definiste en el análisis. Contesta dos cosas distintas: si la vuelta salió bien, mal o si " +
     "todavía no se puede saber ('neutral' es una respuesta honesta y frecuente, no un fracaso); " +
     "y si la CAUSA RAÍZ sigue viva. No son lo mismo: las tareas pueden haberse completado y la " +
-    "condición que produjo el problema seguir intacta, y ese caso hay que decirlo. Cierra con la " +
+    "condición que produjo el problema seguir intacta, y ese caso hay que decirlo.\n\nY contesta " +
+    "una tercera, distinta de las dos: en `controlInstalado`, si lo que dijiste que iba a " +
+    "sostener la mejora quedó realmente puesto — si hay alguien a cargo, si quedó escrito y si el " +
+    "indicador se está mirando. Arriba, en lo que propusiste, está lo que dijiste que harías. Una " +
+    "vuelta puede salir exitosa, matar la raíz y aun así no haber dejado nada instalado: eso se " +
+    "ve igual que un éxito hoy y rebota en dos meses, así que dilo. Cierra con la " +
     "lección para las próximas vueltas, que es lo que hace que la empresa aprenda y no solo " +
     'repare. Formato: {"result": "exitoso"|"fallido"|"neutral", "note": string, ' +
-    '"laRaizSigueViva": boolean, "learning": string}.',
+    '"laRaizSigueViva": boolean, "controlInstalado": boolean, "learning": string}.',
 };
 
 function bloque(titulo: string, cuerpo: string): string {
@@ -504,6 +572,7 @@ export function buildDirectorPrompt(c: DirectorContext): string {
     bloque("Tu análisis:", c.cycle.analysis ?? ""),
     bloque("Cómo dijiste que se verificaría:", c.cycle.verification ?? ""),
     bloque("Lo que propusiste:", c.cycle.suggestion ?? ""),
+    bloque("Lo que dijiste que sostendría la mejora:", c.cycle.controlPlan ?? ""),
     c.cycle.ownerDecision ? `El dueño ${c.cycle.ownerDecision}.` : "",
     bloque("Y te dijo:", c.cycle.ownerFeedback ?? ""),
     bloque("Tareas de esta vuelta:", tareas),

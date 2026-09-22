@@ -1,0 +1,1 @@
+ALTER TABLE "improvement_cycle" ADD COLUMN "control_plan" text;

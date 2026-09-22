@@ -169,6 +169,28 @@ describe("el catálogo de herramientas", () => {
     expect(suyo.volatil).not.toContain("LA EMPRESA ESTÁ VACÍA");
   });
 
+  it(
+    "WHEN se arma el prompt de la burbuja THE SYSTEM SHALL llevar el metodo en el bloque " +
+      "cacheado, y en su version de chat — las cinco fases numeradas no caben en una burbuja",
+    () => {
+      const p = buildBurbujaSystem({
+        nombre: "Jose Carlos",
+        esDueno: true,
+        panel: "Clientes",
+        empresa: "Pruebas",
+        inventario: { areas: 2, clientes: 3, proyectos: 1, empleados: 2 },
+        ownerBrief: "",
+        relacion: "",
+      });
+      // El metodo entero viaja con la persona, y ademas la instruccion de no recitarlo aqui.
+      expect(p.estable).toContain("CONTROLAR");
+      expect(p.estable).toContain("EL MÉTODO EN UNA BURBUJA");
+      expect(p.estable).toContain("sin numerar pasos");
+      // Y sigue estando en el bloque que se cachea, no en el que cambia de pantalla a pantalla.
+      expect(p.volatil).not.toContain("CONTROLAR");
+    },
+  );
+
   it("WHEN se navega entre paneles THE SYSTEM SHALL dejar intacto el bloque cacheado", () => {
     // El ahorro entero del caché depende de esto: lo que cambia al navegar tiene que estar FUERA
     // del bloque estable. Si un día alguien mete el panel o la fecha en `estable`, el caché se

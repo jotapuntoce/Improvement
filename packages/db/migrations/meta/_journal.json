@@ -183,6 +183,13 @@
       "when": 1790099208100,
       "tag": "0025_hard_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790101064134,
+      "tag": "0026_nebulous_scorpion",
+      "breakpoints": true
     }
   ]
 }

@@ -168,10 +168,17 @@ export async function advanceCycle(
 
   switch (from) {
     case "observacion": {
-      const d = salida.data as { observation: string; impacto: string; tags: string[] };
-      // El impacto se apila bajo la observación y no en columna propia: es la definición del
-      // problema, no un dato que nadie vaya a agrupar después — a diferencia de la causa raíz.
-      const texto = `${d.observation}\n\nImpacto: ${d.impacto}`;
+      const d = salida.data as {
+        observation: string;
+        impacto: string;
+        aQuienLeDuele: string;
+        tags: string[];
+      };
+      // El impacto y a quién le duele se apilan bajo la observación y no en columna propia: son
+      // la definición del problema, no datos que nadie vaya a agrupar después — a diferencia de
+      // la causa raíz. "A quién le duele" es la fase Definir de Six Sigma sin el vocabulario:
+      // un problema que el cliente no siente produce mejoras que nadie afuera nota.
+      const texto = `${d.observation}\n\nImpacto: ${d.impacto}\n\nA quién le duele: ${d.aQuienLeDuele}`;
       return mover(cycle, "inferencia", { observation: texto, tags: d.tags }, texto);
     }
     case "inferencia": {
@@ -201,8 +208,15 @@ export async function advanceCycle(
     case "analisis": {
       // Entra a `sugerencia` SIN sugerencia escrita: la genera la siguiente pasada, para no
       // encadenar dos llamadas al modelo en un mismo tick.
-      const d = salida.data as { analysis: string; siNoSeCorrige: string; comoSeVerifica: string };
-      const texto = `${d.analysis}\n\nSi no se corrige: ${d.siNoSeCorrige}`;
+      const d = salida.data as {
+        analysis: string;
+        lineaBase: string;
+        siNoSeCorrige: string;
+        comoSeVerifica: string;
+      };
+      // La línea base encabeza el análisis a propósito: es el número contra el que la medición va
+      // a comparar, y sin él cualquier resultado se puede contar como éxito.
+      const texto = `Hoy estamos en: ${d.lineaBase}\n\n${d.analysis}\n\nSi no se corrige: ${d.siNoSeCorrige}`;
       // `verification` se escribe AQUÍ, antes de proponer nada: una vara elegida después de ver
       // el resultado siempre dice que salió bien.
       return mover(cycle, "sugerencia", { analysis: texto, verification: d.comoSeVerifica }, texto);
@@ -215,6 +229,7 @@ export async function advanceCycle(
         result: "exitoso" | "fallido" | "neutral";
         note: string;
         laRaizSigueViva: boolean;
+        controlInstalado: boolean;
         learning: string;
       };
       const despues = await snapshotMetrics(cycle.orgId);
@@ -235,6 +250,11 @@ export async function advanceCycle(
               d.laRaizSigueViva
                 ? `La causa raíz siguió viva: ${cycle.rootCause ?? "sin identificar"}`
                 : null,
+              // Una mejora que nadie sostiene vuelve, y cuando vuelve la vuelta siguiente tiene
+              // que saber que el problema no es nuevo: es el mismo, sin control.
+              !d.controlInstalado && cycle.controlPlan
+                ? "La mejora quedó sin nada que la sostenga: no se instaló el control."
+                : null,
               d.learning,
             ]
               .filter(Boolean)
@@ -242,6 +262,9 @@ export async function advanceCycle(
         },
         `${d.note}` +
           (d.laRaizSigueViva ? "\n\nOJO: la causa raíz sigue viva." : "") +
+          (!d.controlInstalado && cycle.controlPlan
+            ? "\n\nOJO: no quedó nadie a cargo de sostener esto. Va a volver."
+            : "") +
           (d.learning ? `\n\nPara la próxima: ${d.learning}` : ""),
       );
       return resultado;
@@ -315,7 +338,14 @@ export async function emitSuggestion(
   const d = salida.data;
   const [row] = await db
     .update(improvementCycle)
-    .set({ aiSuggestion: d.suggestion, conviction: d.conviccion, updatedAt: new Date() })
+    .set({
+      aiSuggestion: d.suggestion,
+      conviction: d.conviccion,
+      // Lo que sostiene la mejora se guarda al proponer, no al medir: un plan de control escrito
+      // después de ver el resultado es teatro, igual que una vara elegida a posteriori.
+      controlPlan: d.comoSeSostiene,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(improvementCycle.id, cycle.id),
@@ -340,7 +370,10 @@ export async function emitSuggestion(
   await replyFromImprovement(
     cycle.orgId,
     cycle.ownerId,
-    `Qué tan convencido estoy: ${d.conviccion}. Si me dices que no: ${d.siMeDicesQueNo}`,
+    `Qué tan convencido estoy: ${d.conviccion}. Si me dices que no: ${d.siMeDicesQueNo}` +
+      // Va pegado y no en un tercer mensaje: quién se queda a cargo es parte de lo que el dueño
+      // está decidiendo, no un anexo que se lee después de haber dicho que sí.
+      `\n\nPara que no se deshaga: ${d.comoSeSostiene}`,
     cycle.id,
   );
 

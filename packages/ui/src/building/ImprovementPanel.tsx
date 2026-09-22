@@ -53,6 +53,8 @@ export interface PanelCycle {
   whys: { pregunta: string; respuesta: string }[];
   contributingFactors: string[];
   verification: string | null;
+  /** Qué queda instalado para que la mejora no se deshaga. null en vueltas anteriores a la fase. */
+  controlPlan: string | null;
   /** "alta" | "media" | "baja", ya traducido a su etiqueta. null en vueltas viejas. */
   conviccionLabel: string | null;
   conviccion: string | null;
@@ -174,6 +176,10 @@ export function ImprovementPanel({
             <Paso titulo="Lo que estimo" texto={cycle.analysis} />
             <Paso titulo="Cómo sabremos si funcionó" texto={cycle.verification} />
             <Paso titulo="Lo que te propongo" texto={cycle.aiSuggestion} destacado />
+            {/* La fase de control, a la vista del dueño y no solo en la base: un plan que sostiene
+                una mejora y que nadie lee no sostiene nada. Va DESPUÉS de la propuesta porque es
+                parte de lo que está decidiendo, no un anexo posterior al sí. */}
+            <Paso titulo="Para que no se deshaga" texto={cycle.controlPlan} />
           </dl>
 
           {cycle.conviccion && cycle.aiSuggestion && (
