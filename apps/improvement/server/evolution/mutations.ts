@@ -7,7 +7,7 @@
 // El camino son sus filas de org_need. Por eso aquí no hay una lista de requisitos por nivel: qué le
 // falta a ESTA empresa es diagnóstico, y el diagnóstico es dato de esa empresa, nunca una rama de
 // código (.claude/rules/motor-generico.md).
-import { and, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { organization, orgNeed } from "@jotapuntoce/db/schema";
@@ -95,21 +95,4 @@ export async function setEvolutionLevel(
   return row
     ? { ok: true, data: row.level }
     : { ok: false, error: { code: "NOT_FOUND", message: "Esa empresa no existe." } };
-}
-
-/**
- * Las necesidades abiertas de varias empresas de un tirón, para el panel del portafolio: dibujar el
- * nivel de cinco empresas no puede costar cinco consultas.
- */
-export async function countOpenNeeds(orgIds: string[]): Promise<Map<string, number>> {
-  const byOrg = new Map<string, number>(orgIds.map((id) => [id, 0]));
-  if (orgIds.length === 0) return byOrg;
-
-  const rows = await db
-    .select({ orgId: orgNeed.orgId })
-    .from(orgNeed)
-    .where(and(inArray(orgNeed.orgId, orgIds), inArray(orgNeed.status, ["abierta", "en_progreso"])));
-
-  for (const row of rows) byOrg.set(row.orgId, (byOrg.get(row.orgId) ?? 0) + 1);
-  return byOrg;
 }

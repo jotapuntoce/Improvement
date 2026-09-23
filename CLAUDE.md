@@ -26,6 +26,15 @@ compartidos) son consumidos por ambas.
 **Gate:** `pnpm lint && pnpm typecheck && pnpm test` debe pasar antes de marcar cualquier tarea como
 hecha.
 
+Dos cosas que el gate atrapa solo y que antes no atrapaba nadie: **`noUnusedLocals`** (tsconfig
+raíz) hace que un import o una variable sin usar rompa el typecheck — ESLint aquí solo trae
+`core-web-vitals`, sin reglas de TypeScript, así que sin esto el código muerto se acumulaba en
+silencio. Y **`tests/rls-cobertura.test.ts`** falla si cualquier tabla del esquema no tiene
+`enable row level security` en alguna migración (ver "Dos puertas", abajo).
+
+Turbo cachea `lint` y `typecheck` por hash de archivos. Si un resultado te parece demasiado limpio,
+`--force` corre de verdad en vez de reproducir la última corrida.
+
 **Crons** (`apps/improvement/vercel.json`, autenticados con bearer `CRON_SECRET`, nunca con sesión):
 `/api/cron/revisiones` (el agente revisor de entregas) y `/api/cron/ciclos` (el motor de las siete
 fases). Los dos corren una vez al día — ver §Architecture.
@@ -68,6 +77,12 @@ guard no existe.
 Ninguna respalda a la otra. Por eso van las dos: no porque se cubran entre sí, sino porque cada una
 cierra una puerta que la otra deja abierta. Un loader nuevo sin guard fuga por la primera; una tabla
 nueva sin política fuga por la segunda.
+
+La segunda ya fugó una vez: `prospect_client` (nombres, correos y WhatsApp de prospectos) nació en
+la migración 0003, después de que 0001 blindara todo lo demás, y pasó veinticuatro migraciones sin
+RLS hasta 0027. Por eso existe `tests/rls-cobertura.test.ts`: lee el esquema y las migraciones y
+falla en el mismo PR que agrega una tabla sin `enable row level security`, en vez de seis meses
+después en una auditoría.
 
 **El motor de Improvement: siete fases, una vuelta a la vez.** Improvement no es un generador de
 sugerencias sueltas — dirige, y dirigir es un ciclo que se repite y del que queda registro. Una
@@ -133,9 +148,15 @@ director que ejecuta sus propias propuestas sin preguntar es un piloto automáti
 de contarle cosas en cuanto la primera se le va de las manos. Es la regla que sostiene el producto:
 si se toca, se toca a propósito y se documenta aquí.
 
-Dos cosas más que el motor garantiza: una fase que falla **no avanza** el ciclo (se queda y se
-reintenta), y cada corrida avanza **una sola fase por ciclo** — entre fase y fase el dueño puede
-escribir algo que cambie el contexto.
+Tres cosas más que el motor garantiza: una fase que falla **no avanza** el ciclo (se queda y se
+reintenta), cada corrida avanza **una sola fase por ciclo** — entre fase y fase el dueño puede
+escribir algo que cambie el contexto —, y **ninguna vuelta se queda en `experimentacion` más de 30
+días** (`DIAS_MAXIMOS_DE_EXPERIMENTO` en `phases.ts`). Ese techo existía en el comentario desde el
+principio, pero `experimentEnd` se leía y nunca se escribía: una tarea nacida sin responsable (el
+modelo nombró un área que no existe) se quedaba "sugerida" para siempre, la vuelta nunca llegaba a
+medición, y como solo puede haber una viva, la empresa entera quedaba sin motor. El dueño puede
+asignar esas tareas desde la burbuja (`asignar_tarea`); el techo es lo que garantiza que el motor
+no se cuelgue aunque nadie lo haga.
 
 El cron corre **una vez al día**, no cada seis horas: el plan de Vercel de este proyecto solo admite
 cron diario y un `schedule` más frecuente hace fallar el deploy entero (ya pasó, commit `4a5a0d2`).

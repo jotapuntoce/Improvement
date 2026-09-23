@@ -6,17 +6,20 @@
 //
 // CRON Y NO WEBSOCKET (decisión de diseño #2 del plan). Un motor reactivo tendría que decidir, en
 // cada escritura de cualquier tabla, si eso amerita mover un ciclo — y esa decisión es justo la
-// que el modelo no debe tomar cien veces al día. Cada seis horas es predecible, se puede
+// que el modelo no debe tomar cien veces al día. Una vez al día es predecible, se puede
 // presupuestar en llamadas de IA y se puede leer en un log.
 //
-// UNA FASE POR CICLO POR CORRIDA. Con cron de seis horas, una vuelta completa tarda entre uno y
-// dos días, que es aproximadamente lo que tarda una vuelta de mejora de verdad. Un motor que
+// UNA FASE POR CICLO POR CORRIDA. Con el cron diario (el único que admite el plan de Vercel, ver
+// commit 4a5a0d2), la propuesta tarda CUATRO días en llegarle al dueño: observa, infiere,
+// analiza y propone, una por corrida. Esta frase decía "entre uno y dos días" y se escribió
+// para un cron de seis horas que nunca pudo desplegarse. El botón "Avanza ya" corre el mismo
+// advanceCycle y es lo que comprime esos días cuando el dueño no quiere esperar. Un motor que
 // corriera las siete fases de golpe entregaría en diez segundos un análisis que nadie alcanzó a
 // contrastar con la realidad.
 //
 // Este archivo es motor (.claude/rules/motor-generico.md): recorre las empresas que haya, sin
 // mencionar ninguna.
-import { and, asc, desc, eq, lt, ne, sql } from "drizzle-orm";
+import { and, asc, eq, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, improvementCycle, improvementEvent } from "@jotapuntoce/db/schema";
@@ -130,29 +133,6 @@ export async function activeCycle(userId: string, orgId: string): Promise<CycleR
     .limit(1);
 
   return row ?? null;
-}
-
-/** El historial de vueltas de esta empresa, la más reciente primero. */
-export async function listCycles(userId: string, orgId: string, limit = 20): Promise<CycleRow[]> {
-  if (!(await findOwnerMembership(userId, orgId))) return [];
-
-  return db
-    .select()
-    .from(improvementCycle)
-    .where(and(eq(improvementCycle.orgId, orgId), eq(improvementCycle.ownerId, userId)))
-    .orderBy(desc(improvementCycle.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 100));
-}
-
-/** Los eventos de un ciclo, en orden. Es la historia que las columnas del ciclo no cuentan. */
-export async function listCycleEvents(userId: string, orgId: string, cycleId: string) {
-  if (!(await findOwnerMembership(userId, orgId))) return [];
-
-  return db
-    .select()
-    .from(improvementEvent)
-    .where(and(eq(improvementEvent.orgId, orgId), eq(improvementEvent.cycleId, cycleId)))
-    .orderBy(asc(improvementEvent.createdAt));
 }
 
 const decisionSchema = z.object({
@@ -339,7 +319,7 @@ export async function processCycles(provider?: SuggestionProvider): Promise<Moto
  * Le avisa al dueño de los ciclos que llevan demasiado tiempo en la misma fase.
  *
  * Una sola vez por atasco, no en cada corrida: el aviso se marca en el log del ciclo y la consulta
- * de abajo salta los que ya lo tienen. Un recordatorio cada seis horas se convierte en ruido, y el
+ * de abajo salta los que ya lo tienen. Un recordatorio en cada corrida se convierte en ruido, y el
  * ruido se ignora — que es lo contrario de avisar.
  */
 async function avisarAtorados(): Promise<number> {

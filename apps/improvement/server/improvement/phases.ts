@@ -29,6 +29,16 @@ import {
 export type Phase = CycleRow["phase"];
 
 /**
+ * Cuánto espera una vuelta a que el equipo cierre sus tareas antes de medir con lo que haya.
+ *
+ * Treinta y no catorce: a los catorce días de atasco el motor ya le avisa al dueño
+ * (DIAS_PARA_AVISAR en motor.ts), y el plazo tiene que caer DESPUÉS del aviso para que el dueño
+ * alcance a destrabarlo a mano antes de que el sistema mida por su cuenta. Medir con tareas
+ * abiertas no es un fallo: la medición sabe decir "neutral" y "la raíz sigue viva".
+ */
+const DIAS_MAXIMOS_DE_EXPERIMENTO = 30;
+
+/**
  * A dónde pasa cada fase cuando sale bien.
  *
  * `sugerencia` apunta a `decision` pero NADIE la avanza automáticamente: el motor se detiene ahí
@@ -94,7 +104,7 @@ async function log(
  * Avanza UN ciclo una sola fase.
  *
  * Una y no todas de corrido: cada fase es una llamada al modelo, y encadenar cinco en una pasada
- * convierte un cron de seis horas en cinco llamadas simultáneas por empresa. Además, entre fase y
+ * convierte cada corrida del cron en cinco llamadas simultáneas por empresa. Además, entre fase y
  * fase el dueño puede escribir algo en el chat que cambie el contexto — y con la vuelta completa
  * de golpe, ese mensaje llegaría siempre tarde.
  *
@@ -114,9 +124,20 @@ export async function advanceCycle(
   // Pasa a medición cuando ya no queda ninguna tarea abierta. Si el experimento tenía fecha y ya
   // pasó, también pasa: medir tarde sirve más que un ciclo colgado para siempre esperando una
   // tarea que nadie va a cerrar.
+  //
+  // El plazo sale de `experimentEnd`, y si no lo hay, de `experimentStart` + el máximo. El
+  // respaldo no es cortesía: durante meses `experimentEnd` se leía aquí pero no se escribía en
+  // ningún lado, así que `vencido` era siempre falso — y una tarea nacida sin responsable (el
+  // área que el modelo nombró no existía, o no tenía a nadie) se quedaba "sugerida" para
+  // siempre, porque nadie más que su responsable puede contestarla. La vuelta nunca llegaba a
+  // medición, y como solo puede haber una viva, la empresa no podía abrir otra. Las vueltas que
+  // ya estaban atoradas así en la base no tienen `experimentEnd`; el respaldo es lo que las saca.
   if (from === "experimentacion") {
     const listas = await cycleTasksSettled(cycle.orgId, cycle.id);
-    const vencido = cycle.experimentEnd !== null && cycle.experimentEnd.getTime() < Date.now();
+    const inicio = cycle.experimentStart ?? cycle.updatedAt;
+    const plazo =
+      cycle.experimentEnd ?? new Date(inicio.getTime() + DIAS_MAXIMOS_DE_EXPERIMENTO * 86_400_000);
+    const vencido = plazo.getTime() < Date.now();
     if (!listas && !vencido) return quieto("El equipo todavía trae tareas abiertas.");
     return mover(cycle, "medicion", {}, listas ? "tareas cerradas" : "se venció el plazo");
   }
@@ -127,11 +148,15 @@ export async function advanceCycle(
       return quieto("El dueño no aceptó, el ciclo se cierra por decisión (ver decideCycle).");
     }
     const antes = await snapshotMetrics(cycle.orgId);
+    const inicio = new Date();
     return mover(
       cycle,
       "experimentacion",
       {
-        experimentStart: new Date(),
+        experimentStart: inicio,
+        // El plazo se escribe al entrar, no se calcula al salir: así queda en la fila y la
+        // pantalla puede decirle al dueño hasta cuándo espera esta vuelta.
+        experimentEnd: new Date(inicio.getTime() + DIAS_MAXIMOS_DE_EXPERIMENTO * 86_400_000),
         // La foto de "antes" se congela aquí a propósito, y es lo único del contexto que sí se
         // guarda: sin ella, la medición compararía el después contra el después.
         metrics: { ...(cycle.metrics as Record<string, unknown>), antes },
@@ -221,9 +246,6 @@ export async function advanceCycle(
       // el resultado siempre dice que salió bien.
       return mover(cycle, "sugerencia", { analysis: texto, verification: d.comoSeVerifica }, texto);
     }
-    case "sugerencia":
-      // Inalcanzable: la rama de arriba ya devolvió. Está por exhaustividad del switch.
-      return quieto("Esperando la decisión del dueño.");
     case "medicion": {
       const d = salida.data as {
         result: "exitoso" | "fallido" | "neutral";

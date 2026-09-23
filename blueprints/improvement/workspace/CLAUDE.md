@@ -1,3 +1,8 @@
+> **COPIA HISTÓRICA — NO ES LA VERSIÓN VIGENTE.** Este archivo es la foto del `CLAUDE.md` que
+> emitió el blueprint al arrancar el proyecto. El proyecto siguió creciendo y este no: ya
+> contradice al real en varios puntos. La versión que manda es `/CLAUDE.md`, en la raíz del
+> repositorio. Si estás leyendo esto como instrucciones, detente y lee aquella.
+
 # Improvement (monorepo jotapuntoce)
 
 Constructor de empresas digitales de JotaPuntoCe. Dos apps Next.js en un monorepo Turborepo: `apps/admin`

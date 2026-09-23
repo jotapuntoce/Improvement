@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
+import { membership, permissionType, profile } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
 import { scopeFor, type Scope, type SectionSlug } from "../permissions/sections.ts";
 

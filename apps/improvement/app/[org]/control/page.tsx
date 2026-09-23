@@ -144,6 +144,7 @@ export default async function ControlPage({ params }: { params: Promise<{ org: s
         {sinDueno.length > 0 && (
           <p className="invite-error" role="status">
             {sinDueno.length} sin responsable — el área no tenía a nadie a quien asignárselas.
+            Pídele a Improvement que se las asigne a alguien.
           </p>
         )}
         {porPersona.length > 0 && (

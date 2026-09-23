@@ -610,7 +610,7 @@ export async function reviewPendingObjectives(
 // pueda leer de una sola tabla.
 
 /** Tope de llamadas del motor por empresa por hora. Un ciclo completo son cinco llamadas; con 20
- *  caben cuatro vueltas por hora, muy por encima de lo que un cron de seis horas puede pedir. El
+ *  caben cuatro vueltas por hora, muy por encima de lo que un cron diario puede pedir. El
  *  tope existe para el caso en que algo se cicle, no para racionar el uso normal. */
 const MAX_DIRECTOR_CALLS_PER_HOUR = 20;
 /**

@@ -10,7 +10,7 @@
 //  4. El prompt conserva las prohibiciones de voz. Son la diferencia entre este Director y un
 //     asistente genérico, y son exactamente lo que se pierde primero al editar un prompt largo.
 import { afterEach, describe, expect, it } from "vitest";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { improvementCycle, membership, organization, profile } from "@jotapuntoce/db/schema";
 import {
@@ -74,7 +74,7 @@ function vuelta(
     orgId,
     ownerId,
     title: x.title,
-    phase: "cerrado",
+    phase: "cerrado" as const,
     rootCause: x.rootCause ?? null,
     causeCategory: x.causeCategory ?? null,
     conviction: x.conviction ?? null,

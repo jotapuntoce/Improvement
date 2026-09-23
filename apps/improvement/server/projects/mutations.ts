@@ -145,31 +145,3 @@ export async function createProject(
   if (!row) return fail("No se pudo guardar el proyecto.", "DB_ERROR");
   return { ok: true, data: row };
 }
-
-/**
- * Mueve el avance o el estado de un proyecto. Scoped por orgId ADEMÁS del id de la fila: un id
- * válido de otra empresa no alcanza para escribir (no negociable, CLAUDE.md).
- */
-export async function updateProjectProgress(
-  userId: string,
-  orgId: string,
-  projectId: string,
-  progress: number,
-  status?: ProjectStatus,
-): Promise<Result<ProjectRow>> {
-  if (!(await findOwnerMembership(userId, orgId))) {
-    return fail("Solo el dueño mueve el avance de un proyecto.", "FORBIDDEN");
-  }
-
-  const parsed = z.coerce.number().int().min(0).max(100).safeParse(progress);
-  if (!parsed.success) return fail("El avance va de 0 a 100.");
-
-  const [row] = await db
-    .update(project)
-    .set({ progress: parsed.data, ...(status ? { status } : {}), updatedAt: new Date() })
-    .where(and(eq(project.id, projectId), eq(project.orgId, orgId)))
-    .returning();
-
-  if (!row) return fail("Ese proyecto no existe en esta empresa.", "NOT_FOUND");
-  return { ok: true, data: row };
-}

@@ -4,6 +4,9 @@ paths:
   - "apps/improvement/server/ai/**"
 ---
 
+> **COPIA HISTÓRICA — NO ES LA VERSIÓN VIGENTE.** Foto de esta regla tal como la emitió el
+> blueprint. La que manda vive en `/.claude/rules/`, en la raíz del repositorio.
+
 - `@anthropic-ai/sdk` se importa en exactamente un archivo de todo el repo:
   `apps/improvement/server/ai/gateway.ts`. Ningún componente, ruta ni Server Action importa el SDK
   directo.

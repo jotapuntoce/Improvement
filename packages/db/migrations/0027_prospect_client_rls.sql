@@ -1,0 +1,27 @@
+-- prospect_client: la tabla que se quedó fuera de 0001_rls.sql, y la única sin RLS del esquema.
+--
+-- POR QUÉ FALTABA. 0001_rls.sql blindó todo lo que existía entonces y dejó escrito el criterio para
+-- este caso: "prospect_company: RLS habilitada, deliberadamente SIN política para `authenticated`
+-- — nadie con un JWT normal puede leerla. Solo la service-role key (apps/admin, bypasea RLS por
+-- diseño de Supabase)". prospect_client nació dos migraciones después, en 0003, y nadie volvió a
+-- 0001 a aplicarle la misma regla. No fue una decisión distinta: fue un olvido, y las dos tablas
+-- llevan la misma nota en el esquema diciendo que son solo de apps/admin.
+--
+-- QUÉ DEJABA ABIERTO. Guarda full_name, email y whatsapp_phone de los prospectos de Jose Carlos.
+-- Sin RLS, el rol `authenticated` la lee entera — y por la segunda puerta que CLAUDE.md documenta
+-- ("Dos puertas, no dos cerraduras"), cualquier empleado de cualquier empresa cliente tiene ese
+-- rol: el anon key viaja al navegador y su JWT es real. El guard de la aplicación no cubre nada
+-- aquí, porque apps/improvement nunca toca esta tabla; ese es justo el punto. La puerta que estaba
+-- abierta era la que el guard no vigila.
+--
+-- SIN POLÍTICA, A PROPÓSITO. RLS habilitada y cero policies = deny-all para `authenticated`, que es
+-- exactamente lo que queremos. apps/admin entra con la service-role key, que bypasea RLS por
+-- diseño, así que no pierde nada. Una política "permisiva pero acotada" aquí sería inventar un
+-- consumidor que no existe.
+--
+-- Archivo escrito a mano, como 0022_motor_rls.sql: drizzle-kit no conoce las policies, así que
+-- `pnpm db:generate` nunca las emite. El no negociable #6 (no editar migraciones a mano) habla de
+-- las que genera la herramienta; estas se escriben y se registran en el journal, y ese es el
+-- precedente que 0001 y 0022 ya establecieron.
+
+alter table prospect_client enable row level security;

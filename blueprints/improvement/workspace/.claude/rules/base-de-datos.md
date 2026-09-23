@@ -4,6 +4,9 @@ paths:
   - "packages/db/**"
 ---
 
+> **COPIA HISTÓRICA — NO ES LA VERSIÓN VIGENTE.** Foto de esta regla tal como la emitió el
+> blueprint. La que manda vive en `/.claude/rules/`, en la raíz del repositorio.
+
 - El esquema vive solo en `packages/db/src/schema.ts`. Cualquier cambio pasa por `pnpm db:generate` —
   nunca se edita a mano un archivo bajo `packages/db/migrations/`.
 - Toda tabla nueva que tenga una columna `org_id` es org-scoped y **necesita** una política RLS en la

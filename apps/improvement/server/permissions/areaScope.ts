@@ -17,8 +17,7 @@
 //     quién es cada fila no puede honrar "solo lo tuyo", y aparentar que sí sería la fuga.
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
-import { resolveSection } from "../auth/guard.ts";
-import type { Scope, SectionSlug } from "./sections.ts";
+import type { Scope } from "./sections.ts";
 
 export interface AreaScopeColumns {
   /** La columna de área de la tabla que se está consultando. */
@@ -47,27 +46,6 @@ export function areaScopeFilter(
   // scope === "propio"
   if (!cols.ownerId) return sql`false`;
   return eq(cols.ownerId, member.userId);
-}
-
-/**
- * Resuelve el alcance y devuelve ya armado el filtro. Es la forma corta que usan los loaders:
- * `const { scope, filter } = await scopedFilter(userId, orgId, "objetivos", { areaId: ... })`.
- *
- * El alcance se resuelve ADENTRO y no lo pasa el llamador, como todo en esta casa: así ninguna
- * pantalla futura puede mandar la señal equivocada.
- */
-export async function scopedFilter(
-  userId: string,
-  orgId: string,
-  section: SectionSlug,
-  cols: AreaScopeColumns,
-): Promise<{ scope: Scope; areaId: string | null; filter: SQL }> {
-  const { membership: member, scope } = await resolveSection(userId, orgId, section);
-  return {
-    scope,
-    areaId: member.areaId,
-    filter: areaScopeFilter(scope, { areaId: member.areaId, userId }, cols),
-  };
 }
 
 /**

@@ -56,8 +56,3 @@ export async function loadOrgKpis(orgIds: string[]): Promise<Map<string, KpiCard
 
   return byOrg;
 }
-
-/** Los indicadores de una sola empresa — lo que dibuja y edita /empresas/configuracion. */
-export async function listOrgKpis(orgId: string): Promise<KpiCard[]> {
-  return (await loadOrgKpis([orgId])).get(orgId) ?? [];
-}

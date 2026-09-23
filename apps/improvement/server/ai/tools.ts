@@ -17,7 +17,7 @@
 // Improvement propone, el dueño dispone— aplicada a la conversación.
 import { z } from "zod";
 import { listAreasByOrg } from "../areas/listAreas.ts";
-import { listClients, createClient } from "../clients/mutations.ts";
+import { createClient } from "../clients/mutations.ts";
 import {
   DEAL_STAGES,
   RISK_FACTORS,
@@ -43,9 +43,11 @@ import { listTeammates } from "../employees/teammates.ts";
 import { loadAnalytics } from "../improvement/analytics.ts";
 import { activeCycle, startCycle } from "../improvement/motor.ts";
 import {
+  assignDelegatedTask,
   completeDelegatedTask,
   listDelegations,
   listMyDelegatedTasks,
+  reviewDelegatedTask,
   tasksOfCycle,
 } from "../improvement/delegation.ts";
 import { SECTIONS } from "../permissions/sections.ts";
@@ -327,6 +329,44 @@ const HACER: DirectorTool[] = [
     }),
     resumen: (i) => `Marcar hecha la tarea "${i.tarea}"`,
     run: (c, i) => completeDelegatedTask(c.userId, c.orgId, i.taskId, { note: i.note }),
+  }),
+  tool({
+    // La tarea que nace sin responsable —el área que nombró el modelo no existía, o no tenía a
+    // nadie— solo la puede tomar quien la tenga asignada. Sin esto no había cómo asignarla: el
+    // tablero la enseña como "sin responsable" y ahí se quedaba. Vive en la burbuja y no en un
+    // formulario de /control porque ese tablero solo lee, y porque "asígnale esa a Ana" es
+    // justo el gesto que el dueño tiene que poder hacer sin llenar nada.
+    name: "asignar_tarea",
+    kind: "hacer",
+    soloDueno: true,
+    description:
+      "Asigna o reasigna una tarea delegada a alguien del equipo. Úsala sobre todo con las que " +
+      "tareas_delegadas enseña sin responsable. Saca el id de la persona con equipo.",
+    schema: z.object({
+      taskId: z.uuid(),
+      tarea: z.string().describe("El título, para que la confirmación se lea"),
+      userId: z.uuid(),
+      persona: z.string().describe("El nombre, para que la confirmación se lea"),
+    }),
+    resumen: (i) => `Asignarle "${i.tarea}" a ${i.persona}`,
+    run: (c, i) => assignDelegatedTask(c.userId, c.orgId, i.taskId, i.userId),
+  }),
+  tool({
+    // La otra mitad de algo que ya existía: la bandeja del empleado enseña "Tu jefe dijo…", pero
+    // no había forma de escribirlo, así que esa línea nunca aparecía.
+    name: "opinar_de_tarea",
+    kind: "hacer",
+    soloDueno: true,
+    description:
+      "Deja la opinión del dueño sobre una tarea delegada ya terminada. La lee quien la hizo, en " +
+      "su bandeja. Es sobre el trabajo entregado, nunca sobre la persona.",
+    schema: z.object({
+      taskId: z.uuid(),
+      tarea: z.string().describe("El título, para que la confirmación se lea"),
+      opinion: z.string().min(1).max(1000),
+    }),
+    resumen: (i) => `Dejar tu opinión sobre "${i.tarea}"`,
+    run: (c, i) => reviewDelegatedTask(c.userId, c.orgId, i.taskId, i.opinion),
   }),
   tool({
     name: "mover_subtarea",

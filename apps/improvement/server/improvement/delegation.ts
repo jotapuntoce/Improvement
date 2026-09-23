@@ -23,7 +23,6 @@ import { db } from "@jotapuntoce/db";
 import {
   area,
   delegatedTask,
-  improvementCycle,
   membership,
   objective,
   profile,
@@ -373,8 +372,9 @@ export async function completeDelegatedTask(
   return row ? { ok: true, data: true } : fail("Esa tarea no es tuya o no está aceptada.", "NOT_FOUND");
 }
 
-/** El dueño opina de una tarea ya terminada. No cambia el estado: la tarea ya está completada, y
- *  la opinión es lo que el motor lee en la fase de medición. */
+/** El dueño opina de una tarea ya terminada. No cambia el estado: la tarea ya está completada. La
+ *  opinión la lee quien hizo la tarea, en su bandeja ("Tu jefe dijo…"); el motor NO la lee en la
+ *  medición — la medición trabaja con el estado de las tareas y las métricas, no con prosa. */
 export async function reviewDelegatedTask(
   ownerId: string,
   orgId: string,
@@ -488,15 +488,4 @@ export async function countMyOpenDelegations(userId: string, orgId: string): Pro
  *  abierto: ni sugerida, ni aceptada, ni en curso. Un ciclo sin tareas cuenta como terminado. */
 export async function cycleTasksSettled(orgId: string, cycleId: string): Promise<boolean> {
   return (await countOpenDelegations(orgId, cycleId)) === 0;
-}
-
-/** El ciclo al que pertenece una tarea, para que quien la complete pueda empujar su medición. */
-export async function cycleOfTask(orgId: string, taskId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ cycleId: delegatedTask.cycleId })
-    .from(delegatedTask)
-    .innerJoin(improvementCycle, eq(improvementCycle.id, delegatedTask.cycleId))
-    .where(and(eq(delegatedTask.id, taskId), eq(delegatedTask.orgId, orgId)))
-    .limit(1);
-  return row?.cycleId ?? null;
 }

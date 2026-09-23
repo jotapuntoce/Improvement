@@ -39,7 +39,6 @@ import type { Industry } from "./industries.ts";
 import { areaIcon } from "./areaIcons.ts";
 import {
   ALCANCE,
-  APOYO_Y,
   type Caja,
   ESCENA,
   GLOBO,

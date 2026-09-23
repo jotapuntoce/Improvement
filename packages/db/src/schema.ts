@@ -793,7 +793,7 @@ export const orgKpi = pgTable(
 //
 // Una fila de improvement_cycle es una vuelta completa. Nunca se borra al cerrarse: un ciclo
 // fallido enseña tanto como uno exitoso, y borrarlo dejaría al motor repitiendo el mismo error
-// cada seis horas.
+// en cada vuelta.
 export const IMPROVEMENT_PHASES = [
   "observacion",
   "inferencia",
@@ -819,7 +819,10 @@ export const improvementCycle = pgTable(
       .references(() => profile.id, { onDelete: "cascade" }),
     // Sobre qué área gira esta vuelta, si gira sobre una. null = la empresa entera.
     areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
-    phase: text("phase").notNull().default("observacion"),
+    // `enum` aquí es solo de TypeScript —en la base sigue siendo text, y el check de abajo es la
+    // última palabra—, pero sin él la columna se infería como `string` pelado: `Phase` en
+    // phases.ts no garantizaba nada y un "medicon" mal escrito compilaba sin chistar.
+    phase: text("phase", { enum: IMPROVEMENT_PHASES }).notNull().default("observacion"),
     title: text("title").notNull(),
     description: text("description"),
     // El texto que produjo cada fase. Columnas y no filas de improvement_event porque la pantalla

@@ -43,6 +43,7 @@ import {
   respondToTask,
 } from "../server/improvement/delegation.ts";
 import { advanceCycle } from "../server/improvement/phases.ts";
+import { runAccion } from "../server/ai/conversation.ts";
 import {
   activeCycle,
   closeCycle,
@@ -333,6 +334,115 @@ describe("la decisión del dueño", () => {
     expect(despues.experimentStart).not.toBeNull();
     expect(despues.metrics).toHaveProperty("antes");
   });
+
+  it(
+    "WHEN el dueño acepta THE SYSTEM SHALL fijar el plazo del experimento al entrar — sin él, una " +
+      "tarea que nadie puede cerrar dejaba la vuelta en experimentación para siempre",
+    async () => {
+      const { org, ownerId, provider } = await hastaSugerencia("Motor Plazo");
+      const ciclo = await cicloDe(org.id);
+      await decideCycle(ownerId, org.id, ciclo.id, { decision: "acepto", feedback: "Va." });
+      await advanceCycle(await cicloDe(org.id), provider);
+
+      const despues = await cicloDe(org.id);
+      expect(despues.experimentStart).not.toBeNull();
+      expect(despues.experimentEnd).not.toBeNull();
+      const dias =
+        (despues.experimentEnd!.getTime() - despues.experimentStart!.getTime()) / 86_400_000;
+      expect(Math.round(dias)).toBe(30);
+    },
+  );
+
+  /**
+   * El bug que esta prueba amarra: una tarea nacida sin responsable (el área que nombró el modelo
+   * no existía) se queda "sugerida" para siempre, porque solo su responsable puede contestarla.
+   * countOpenDelegations la cuenta como abierta, así que la vuelta nunca salía de experimentación,
+   * y `experimentEnd` —la salida de emergencia— se leía pero nunca se escribía. La empresa entera
+   * se quedaba sin motor, porque solo puede haber una vuelta viva.
+   */
+  async function colgadaDesde(nombre: string, diasAtras: number) {
+    const { org, ownerId, provider } = await hastaSugerencia(nombre);
+    const ciclo = await cicloDe(org.id);
+    await db
+      .update(improvementCycle)
+      .set({
+        phase: "experimentacion",
+        ownerDecision: "acepto",
+        experimentStart: new Date(Date.now() - diasAtras * 86_400_000),
+        // Así quedaron las filas viejas: sin plazo, porque nadie lo escribía.
+        experimentEnd: null,
+      })
+      .where(eq(improvementCycle.id, ciclo.id));
+    await db
+      .insert(delegatedTask)
+      .values({ orgId: org.id, cycleId: ciclo.id, assignedTo: null, title: "Huérfana" });
+    return { org, ownerId, provider };
+  }
+
+  it(
+    "WHEN una vuelta vieja lleva más del plazo atorada por una tarea sin responsable THE SYSTEM " +
+      "SHALL mandarla a medición — medir tarde sirve más que un motor colgado para siempre",
+    async () => {
+      const { org, provider } = await colgadaDesde("Motor Colgada", 31);
+      const r = await advanceCycle(await cicloDe(org.id), provider);
+      expect(r.to).toBe("medicion");
+    },
+  );
+
+  it(
+    "WHEN la misma vuelta todavía está dentro del plazo THE SYSTEM SHALL seguir esperando — el " +
+      "techo es un techo, no un atajo",
+    async () => {
+      const { org, provider } = await colgadaDesde("Motor Todavia", 5);
+      const r = await advanceCycle(await cicloDe(org.id), provider);
+      expect(r.to).toBe("experimentacion");
+    },
+  );
+
+  it(
+    "WHEN el dueño asigna una tarea huérfana desde la burbuja THE SYSTEM SHALL asignarla, y a un " +
+      "empleado que mande la misma acción a mano le SHALL contestar que no",
+    async () => {
+      const { org, ownerId } = await colgadaDesde("Motor Asigna", 1);
+      const [huerfana] = await db
+        .select()
+        .from(delegatedTask)
+        .where(eq(delegatedTask.orgId, org.id));
+      if (!huerfana) throw new Error("no hay tarea");
+
+      const empleado = crypto.randomUUID();
+      await db.insert(profile).values({ id: empleado, email: `${empleado}@example.com` });
+      createdProfileIds.push(empleado);
+      await db
+        .insert(membership)
+        .values({ userId: empleado, orgId: org.id, role: "employee", acceptedAt: new Date() });
+
+      const accion = {
+        taskId: huerfana.id,
+        tarea: huerfana.title,
+        userId: empleado,
+        persona: "Ana",
+      };
+
+      // Un empleado que falsifique la llamada recibe el mismo no que desde la pantalla: lo pone
+      // la función de server/**, no la burbuja.
+      const falsa = await runAccion(
+        { userId: empleado, orgId: org.id, esDueno: false },
+        "asignar_tarea",
+        accion,
+      );
+      expect(falsa.ok).toBe(false);
+      if (!falsa.ok) expect(falsa.error.code).toBe("FORBIDDEN");
+
+      const buena = await runAccion({ userId: ownerId, orgId: org.id, esDueno: true }, "asignar_tarea", accion);
+      expect(buena.ok).toBe(true);
+      const [despues] = await db
+        .select()
+        .from(delegatedTask)
+        .where(eq(delegatedTask.id, huerfana.id));
+      expect(despues?.assignedTo).toBe(empleado);
+    },
+  );
 
   it(
     "WHEN el dueño rechaza THE SYSTEM SHALL cerrar la vuelta como fallida — una propuesta que " +

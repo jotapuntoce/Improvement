@@ -5,6 +5,9 @@ paths:
   - "packages/ui/**"
 ---
 
+> **COPIA HISTÓRICA — NO ES LA VERSIÓN VIGENTE.** Foto de esta regla tal como la emitió el
+> blueprint. La que manda vive en `/.claude/rules/`, en la raíz del repositorio.
+
 - Todo token de color, radio o sombra vive en `packages/ui/src/tokens.css`. Ningún archivo `.css` de
   `apps/admin` o `apps/improvement` define un valor hex nuevo — solo referencia `var(--token)`.
 - Un componente que "necesita un color distinto" primero pregunta si ese color ya existe como token

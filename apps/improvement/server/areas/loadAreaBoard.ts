@@ -11,7 +11,7 @@
 //
 // El alcance se resuelve ADENTRO, como todo loader de la casa: quien no pertenece a la empresa
 // recibe 404 de assertMembership, y a quien solo alcanza su área se le manda su área sola.
-import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, client, membership, objective, profile, project } from "@jotapuntoce/db/schema";
 import { assertMembership, resolveSection } from "../auth/guard.ts";
@@ -123,28 +123,4 @@ export async function loadAreaBoard(userId: string, orgId: string): Promise<Area
     projects: porProyectos.get(a.id) ?? 0,
     clients: porCuentas.get(a.id) ?? 0,
   }));
-}
-
-/**
- * Los proyectos de UN área. Lo usa el tablero de áreas cuando el dueño abre una, y la fase de
- * observación del motor cuando el ciclo gira sobre un área concreta.
- *
- * Scoped por orgId además de areaId: un areaId válido de otra empresa no alcanza para leer nada
- * (no negociable #2 de CLAUDE.md, mismo criterio que renameArea).
- */
-export async function listProjectsByArea(userId: string, orgId: string, areaId: string) {
-  await assertMembership(userId, orgId);
-
-  return db
-    .select({
-      id: project.id,
-      name: project.name,
-      status: project.status,
-      progress: project.progress,
-      risk: project.risk,
-      dueAt: project.dueAt,
-    })
-    .from(project)
-    .where(and(eq(project.orgId, orgId), eq(project.areaId, areaId)))
-    .orderBy(sql`${project.progress} desc`, asc(project.createdAt));
 }

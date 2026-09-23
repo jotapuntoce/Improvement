@@ -133,24 +133,3 @@ export async function removeOrgKpi(userId: string, orgId: string, kpiId: string)
 
   return row ? { ok: true, data: true } : fail("Ese indicador no existe.", "NOT_FOUND");
 }
-
-/** El número de un indicador `manual` — lo captura el dueño hasta que la fila se repunte a una fuente real. */
-export async function setManualKpiValue(
-  userId: string,
-  orgId: string,
-  kpiId: string,
-  value: number,
-): Promise<Result<true>> {
-  const owner = await requireOwner(userId, orgId);
-  if (!owner.ok) return owner;
-
-  if (!Number.isFinite(value)) return fail("Ese no es un número.");
-
-  const [row] = await db
-    .update(orgKpi)
-    .set({ manualValue: Math.round(value), updatedAt: new Date() })
-    .where(and(eq(orgKpi.id, kpiId), eq(orgKpi.orgId, orgId), eq(orgKpi.source, "manual")))
-    .returning({ id: orgKpi.id });
-
-  return row ? { ok: true, data: true } : fail("Ese indicador no se captura a mano.", "NOT_FOUND");
-}

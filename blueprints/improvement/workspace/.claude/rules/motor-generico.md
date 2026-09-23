@@ -5,6 +5,9 @@ paths:
   - "apps/*/server/**"
 ---
 
+> **COPIA HISTÓRICA — NO ES LA VERSIÓN VIGENTE.** Foto de esta regla tal como la emitió el
+> blueprint. La que manda vive en `/.claude/rules/`, en la raíz del repositorio.
+
 # Motor genérico — sin lógica por cliente
 
 Con el primer cliente real (Jaime Salinas) todo se construye a la medida en **datos** (áreas,
