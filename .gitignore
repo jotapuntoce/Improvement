@@ -56,3 +56,7 @@ yarn-error.log*
 # Sin esta línea, un `git add -A` distraído commitea el caché entero. Anclado a la raíz (/):
 # git en Windows ignora mayúsculas y sin la barra el patrón también tapaba apps/improvement/.
 /Improvement/
+
+# Investigación de negocio por proyecto (mercado, estrategia). Vive en disco, no en el repo:
+# no es código del producto, y en main se mezclaría con él.
+/projects/
