@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Caveat } from "next/font/google";
+import { Geist, Geist_Mono, Caveat, Inter } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
@@ -24,6 +24,13 @@ const caveat = Caveat({
   subsets: ["latin"],
 });
 
+// Solo para /login (estilo Dala: Inter sustituye a PP Neue Montreal; el cuerpo usa peso 200).
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["200", "400", "600"],
+});
+
 export const metadata = {
   title: "JotaPuntoCe · Panel Administrativo",
   description: "Panel administrativo de JotaPuntoCe — gestión de Improvement y futuras marcas.",
@@ -38,12 +45,11 @@ export default async function RootLayout({ children }) {
   const isLoginRoute = headerList.get("x-pathname") === "/login";
 
   if (isLoginRoute) {
-    // Ni .app-shell (display:flex en fila, pensado para Sidebar+Topbar — cortaba el scroll de la
-    // tarjeta de login cuando el contenido era más alto que el viewport) ni .app-bg (los brillos
-    // morado/cian del dashboard, que no pintan nada sobre el cielo nocturno del edificio) aplican
-    // aquí. .jpc-scene ya trae su propio fondo, alto mínimo y scroll normal de página.
+    // Ni .app-shell (display:flex en fila, pensado para Sidebar+Topbar) ni .app-bg (los brillos
+    // morado/cian del dashboard) aplican aquí: .jl-root (app/login/login.css) ocupa la pantalla
+    // completa con su propio fondo, sin scroll.
     return (
-      <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable}`}>
+      <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} ${inter.variable}`}>
         <body>{children}</body>
       </html>
     );

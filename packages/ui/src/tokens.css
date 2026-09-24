@@ -126,3 +126,30 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* Login de JotaPuntoCe (apps/admin/app/login) — estilo Dala (biblioteca de diseño, estilo "dala")
+   con el cerebro del logo de JotaPuntoCe. Fijos: son identidad de la pantalla de entrada, no siguen
+   el AccentPicker. --brain-* los lee components/login/brainScene.js para pintar el cerebro. */
+:root {
+  --login-bg: #011124;
+  --login-text: #ffffff;
+  --login-muted: #9a9a9a;
+  --login-action: #8052ff;
+  --login-action-hover: #15846e;
+  --login-accent: #ffb829;
+  --login-glass: rgba(0, 7, 18, 0.35);
+  --login-glass-top: rgba(0, 7, 18, 0.25);
+  --login-glass-bottom: rgba(0, 7, 18, 0.6);
+  --login-glass-border: rgba(255, 255, 255, 0.1);
+  --login-focus-border: rgba(128, 82, 255, 0.9);
+  --login-autofill: #010d1c;
+  --login-spinner-track: rgba(255, 255, 255, 0.35);
+
+  --brain-red: #ff4a4a;
+  --brain-blue: #3a7bff;
+  --brain-violet: #8052ff;
+  --brain-pink: #ff6fc8;
+  --brain-amber: #ffb829;
+  --brain-green: #3ddc84;
+  --brain-white: #ffffff;
+}

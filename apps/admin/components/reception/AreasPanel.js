@@ -3,10 +3,8 @@
 import { useEffect, useRef } from "react";
 
 // Las 6 áreas creativas de JotaPuntoCe (Planeación, Soluciones, Imaginación, Valor agregado,
-// Branding, Presentación) — mismo set de la fachada del edificio en /login
-// (components/building/LoginExperience.js, que monta Building/Reception de @jotapuntoce/ui). Son
-// la identidad interna fija de la empresa, no datos de una organización cliente, así que viven
-// como constante aquí, igual que allá.
+// Branding, Presentación). Son la identidad interna fija de la empresa, no datos de una
+// organización cliente, así que viven como constante aquí.
 const AREAS = [
   { key: "planeacion", name: "Planeación", tokenVar: "--dept-planeacion", count: 2 },
   { key: "soluciones", name: "Soluciones", tokenVar: "--dept-soluciones", count: 1 },
