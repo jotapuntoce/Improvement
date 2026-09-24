@@ -3,7 +3,7 @@
 // apps/improvement/server/auth/guard.ts (requireOrgMembership), adaptado a un solo rol de plataforma
 // en vez de tenencia por org.
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { profile } from "@jotapuntoce/db/schema";
 import { db, supabaseAdmin } from "./db.js";
@@ -50,14 +50,14 @@ export async function assertPlatformAdmin(userId) {
 }
 
 /**
- * Guard de entrada: WHEN no hay sesión, o la sesión no pertenece a un profile con
- * is_platform_admin=true, THE SYSTEM SHALL responder 404. Se llama desde cada página/Server Action
- * de apps/admin/app/* excepto /login (nunca desde código que ya recibe un userId resuelto — para
- * eso está assertPlatformAdmin).
+ * Guard de entrada: WHEN no hay sesión válida THE SYSTEM SHALL redirigir a /login; WHEN la sesión no
+ * pertenece a un profile con is_platform_admin=true THE SYSTEM SHALL responder 404. Se llama desde
+ * cada página/Server Action de apps/admin/app/* excepto /login (nunca desde código que ya recibe un
+ * userId resuelto — para eso está assertPlatformAdmin).
  */
 export async function requirePlatformAdmin() {
   const userId = await getSessionUserId();
-  if (!userId) notFound();
+  if (!userId) redirect("/login");
 
   return assertPlatformAdmin(userId);
 }
