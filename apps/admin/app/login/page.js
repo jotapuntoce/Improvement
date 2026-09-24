@@ -5,13 +5,14 @@
 // NEXT_PUBLIC_SUPABASE_ANON_KEY, y con la cookie puesta httpOnly del lado del servidor — el
 // comportamiento que el blueprint describe en su sección "Sessions" (httpOnly, Secure, SameSite=Lax).
 //
-// La presentación (edificio de noche + recepción) vive en components/building/LoginExperience.js —
-// signIn se le pasa como prop; un Server Action puede cruzar a un Client Component así sin
-// problema. app/layout.js oculta el Sidebar/Topbar específicamente en esta ruta (ver x-pathname).
+// La presentación (cerebro del logo de JotaPuntoCe + tarjeta de vidrio) vive en
+// components/login/BrainLogin.js — signIn se le pasa como prop; un Server Action puede cruzar a un
+// Client Component así sin problema. app/layout.js oculta el Sidebar/Topbar específicamente en esta ruta (ver x-pathname).
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "../../lib/db.js";
-import LoginExperience from "@/components/building/LoginExperience";
+import BrainLogin from "@/components/login/BrainLogin";
+import "./login.css";
 
 async function signIn(formData) {
   "use server";
@@ -42,5 +43,5 @@ export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
   const hasError = params?.error === "1";
 
-  return <LoginExperience signInAction={signIn} hasError={hasError} />;
+  return <BrainLogin signInAction={signIn} hasError={hasError} />;
 }

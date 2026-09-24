@@ -1,0 +1,113 @@
+/* Pantalla de entrada de JotaPuntoCe (components/login/BrainLogin.js). Estilo "dala" de la biblioteca
+   de diseño adaptado a JotaPuntoCe; colores solo como var(--login-*) de packages/ui/src/tokens.css.
+
+   Composición fija de 710×686 escalada con un solo factor --s (lo publica brainScene.js): la tarjeta
+   y el cerebro conservan sus proporciones en cualquier pantalla, sin scroll. */
+
+/* Handelson Three / Four (Mika Melvas) son comerciales: se toman instaladas en el equipo. Cuando haya
+   licencia webfont, agregar url('/fonts/…') aquí. Mientras tanto las sustituye Caveat. */
+@font-face { font-family: "Handelson Three"; font-display: swap; src: local("Handelson Three"), local("HandelsonThree"); }
+@font-face { font-family: "Handelson Four"; font-display: swap; src: local("Handelson Four"), local("HandelsonFour"); }
+
+.jl-root {
+  --s: 1;
+  --jl-ease: cubic-bezier(0.5, 1, 0.89, 1);
+  --jl-sans: var(--font-inter), system-ui, sans-serif;
+  --jl-script-3: "Handelson Three", var(--font-caveat), cursive;
+  --jl-script-4: "Handelson Four", var(--font-caveat), cursive;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--login-bg);
+  color: var(--login-text);
+  font-family: var(--jl-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.jl-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.jl-header {
+  position: fixed; top: 0; left: 0; z-index: 3;
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  width: calc(100% / var(--s)); transform: scale(var(--s)); transform-origin: 0 0;
+}
+.jl-logo { font-family: var(--jl-script-4); font-size: 30px; font-weight: 700; font-feature-settings: "calt" 1; }
+.jl-logo sup { font-size: 10px; margin-left: 1px; }
+.jl-spacer { flex: 1; }
+
+.jl-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px; padding: 14.4px 24px; border: 0; border-radius: 9999px; cursor: pointer;
+  background: var(--login-action); color: var(--login-text); text-decoration: none;
+  font: 600 14px/1.2 var(--jl-sans); letter-spacing: 0.025em; text-transform: uppercase;
+  transition: background-color 0.5s var(--jl-ease);
+}
+.jl-btn:hover { background: var(--login-action-hover); }
+.jl-header .jl-btn { min-height: 44px; padding: 0 18px; font-size: 12px; }
+.jl-root :focus-visible { outline: 2px solid var(--login-accent); outline-offset: 3px; }
+
+.jl-stage {
+  position: fixed; z-index: 1; left: 50%; top: 50%;
+  width: 710px; height: 686px; margin: -343px 0 0 -355px; transform: scale(var(--s));
+  display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 84px 16px 24px;
+}
+.jl-card {
+  width: 440px; padding: 24px 20px; border-radius: 24px;
+  border: 1.6px solid var(--login-glass-border);
+  backdrop-filter: blur(6px);
+  background: linear-gradient(0deg, var(--login-glass-bottom), var(--login-glass-top));
+}
+.jl-title {
+  font-family: var(--jl-script-3); font-weight: 500; font-size: 32px; line-height: 1.15;
+  color: var(--login-accent); white-space: nowrap;
+}
+
+.jl-form { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.jl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.jl-pill {
+  display: flex; align-items: center; border-radius: 50px;
+  border: 1.6px solid var(--login-glass-border); background: var(--login-glass);
+  transition: border-color 0.5s var(--jl-ease);
+}
+.jl-pill:focus-within { border-color: var(--login-focus-border); }
+.jl-pill.jl-bad { border-color: var(--login-accent); }
+.jl-pill input {
+  flex: 1; min-width: 0; height: 54px; padding: 0 24px; background: none; border: 0; outline: none;
+  color: var(--login-text); font: 700 22px var(--jl-script-4); font-feature-settings: "calt" 1;
+}
+.jl-pill input::placeholder { color: var(--login-muted); }
+.jl-pill input:-webkit-autofill {
+  -webkit-text-fill-color: var(--login-text); caret-color: var(--login-text);
+  box-shadow: 0 0 0 100px var(--login-autofill) inset; border-radius: 50px; transition: background-color 9999s;
+}
+.jl-toggle {
+  min-width: 48px; min-height: 48px; margin-right: 6px; padding: 0 12px; border: 0; border-radius: 9999px;
+  background: none; cursor: pointer; color: var(--login-muted);
+  font: 600 12px var(--jl-sans); letter-spacing: 0.025em; text-transform: uppercase;
+  transition: color 0.5s var(--jl-ease);
+}
+.jl-toggle:hover { color: var(--login-text); }
+.jl-msg { min-height: 20px; padding-left: 24px; font-size: 14px; line-height: 20px; color: var(--login-accent); }
+.jl-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 6px 0 24px; }
+.jl-row .jl-btn { flex: 1 1 140px; }
+.jl-ghost {
+  display: inline-flex; align-items: center; min-height: 44px; white-space: nowrap;
+  color: var(--login-muted); font-size: 14px; text-decoration: none; transition: color 0.5s var(--jl-ease);
+}
+.jl-ghost:hover { color: var(--login-text); }
+.jl-spin {
+  display: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--login-spinner-track); border-top-color: var(--login-text);
+  animation: jl-spin 0.7s linear infinite;
+}
+.jl-btn[aria-busy="true"] { cursor: progress; }
+.jl-btn[aria-busy="true"] .jl-spin { display: block; }
+@keyframes jl-spin { to { transform: rotate(360deg); } }
+
+.jl-in { opacity: 0; transform: translateY(24px); animation: jl-in 0.9s var(--jl-ease) forwards; }
+@keyframes jl-in { to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .jl-in { animation: none; opacity: 1; transform: none; }
+  .jl-spin { animation: none; }
+}
