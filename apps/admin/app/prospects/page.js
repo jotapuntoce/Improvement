@@ -44,7 +44,7 @@ export default async function ProspectsPage() {
       <section className="toolbar">
         <div>
           <Link href="/" className="page-back-link">
-            ← Dashboard
+            ← Recepción
           </Link>
           <h2>Backlog de prospectos</h2>
           <p className="topbar-subtitle">Cliente → empresa(s) → prospecto → en construcción → live.</p>

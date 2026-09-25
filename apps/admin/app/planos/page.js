@@ -7,6 +7,8 @@ import { assembly, assemblyConnection, assemblyPiece, organization } from "@jota
 import { AssemblyMap } from "@jotapuntoce/ui/assembly/AssemblyMap.tsx";
 import { db } from "../../lib/db.js";
 import { requirePlatformAdmin } from "../../lib/auth.js";
+import { listProyectos } from "@/lib/procesos.js";
+import Carpeta from "@/components/planos/Carpeta.js";
 
 export default async function PlanosPage() {
   await requirePlatformAdmin();
@@ -21,21 +23,39 @@ export default async function PlanosPage() {
   ]);
 
   const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+  const proyectos = listProyectos();
 
   return (
     <div className="page-stack">
       <section className="toolbar">
         <div>
           <Link href="/" className="page-back-link">
-            ← Dashboard
+            ← Recepción
           </Link>
           <h2>Planos</h2>
           <p className="topbar-subtitle">
-            Los proyectos de todas las organizaciones, vistos como piezas conectadas. Solo lectura.
+            El proceso de cada proyecto en su carpeta, y los ensambles de las organizaciones.
           </p>
         </div>
       </section>
 
+      {/* Expedientes de proceso: una carpeta por proyecto, cada una con el estilo de su marca. */}
+      <section>
+        <p className="wall-label">
+          <span className="wall-label-dot" />
+          Expedientes por proyecto
+        </p>
+        <div className="carpetas">
+          {proyectos.map((p) => (
+            <Carpeta key={p.slug} {...p} />
+          ))}
+        </div>
+      </section>
+
+      <p className="wall-label" style={{ marginTop: "8px" }}>
+        <span className="wall-label-dot" />
+        Ensambles de las organizaciones
+      </p>
       {assemblies.length === 0 && <p className="topbar-subtitle">Todavía no hay planos.</p>}
 
       {assemblies.map((plano) => {

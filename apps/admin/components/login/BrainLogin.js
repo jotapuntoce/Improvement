@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { startBrainScene } from "./brainScene.js";
+import Monogram from "@/components/brand/Monogram";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -47,14 +48,14 @@ export default function BrainLogin({ signInAction, hasError }) {
       <canvas className="jl-canvas" ref={canvasRef} aria-hidden="true" />
 
       <header className="jl-header">
-        <span className="jl-logo jl-in">JotaPuntoCe<sup>®</sup></span>
+        <Monogram className="jl-logo jl-in" />
         <span className="jl-spacer" />
         <a className="jl-btn jl-in" href="#" style={{ animationDelay: ".1s" }}>Solicitar acceso</a>
       </header>
 
       <main className="jl-stage">
         <div className="jl-card jl-in" style={{ animationDelay: ".5s" }}>
-          <h1 className="jl-title">Sistemas locos. Ingenio inevitable.</h1>
+          <h1 className="jl-title">Sistemas locos. <span className="jl-hand">Ingenio inevitable.</span></h1>
 
           <form action={signInAction} onSubmit={validate} noValidate className="jl-form">
             <label className="jl-sr" htmlFor="email">Correo</label>

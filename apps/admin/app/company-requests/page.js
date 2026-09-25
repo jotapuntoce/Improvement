@@ -51,7 +51,7 @@ export default async function CompanyRequestsPage() {
       <section className="toolbar">
         <div>
           <Link href="/" className="page-back-link">
-            ← Dashboard
+            ← Recepción
           </Link>
           <h2>Solicitudes de empresa</h2>
           <p className="topbar-subtitle">Auto-registro de clientes ya logueados en Improvement.</p>

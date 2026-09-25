@@ -49,7 +49,7 @@ export default async function PowerupsPage() {
       <section className="toolbar">
         <div>
           <Link href="/" className="page-back-link">
-            ← Dashboard
+            ← Recepción
           </Link>
           <h2>Catálogo de PowerUps</h2>
           <p className="topbar-subtitle">

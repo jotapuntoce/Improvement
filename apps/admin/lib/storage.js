@@ -3,15 +3,6 @@
 // solo existe "improvement", pero la función acepta un namespace para
 // que agregar otra marca en el futuro no obligue a rediseñar esto.
 
-const ACCENT_KEY = "jpc-admin-accent-v1";
-
-export const ACCENT_PRESETS = [
-  { id: "aurora", label: "Aurora", c1: "#7c5cff", c2: "#22d3ee" },
-  { id: "esmeralda", label: "Esmeralda", c1: "#10b981", c2: "#a3e635" },
-  { id: "solar", label: "Solar", c1: "#fb923c", c2: "#f472b6" },
-  { id: "indigo", label: "Índigo", c1: "#6366f1", c2: "#3b82f6" },
-];
-
 export const CATEGORY_PALETTE = [
   "#7c5cff",
   "#22d3ee",
@@ -95,19 +86,4 @@ export function categoryColor(category) {
     hash = category.charCodeAt(i) + ((hash << 5) - hash);
   }
   return CATEGORY_PALETTE[Math.abs(hash) % CATEGORY_PALETTE.length];
-}
-
-export function getAccent() {
-  if (!isBrowser()) return ACCENT_PRESETS[0];
-  try {
-    const id = window.localStorage.getItem(ACCENT_KEY);
-    return ACCENT_PRESETS.find((a) => a.id === id) || ACCENT_PRESETS[0];
-  } catch {
-    return ACCENT_PRESETS[0];
-  }
-}
-
-export function setAccent(id) {
-  if (!isBrowser()) return;
-  window.localStorage.setItem(ACCENT_KEY, id);
 }

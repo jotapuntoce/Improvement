@@ -1,13 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import AccentPicker from "./AccentPicker";
 import AppIcon from "./AppIcon";
 
 const TITLES = {
-  "/": { title: "Dashboard", subtitle: "Resumen general de JotaPuntoCe" },
+  "/": { title: "Recepción", subtitle: "", script: true },
   "/improvement": { title: "Improvement", subtitle: "Empresa digital · catálogo y productos" },
-  "/planos": { title: "Planos", subtitle: "Los proyectos como piezas conectadas · solo lectura" },
+  "/planos": { title: "Planos", subtitle: "Expedientes por proyecto y ensambles" },
   "/company-requests": { title: "Solicitudes", subtitle: "Auto-registro de empresa de tus clientes" },
 };
 
@@ -19,7 +18,8 @@ const TITLES = {
 // así, mismo patrón que signIn en app/login/page.js.
 export default function Topbar({ orgCount = 0, signOut }) {
   const pathname = usePathname();
-  const meta = TITLES[pathname] || { title: "Panel", subtitle: "" };
+  // Subpáginas (/planos/jotapuntoce) toman el título de su sección.
+  const meta = TITLES[pathname] || TITLES[`/${pathname.split("/")[1]}`] || TITLES["/"];
 
   return (
     <header className="topbar">
@@ -28,12 +28,11 @@ export default function Topbar({ orgCount = 0, signOut }) {
           <AppIcon size={34} liveCount={orgCount} liveLabel="organización(es)" />
         )}
         <div>
-          <h1 className="topbar-title">{meta.title}</h1>
+          <h1 className={`topbar-title ${meta.script ? "topbar-title-script" : ""}`}>{meta.title}</h1>
           {meta.subtitle && <p className="topbar-subtitle">{meta.subtitle}</p>}
         </div>
       </div>
       <div className="topbar-actions">
-        <AccentPicker />
         <div className="user-chip" title="Jose Carlos">JC</div>
         {signOut && (
           <form action={signOut}>
