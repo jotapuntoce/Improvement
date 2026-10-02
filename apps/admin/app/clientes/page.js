@@ -1,4 +1,4 @@
-// Backlog de prospectos, agrupado por cliente (la persona) -> empresas (una o más). Caso real que
+// Clientes (quien ya compró algo), agrupados por cliente (la persona) -> empresas (una o más). Caso real que
 // forzó este modelo: Jaime Salinas es dueño de dos empresas, Camibel y Afianza — antes de este cambio
 // prospectCompany no tenía forma de expresar "estas dos filas son la misma persona".
 // Flujo por empresa: prospecto -> en_construcción -> live. Mover a en_construcción dispara
