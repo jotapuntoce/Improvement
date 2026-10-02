@@ -733,3 +733,84 @@ export const orgKpi = pgTable(
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],
 );
+
+// Inventario de chequeos (etapa 0 del CRM de JotaPuntoCe): llegan desde la landing o los crea Jose Carlos. FUERA del
+// alcance de RLS multi-tenant, igual que prospect_company: solo apps/admin con la service-role key. RLS activado sin
+// políticas (migración chequeo_rls) para cerrar PostgREST. Spec: docs/superpowers/specs/2026-10-02-inventario-chequeos-design.md
+export const chequeo = pgTable(
+  "chequeo",
+  {
+    id: id(),
+    origen: text("origen").notNull(),
+    tipo: text("tipo").notNull(),
+    nombre: text("nombre"),
+    negocio: text("negocio"),
+    // slug(negocio)|slug(ciudad) — la unicidad "un chequeo por negocio"; null para emprendedores.
+    negocioClave: text("negocio_clave"),
+    giro: text("giro").notNull(),
+    ciudad: text("ciudad").notNull(),
+    correo: text("correo"),
+    telefono: text("telefono"),
+    canal: text("canal").notNull(),
+    canalDetalle: text("canal_detalle"),
+    utm: jsonb("utm"),
+    enlaces: jsonb("enlaces"),
+    sinRedes: boolean("sin_redes").notNull().default(false),
+    // [{pregunta, respuesta}] — la pregunta viaja con la respuesta para que cambiar las preguntas no rompa el pasado.
+    respuestas: jsonb("respuestas"),
+    entrevistaSegundos: integer("entrevista_segundos"),
+    entrevistaAt: timestamp("entrevista_at", { withTimezone: true }),
+    claveHash: text("clave_hash"),
+    etapa: text("etapa").notNull().default("registrado"),
+    abrePuerta: text("abre_puerta"),
+    proximaAccion: text("proxima_accion"),
+    // ISO YYYY-MM-DD como texto: evita el corrimiento de zona horaria de un Date a medianoche UTC.
+    proximaFecha: text("proxima_fecha"),
+    notas: text("notas"),
+    pdfPath: text("pdf_path"),
+    aceptaAvisoAt: timestamp("acepta_aviso_at", { withTimezone: true }),
+    aceptaCorreos: boolean("acepta_correos").notNull().default(false),
+    aceptaCorreosAt: timestamp("acepta_correos_at", { withTimezone: true }),
+    prospectClientId: uuid("prospect_client_id").references(() => prospectClient.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("uq_chequeo_correo").on(t.correo).where(sql`${t.correo} is not null`),
+    uniqueIndex("uq_chequeo_telefono").on(t.telefono).where(sql`${t.telefono} is not null`),
+    uniqueIndex("uq_chequeo_negocio_clave").on(t.negocioClave).where(sql`${t.negocioClave} is not null`),
+    check("chequeo_origen_check", sql`${t.origen} in ('landing','propio')`),
+    check("chequeo_tipo_check", sql`${t.tipo} in ('negocio','emprendedor')`),
+    check(
+      "chequeo_canal_check",
+      sql`${t.canal} in ('anuncio_meta','referido','summum','tiktok','youtube','anuncio_google','conferencia','webinar','live','reel','otro')`,
+    ),
+    check(
+      "chequeo_etapa_check",
+      sql`${t.etapa} in ('registrado','pedido','entregado','contacto','conversacion','diagnostico','propuesta','cliente','perdido')`,
+    ),
+  ],
+);
+
+// Bitácora append-only de cada chequeo: la materia prima de la cadena que diagnostica. Nunca se edita ni se borra.
+export const chequeoEvento = pgTable(
+  "chequeo_evento",
+  {
+    id: id(),
+    chequeoId: uuid("chequeo_id")
+      .notNull()
+      .references(() => chequeo.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    autor: text("autor").notNull(),
+    detalle: jsonb("detalle"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_chequeo_evento_chequeo_id").on(t.chequeoId),
+    check(
+      "chequeo_evento_tipo_check",
+      sql`${t.tipo} in ('registro','entrevista','etapa','correo','mensaje','llamada','nota','compra')`,
+    ),
+    check("chequeo_evento_autor_check", sql`${t.autor} in ('prospecto','jose_carlos','improvement')`),
+  ],
+);
