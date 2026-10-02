@@ -145,3 +145,9 @@ export function camposInvalidos(error) {
   }
   return campos;
 }
+
+/** Cómo se nombra un chequeo en el panel: el negocio, o la idea del emprendedor. */
+export const nombreDe = (c) => c.negocio ?? `Idea: ${c.giro}`;
+
+/** Etapa visible: un `pedido` que ya tiene PDF está listo para entregar. */
+export const etapaDe = (c) => (c.etapa === "pedido" && c.pdfPath ? "Listo para entregar" : ETAPA_LABEL[c.etapa]);

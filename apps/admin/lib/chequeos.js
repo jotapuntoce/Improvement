@@ -295,9 +295,13 @@ export async function listarChequeos({ etapa } = {}) {
   const { chequeos, eventos } = await todo();
   const ultimo = new Map();
   for (const e of eventos) if (!ultimo.has(e.chequeoId)) ultimo.set(e.chequeoId, e.createdAt);
+  const ahora = Date.now();
   return chequeos
     .filter((c) => !etapa || c.etapa === etapa)
-    .map((c) => ({ ...c, ultimoMovimiento: ultimo.get(c.id) ?? c.createdAt }));
+    .map((c) => {
+      const ultimoMovimiento = ultimo.get(c.id) ?? c.createdAt;
+      return { ...c, ultimoMovimiento, diasSinMovimiento: Math.floor((ahora - ultimoMovimiento) / 86_400_000) };
+    });
 }
 
 export async function tablero() {

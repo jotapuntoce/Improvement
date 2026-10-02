@@ -92,3 +92,25 @@ export function SolicitudesIcon(props) {
     </Icono>
   );
 }
+
+// Chequeos: el regalo (el chequeo gratis); el moño lleva el hilo.
+export function ChequeosIcon(props) {
+  return (
+    <Icono {...props}>
+      <defs>
+        <Hilo id="jc-hilo-chequeos" x1="7.6" x2="16.4" />
+      </defs>
+      <g {...trazo}>
+        <rect x="3.5" y="9" width="17" height="11.5" rx="1.4" />
+        <path d="M2.8 9h18.4M12 9v11.5" />
+      </g>
+      <path
+        d="M12 8.6C10.8 6 7.6 5.2 7.6 7.2c0 1.3 2.4 1.4 4.4 1.4s4.4-.1 4.4-1.4c0-2-3.2-1.2-4.4 1.4"
+        stroke="url(#jc-hilo-chequeos)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </Icono>
+  );
+}

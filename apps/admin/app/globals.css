@@ -1683,3 +1683,136 @@ body {
     padding: 16px 20px;
   }
 }
+
+/* ---- Chequeos (app/chequeos) ---- */
+.chq-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.chq-stat {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.chq-stat-meta {
+  border-color: var(--accent-1);
+}
+.chq-stat-value {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.chq-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.chq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chq-chip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.chq-chip-active {
+  border-color: var(--accent-1);
+  background: var(--bg-card);
+}
+.chq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.chq-table th,
+.chq-table td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.chq-table td:not(:first-child),
+.chq-table th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.chq-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chq-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.chq-card:hover {
+  border-color: var(--accent-1);
+}
+.chq-muted {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 3px 0 0;
+}
+.chq-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.chq-form .input {
+  min-width: 160px;
+  flex: 1;
+}
+.chq-ok {
+  font-size: 12px;
+  color: var(--success);
+}
+.chq-section {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chq-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.chq-respuesta {
+  white-space: pre-wrap;
+  margin: 2px 0 10px;
+}
+.chq-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.chq-pdf {
+  width: 100%;
+  height: 80vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
