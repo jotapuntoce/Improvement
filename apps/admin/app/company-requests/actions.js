@@ -1,7 +1,7 @@
 "use server";
 
 // Aprobación/rechazo de solicitudes de auto-registro (company_request) — distinto de
-// provisionOrganization (prospects/actions.js): aquí el requester YA tiene cuenta y sesión real en
+// provisionOrganization (clientes/actions.js): aquí el requester YA tiene cuenta y sesión real en
 // apps/improvement, así que no hay que crear usuario de Supabase Auth ni mandar invitación por
 // WhatsApp, solo el organization + membership(owner) + primera etapa del mapa, igual que ahí.
 import { randomUUID } from "node:crypto";

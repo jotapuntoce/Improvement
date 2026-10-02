@@ -13,7 +13,7 @@ import {
   prospectCompany,
   orgBuildStage,
 } from "@jotapuntoce/db/schema";
-import { markProspectLive, provisionOrganization } from "../app/prospects/actions.js";
+import { markProspectLive, provisionOrganization } from "../app/clientes/actions.js";
 
 const createdProspectIds = [];
 const createdClientIds = [];

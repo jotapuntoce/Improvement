@@ -1,5 +1,5 @@
 // CRUD del catálogo global de PowerUps. Server Component + Server Actions contra la base real —
-// mismo patrón que app/prospects/actions.js (db normal, sin service-role key: esta tabla no tiene
+// mismo patrón que app/clientes/actions.js (db normal, sin service-role key: esta tabla no tiene
 // RLS que Jose Carlos necesite bypasear vía service-role, el rol de Postgres de la app ya la lee y
 // escribe completa).
 import Link from "next/link";

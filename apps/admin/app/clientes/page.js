@@ -46,8 +46,8 @@ export default async function ProspectsPage() {
           <Link href="/" className="page-back-link">
             ← Recepción
           </Link>
-          <h2>Backlog de prospectos</h2>
-          <p className="topbar-subtitle">Cliente → empresa(s) → prospecto → en construcción → live.</p>
+          <h2>Clientes</h2>
+          <p className="topbar-subtitle">Quien ya compró algo: cliente → empresa(s) → en construcción → live.</p>
         </div>
       </section>
 
@@ -89,7 +89,7 @@ export default async function ProspectsPage() {
               "use server";
               formData.set("prospectClientId", client.id);
               await addProspectCompanyAction(formData);
-              revalidatePath("/prospects");
+              revalidatePath("/clientes");
             }
 
             return (
@@ -111,13 +111,13 @@ export default async function ProspectsPage() {
                     async function provision() {
                       "use server";
                       await provisionOrganizationAction(prospect.id);
-                      revalidatePath("/prospects");
+                      revalidatePath("/clientes");
                     }
 
                     async function markLive() {
                       "use server";
                       await markProspectLiveAction(prospect.id);
-                      revalidatePath("/prospects");
+                      revalidatePath("/clientes");
                     }
 
                     return (
