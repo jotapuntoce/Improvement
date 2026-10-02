@@ -21,7 +21,9 @@ tiene un botón de WhatsApp y nada más. Jose Carlos lo quiere así:
 - **El análisis empieza en la entrevista**: cómo escribe, qué contesta, si se registró y dejó pasar el tiempo o
   contestó de inmediato, de qué canal llegó.
 - Todo chequeo, el que llega de la landing y el que hace él (Boreal), queda en **su inventario** del panel admin.
-- La meta del embudo es que el prospecto **compre el Diagnóstico 360**. Ese es el número principal.
+- La meta del embudo es que el prospecto **compre Improvement Completo** ($25–30k + $10–16k/mes) y retenerlo de por
+  vida. El Diagnóstico 360 y el nivel 0 son pequeñas victorias en el camino.
+- Improvement le **avisa al momento** cuando alguien pide un chequeo (y quién) y cuando hay una compra.
 - A futuro, Improvement mueve solo al prospecto de etapa y aprende qué contacto (siempre pull) funciona con qué perfil.
   Para eso, cada paso tiene que quedar registrado desde el primer día.
 
@@ -34,7 +36,11 @@ tiene un botón de WhatsApp y nada más. Jose Carlos lo quiere así:
 4. **Todo automático** después de la entrevista (piezas 4–5). Excepción explícita al nivel 0, solo para el Chequeo de
    la landing.
 5. **Correo siempre pull** (valor primero, sin urgencia ni presión).
-6. **Ganado = compró el Diagnóstico 360.** Al marcarlo, pasa solo a Clientes.
+6. **Cliente = compró algo.** Cada compra se registra con producto y monto; la primera lo pasa solo a Clientes. El
+   número principal del tablero es **% que compró Improvement Completo**; 360 y nivel 0 son escalones intermedios.
+   Es un **Flozy propio** (tablas y tablero de JotaPuntoCe), no se usa Flozy.
+11. **Avisos al dueño por WhatsApp** (Twilio, `lib/whatsapp.js`), y siempre también dentro del panel.
+12. **Leer el chequeo dentro del panel** (PDF embebido), sin descargarlo.
 7. **Nivel 0 = emprendedor sin negocio.** También pide su chequeo, con su propia entrevista.
 8. **Prospecto antes de comprar; cliente en cuanto compra algo.** "Prospectos" en el admin se renombra a **Clientes**.
 9. **Giro obligatorio** en los dos orígenes.
@@ -82,7 +88,9 @@ del esquema, para cerrar la puerta de PostgREST.
 | `created_at`, `updated_at` | timestamptz | `created_at` = hora del registro |
 
 **Etapas** (check): `registrado` → `pedido` → `entregado` → `contacto` → `conversacion` → `diagnostico` → `propuesta` →
-`ganado` | `perdido`. Construcción, live y recompra viven en Clientes (`prospect_company.status`), no aquí.
+`cliente` | `perdido`. `cliente` se alcanza registrando una compra, no a mano. Construcción, live y recompra viven en
+Clientes (`prospect_company.status`), no aquí; las compras siguientes (p. ej. Completo después del 360) se siguen
+registrando desde el chequeo para que el embudo completo quede en un solo lugar.
 
 **Un chequeo gratis por persona y por negocio** — índices únicos parciales, la base lo hace cumplir aunque alguien se
 salte el formulario:
@@ -102,12 +110,15 @@ deny-all.
 |---|---|---|
 | `id` | uuid pk | |
 | `chequeo_id` | uuid fk → `chequeo` on delete cascade, indexado | |
-| `tipo` | text not null | check: `registro` · `entrevista` · `etapa` · `correo` · `mensaje` · `llamada` · `nota` |
+| `tipo` | text not null | check: `registro` · `entrevista` · `etapa` · `correo` · `mensaje` · `llamada` · `nota` · `compra` |
 | `autor` | text not null | check: `prospecto` · `jose_carlos` · `improvement` |
 | `detalle` | jsonb | p. ej. `{de, a}` en `etapa`; `{resultado, nota}` en un contacto |
 | `created_at` | timestamptz | |
 
 Resultados de un contacto: `respondio` · `sin_respuesta` · `agendo` · `no_le_interesa` · `otro`.
+
+Compra: `detalle = { producto, monto }`, con `producto` de la escalera (`kit` · `base` · `diagnostico_360` · `completo` ·
+`director` · `acabados` · `become` · `otro`) y `monto` en pesos enteros.
 
 ## Puerta de entrada (`apps/admin/app/api/chequeos/`)
 
@@ -174,8 +185,10 @@ Fuera de alcance por ahora: límite de envíos por minuto. Si llega basura en ca
 
 ### `/chequeos` (barra lateral, debajo de Planos)
 
-- **Tablero:** total · **% que compró el Diagnóstico 360** (`ganado / total`) · registrados sin entrevista ·
-  conteo por etapa · **por canal**: cuántos llegaron y cuántos compraron.
+- **Tablero:** total · la escalera: % que compró algo → % que compró el 360 → **% que compró Improvement Completo**
+  (el número principal) · registrados sin entrevista · conteo por etapa · **por canal**: cuántos llegaron, cuántos
+  compraron algo y cuántos Completo.
+- **Avisos:** los últimos avisos (chequeo nuevo, entrevista contestada, compra) arriba del tablero.
 - **Lista** de tarjetas, del más nuevo al más viejo, filtro por etapa (`?etapa=`). Cada tarjeta: negocio o idea, giro,
   ciudad, persona, canal, etapa, próxima acción y **días sin movimiento** (desde el último evento).
 - **+ Chequeo propio:** tipo, negocio, giro, ciudad, canal; persona, correo y teléfono opcionales; quién abre la
@@ -191,11 +204,26 @@ Fuera de alcance por ahora: límite de envíos por minuto. Si llega basura en ca
   - **Cambiar etapa** → evento `etapa`.
   - **Anotar contacto** (correo · mensaje · llamada + resultado + nota) → evento.
   - **Próxima acción y fecha.**
-  - **Subir PDF** → bucket privado `chequeos` de Supabase Storage (se crea si no existe); "Ver PDF" genera un enlace
-    firmado de pocos minutos al hacer clic.
-- **Al marcar `ganado`:** exige correo y teléfono; crea `prospect_client` + `prospect_company` con
+  - **Subir PDF** → bucket privado `chequeos` de Supabase Storage (se crea si no existe). El chequeo **se lee ahí
+    mismo**: la página embebe el PDF con un enlace firmado de pocos minutos generado al abrirla.
+  - **Registrar compra** (producto + monto) → evento `compra`, aviso por WhatsApp, y la etapa pasa a `cliente`.
+- **La primera compra** exige correo y teléfono; crea `prospect_client` + `prospect_company` con
   `createProspectClient()` (ya existe en `app/prospects/actions.js`), guarda `prospect_client_id` y enlaza a su ficha.
   Idempotente: si `prospect_client_id` ya existe, no crea otro.
+
+## Avisos al dueño
+
+Una función, `avisar(texto)`, en `lib/chequeos.js`: manda WhatsApp con `sendWhatsAppMessage()` al número de
+`AVISOS_WHATSAPP_A` (env, nunca en el código). Se llama en tres momentos:
+
+- **Registro:** "🧠 Chequeo nuevo: Ana López · Boreal (club de pádel, SLP) · llegó por reel · <enlace al panel>".
+- **Entrevista contestada:** "✅ Ana López contestó la entrevista (3 días después del registro, en 6 min)".
+- **Compra:** "💰 Compra: Boreal · Diagnóstico 360 · $7,500".
+
+El aviso **nunca rompe** el registro ni la compra: si Twilio no está configurado o falla, el resultado se ignora y el
+aviso queda igual en la lista de avisos del panel (se leen de `chequeo_evento`, no hace falta otra tabla). Límite
+conocido: fuera de la ventana de 24 h, WhatsApp Business solo deja mandar plantillas aprobadas; en el sandbox de
+Twilio basta con que el número del dueño se haya unido.
 
 ### Renombre "Prospectos" → "Clientes"
 
@@ -215,7 +243,7 @@ acción "mensaje a Ricardo") y se le sube `Chequeo-Boreal.pdf`. La fuente `chequ
 |---|---|
 | `packages/db/src/schema.ts` | `chequeo`, `chequeo_evento` |
 | `packages/db/migrations/*` | generadas con `pnpm db:generate` + una `--custom` con `enable row level security` |
-| `apps/admin/lib/chequeos.js` | `normalizarChequeo`, esquemas zod, `registrarChequeo`, `guardarEntrevista`, `cambiarEtapa`, `anotarContacto`, `marcarGanado`, tablero |
+| `apps/admin/lib/chequeos.js` | `normalizarChequeo`, esquemas zod, `registrarChequeo`, `guardarEntrevista`, `cambiarEtapa`, `anotarContacto`, `registrarCompra`, `avisar`, tablero |
 | `apps/admin/app/api/chequeos/route.js` | `POST`, `OPTIONS` |
 | `apps/admin/app/api/chequeos/[id]/route.js` | `PATCH`, `OPTIONS` |
 | `apps/admin/app/chequeos/page.js`, `[id]/page.js`, `actions.js` | panel |
@@ -223,7 +251,7 @@ acción "mensaje a Ricardo") y se le sube `Chequeo-Boreal.pdf`. La fuente `chequ
 | `apps/admin/app/clientes/*` | renombre de `prospects` |
 | `apps/admin/tests/chequeos.test.js` | ver Pruebas |
 | `apps/admin/package.json` | `zod` |
-| `.env.example` | `CHEQUEOS_ORIGENES` |
+| `.env.example` | `CHEQUEOS_ORIGENES`, `AVISOS_WHATSAPP_A` |
 | `Improvement\jotapuntoce\landing\chequeo-api.md` | la hoja para el chat de la landing |
 
 ## Pruebas
@@ -237,14 +265,23 @@ la lógica de `lib/chequeos.js` y los handlers de ruta llamados con un `Request`
 - Dos emprendedores con la misma idea y distinto correo → ambos pasan.
 - Trampa llena → `201` y nada guardado. Origen fuera de la lista → `403`.
 - Entrevista sin enlaces y sin `sinRedes` → `400`; clave equivocada → `404`; dos veces → `409`; buena → `pedido`.
-- Cambio de etapa escribe evento; `ganado` sin correo → error; `ganado` dos veces → **un** `prospect_client`.
+- Cambio de etapa escribe evento. Compra sin correo → error; primera compra → etapa `cliente` + un `prospect_client`;
+  segunda compra → evento nuevo y **ningún** `prospect_client` extra.
+- `avisar` sin Twilio configurado → no lanza y el registro se guarda igual.
 - `normalizarChequeo` y los esquemas zod con pruebas unitarias sin base de datos.
 
 Gate: `pnpm lint && pnpm typecheck && pnpm test`. Sin `.env.test` las de integración no corren (esperado, ver
 CLAUDE.md); las unitarias sí.
 
-## Fuera de alcance
+## Las siguientes piezas (fuera de este trabajo, cada una con su spec)
 
-Las 3 preguntas (pieza 3) · el motor del chequeo (4) · el correo con video, regalo y PDF (5) · que Improvement mueva
-etapas y analice conversiones (cadena que diagnostica) · correos de valor a la base · bonus sorpresa para clientes
-nuevos · publicar el admin · límite de envíos por minuto.
+1. **Las 3 preguntas**, para negocio y para emprendedor (se definen con el dueño).
+2. **El motor:** Improvement arma el chequeo solo, con lo de la landing o porque el dueño se lo pide.
+3. **El envío:** Gmail desde salinas@jotapuntoce.com (el dueño da el permiso de Google), con su video, la animación del
+   regalo, el PDF y un mensaje de entrada personalizado. También para los chequeos propios que pida a Improvement; sin
+   correo del prospecto, se queda "listo para entregar" y avisa.
+4. **La cadena que diagnostica:** el Flozy propio que mueve etapas solo, aprende qué contacto (pull) convierte con qué
+   perfil y mide la retención de cada cliente.
+5. **Correos de valor** a la base (pull).
+6. **Bonus sorpresa** para cada cliente nuevo.
+7. **Publicar el admin** (requisito para que la landing se conecte) · límite de envíos por minuto si llega basura.
