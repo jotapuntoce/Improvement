@@ -768,6 +768,14 @@ export const chequeo = pgTable(
     proximaFecha: text("proxima_fecha"),
     notas: text("notas"),
     pdfPath: text("pdf_path"),
+    // Motor del Chequeo (spec 2026-10-05-motor-chequeo-design.md). `contenido` es lo que valida
+    // apps/admin/lib/motor/esquema.js sin notas internas ni fuentes, que van aparte.
+    motorEstado: text("motor_estado").notNull().default("sin_empezar"),
+    motorError: text("motor_error"),
+    contenido: jsonb("contenido"),
+    notasInternas: jsonb("notas_internas"),
+    etapaProspecto: text("etapa_prospecto"),
+    fuentes: jsonb("fuentes"),
     aceptaAvisoAt: timestamp("acepta_aviso_at", { withTimezone: true }),
     aceptaCorreos: boolean("acepta_correos").notNull().default(false),
     aceptaCorreosAt: timestamp("acepta_correos_at", { withTimezone: true }),
@@ -789,6 +797,11 @@ export const chequeo = pgTable(
       "chequeo_etapa_check",
       sql`${t.etapa} in ('registrado','pedido','entregado','contacto','conversacion','diagnostico','propuesta','cliente','perdido')`,
     ),
+    check(
+      "chequeo_motor_estado_check",
+      sql`${t.motorEstado} in ('sin_empezar','en_fila','armando','borrador','aprobado','error')`,
+    ),
+    check("chequeo_etapa_prospecto_check", sql`${t.etapaProspecto} in ('idea','arrancando','creciendo','consolidado')`),
   ],
 );
 
@@ -809,7 +822,7 @@ export const chequeoEvento = pgTable(
     index("idx_chequeo_evento_chequeo_id").on(t.chequeoId),
     check(
       "chequeo_evento_tipo_check",
-      sql`${t.tipo} in ('registro','entrevista','etapa','correo','mensaje','llamada','nota','compra')`,
+      sql`${t.tipo} in ('registro','entrevista','etapa','correo','mensaje','llamada','nota','compra','motor')`,
     ),
     check("chequeo_evento_autor_check", sql`${t.autor} in ('prospecto','jose_carlos','improvement')`),
   ],

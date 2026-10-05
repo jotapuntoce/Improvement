@@ -44,6 +44,31 @@ export const PRODUCTO_LABEL = {
   become: "BECOME",
   otro: "Otro",
 };
+
+export const MOTOR_ESTADOS = ["sin_empezar", "en_fila", "armando", "borrador", "aprobado", "error"];
+export const MOTOR_ESTADO_LABEL = {
+  sin_empezar: "Sin armar",
+  en_fila: "En fila (tope del día)",
+  armando: "Armando…",
+  borrador: "Borrador listo",
+  aprobado: "Aprobado",
+  error: "Error",
+};
+export const MOTOR_ACCION_LABEL = {
+  en_fila: "quedó en fila",
+  armado: "armó el borrador",
+  rehecho: "rehizo el borrador",
+  aprobado: "aprobó el borrador",
+  error: "falló al armar",
+};
+// La etapa del prospecto elige la portada del PDF (spec del motor, sección 4).
+export const ETAPAS_PROSPECTO = ["idea", "arrancando", "creciendo", "consolidado"];
+export const ETAPA_PROSPECTO_LABEL = {
+  idea: "Con una idea",
+  arrancando: "Arrancando",
+  creciendo: "Creciendo",
+  consolidado: "Consolidado",
+};
 export const ENLACES = ["instagram", "youtube", "linkedin", "facebook", "tiktok", "sitio", "google"];
 export const RESULTADOS = ["respondio", "sin_respuesta", "agendo", "no_le_interesa", "otro"];
 export const RESULTADO_LABEL = {
@@ -140,6 +165,16 @@ export const contactoSchema = z.object({
   nota: opcional,
 });
 
+/** Enlaces y nota de contexto que Jose Carlos le da a un chequeo propio antes de armarlo. */
+export const datosPropioSchema = z.object({
+  enlaces: z
+    .record(z.string(), z.string().trim())
+    .default({})
+    .transform((e) => Object.fromEntries(Object.entries(e).filter(([, v]) => v)))
+    .pipe(z.partialRecord(z.enum(ENLACES), z.url("Enlace inválido"))),
+  nota: opcional,
+});
+
 /** { campo: mensaje } a partir de un ZodError — lo que la landing usa para marcar cada campo. */
 export function camposInvalidos(error) {
   const campos = {};
@@ -153,5 +188,12 @@ export function camposInvalidos(error) {
 /** Cómo se nombra un chequeo en el panel: el negocio, o la idea del emprendedor. */
 export const nombreDe = (c) => c.negocio ?? `Idea: ${c.giro}`;
 
-/** Etapa visible: un `pedido` que ya tiene PDF está listo para entregar. */
-export const etapaDe = (c) => (c.etapa === "pedido" && c.pdfPath ? "Listo para entregar" : ETAPA_LABEL[c.etapa]);
+/** Etapa visible: un `pedido` con borrador del motor, aprobado o con PDF subido a mano. */
+export const etapaDe = (c) => {
+  if (c.etapa !== "pedido") return ETAPA_LABEL[c.etapa];
+  if (c.motorEstado === "borrador") return "Borrador listo";
+  if (c.motorEstado === "aprobado" || (c.pdfPath && (c.motorEstado ?? "sin_empezar") === "sin_empezar")) {
+    return "Listo para entregar";
+  }
+  return ETAPA_LABEL.pedido;
+};

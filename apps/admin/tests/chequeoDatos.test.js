@@ -8,6 +8,8 @@ import {
   propioSchema,
   entrevistaSchema,
   camposInvalidos,
+  etapaDe,
+  datosPropioSchema,
 } from "../lib/chequeoDatos.js";
 
 const registro = {
@@ -98,5 +100,21 @@ describe("entrevistaSchema", () => {
   });
   it("rechaza un enlace que no es URL", () => {
     expect(entrevistaSchema.safeParse({ ...base, enlaces: { instagram: "boreal" } }).success).toBe(false);
+  });
+});
+
+describe("motor", () => {
+  it("etapaDe distingue borrador, aprobado y PDF subido a mano", () => {
+    expect(etapaDe({ etapa: "pedido", motorEstado: "borrador" })).toBe("Borrador listo");
+    expect(etapaDe({ etapa: "pedido", motorEstado: "aprobado" })).toBe("Listo para entregar");
+    expect(etapaDe({ etapa: "pedido", motorEstado: "sin_empezar", pdfPath: "x/1.pdf" })).toBe("Listo para entregar");
+    expect(etapaDe({ etapa: "pedido", motorEstado: "armando" })).toBe("Pedido");
+    expect(etapaDe({ etapa: "contacto", motorEstado: "aprobado" })).toBe("Contacto");
+  });
+
+  it("datosPropioSchema ignora enlaces vacíos y valida los llenos", () => {
+    const r = datosPropioSchema.parse({ enlaces: { instagram: "", sitio: "https://borealslp.com" }, nota: "  " });
+    expect(r).toEqual({ enlaces: { sitio: "https://borealslp.com" }, nota: null });
+    expect(datosPropioSchema.safeParse({ enlaces: { sitio: "borealslp" } }).success).toBe(false);
   });
 });
