@@ -285,6 +285,11 @@ CLAUDE.md); las unitarias sí.
      la semana, ahorro, lo que sabes hacer o gente que te conoce." (lo que disfruta → la idea → con qué arranca).
      Su Chequeo le entrega: si la idea es viable y qué le falta, sus primeros pasos (babysteps) a su medida, y el
      siguiente nivel, el **Kit Arranque**, como puerta abierta (pull).
+   - **El "¿Lo platicamos?" lleva a la Plática** (dueño, 2026-10-05): sesión de 20–60 min, presencial o en línea,
+     **$20 USD** para el compromiso, enfocada solo en la persona (qué busca, qué le duele a ella, a qué aspira, qué
+     quiere en su negocio y en su vida). Necesita un **cuestionario empático** listo para anotar y dar dirección. El
+     Diagnóstico 360 viene después: lo interno del negocio y lo que tiene que cambiar el dueño. Pieza propia, por
+     diseñar (cuestionario, agenda, cobro y dónde se anotan las respuestas).
 2. **El motor:** Improvement arma el chequeo solo, con lo de la landing o porque el dueño se lo pide.
 3. **El envío:** Gmail desde salinas@jotapuntoce.com (el dueño da el permiso de Google), con su video, la animación del
    regalo, el PDF y un mensaje de entrada personalizado. También para los chequeos propios que pida a Improvement; sin
