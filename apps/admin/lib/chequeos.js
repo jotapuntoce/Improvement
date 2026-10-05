@@ -30,8 +30,8 @@ const noEncontrado = { ok: false, error: { code: "NO_ENCONTRADO" } };
 const esUuid = (id) => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 // drizzle envuelve el error de postgres-js en `cause`.
 const esDuplicado = (e) => (e?.code ?? e?.cause?.code) === "23505";
-const panelUrl = (id) => `${process.env.ADMIN_URL ?? "http://localhost:3100"}/chequeos/${id}`;
-const quien = (c) => [c.nombre, c.negocio].filter(Boolean).join(" · ") || "Sin nombre";
+export const panelUrl = (id) => `${process.env.ADMIN_URL ?? "http://localhost:3100"}/chequeos/${id}`;
+export const quien = (c) => [c.nombre, c.negocio].filter(Boolean).join(" · ") || "Sin nombre";
 
 /** WhatsApp al dueño. Nunca lanza ni frena al que llama: el aviso también vive en la bitácora del panel. */
 export async function avisar(texto) {
@@ -249,14 +249,18 @@ export const pesos = (n) =>
 
 const BUCKET = "chequeos";
 
+/** Sube un PDF al bucket privado. La crea la primera vez. */
+export async function subirPdf(ruta, buffer) {
+  await supabaseAdmin.storage.createBucket(BUCKET, { public: false }).catch(() => {}); // ya existe → se ignora
+  const { error } = await supabaseAdmin.storage.from(BUCKET).upload(ruta, buffer, { contentType: "application/pdf", upsert: true });
+  return error ? { ok: false, error: { code: "STORAGE", mensaje: error.message } } : { ok: true };
+}
+
 export async function guardarPdf(id, archivo) {
   if (!archivo || archivo.type !== "application/pdf") return { ok: false, error: { code: "NO_ES_PDF", mensaje: "Sube un PDF." } };
-  await supabaseAdmin.storage.createBucket(BUCKET, { public: false }).catch(() => {}); // ya existe → se ignora
   const ruta = `${id}/${Date.now()}.pdf`;
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(ruta, Buffer.from(await archivo.arrayBuffer()), { contentType: "application/pdf" });
-  if (error) return { ok: false, error: { code: "STORAGE", mensaje: error.message } };
+  const r = await subirPdf(ruta, Buffer.from(await archivo.arrayBuffer()));
+  if (!r.ok) return r;
   await db.update(chequeo).set({ pdfPath: ruta, updatedAt: new Date() }).where(eq(chequeo.id, id));
   return { ok: true, data: { ruta } };
 }
