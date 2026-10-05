@@ -8,6 +8,7 @@ import {
   avisar,
   cambiarEtapa,
   crearChequeoPropio,
+  guardarDatosPropio,
   guardarEntrevista,
   listarChequeos,
   registrarChequeo,
@@ -128,6 +129,15 @@ describe("entrevista", () => {
 });
 
 describe("panel", () => {
+  it("datos de un propio: guarda enlaces válidos y la nota", async () => {
+    const r = await crearChequeoPropio({ tipo: "negocio", negocio: `Datos ${marca}`, giro: "pádel", ciudad: "SLP", canal: "directo" });
+    ids.push(r.data.id);
+    expect((await guardarDatosPropio(r.data.id, { enlaces: { sitio: "https://borealslp.com", instagram: "" }, nota: "Socias" })).ok).toBe(true);
+    const [f] = await db.select().from(chequeo).where(eq(chequeo.id, r.data.id));
+    expect(f).toMatchObject({ enlaces: { sitio: "https://borealslp.com" }, notas: "Socias" });
+    expect((await guardarDatosPropio(r.data.id, { enlaces: { sitio: "x" } })).error.code).toBe("DATOS_INVALIDOS");
+  });
+
   it("cambiar etapa escribe la bitácora; cliente solo por compra", async () => {
     const { data } = await registrar();
     await cambiarEtapa(data.id, "contacto");

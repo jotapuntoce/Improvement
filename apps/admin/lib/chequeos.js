@@ -14,6 +14,7 @@ import {
   camposInvalidos,
   compraSchema,
   contactoSchema,
+  datosPropioSchema,
   entrevistaSchema,
   negocioClave,
   propioSchema,
@@ -193,7 +194,15 @@ export async function fijarProximaAccion(id, { accion, fecha }) {
   return { ok: true, data: null };
 }
 
-const e164 = (tel) => (tel.length === 10 ? `+52${tel}` : `+${tel}`);
+/** Enlaces y nota de contexto de un chequeo propio, para que el motor tenga de dónde leer. */
+export async function guardarDatosPropio(id, input) {
+  const p = datosPropioSchema.safeParse(input);
+  if (!p.success) return invalido(p.error);
+  await db.update(chequeo).set({ enlaces: p.data.enlaces, notas: p.data.nota, updatedAt: new Date() }).where(eq(chequeo.id, id));
+  return { ok: true, data: null };
+}
+
+const e164 =(tel) => (tel.length === 10 ? `+52${tel}` : `+${tel}`);
 
 /**
  * Registra una compra. La primera vuelve al prospecto cliente: etapa `cliente` y su ficha en Clientes, una sola vez y

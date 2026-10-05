@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth.js";
 import { listarChequeos, tablero } from "@/lib/chequeos.js";
+import { gastoDelMes } from "@/lib/motor/armar.js";
 import { CANALES_PANEL, CANAL_LABEL, ETAPAS, ETAPA_LABEL, etapaDe, nombreDe } from "@/lib/chequeoDatos.js";
 import Formulario from "@/components/chequeos/Formulario.js";
 import { crearPropioAction } from "./actions.js";
@@ -14,7 +15,7 @@ export default async function ChequeosPage({ searchParams }) {
   await requirePlatformAdmin();
   const { etapa } = await searchParams;
   const filtro = ETAPAS.includes(etapa) ? etapa : undefined;
-  const [t, lista] = await Promise.all([tablero(), listarChequeos({ etapa: filtro })]);
+  const [t, lista, gasto] = await Promise.all([tablero(), listarChequeos({ etapa: filtro }), gastoDelMes()]);
   const pct = (n) => (t.total ? `${Math.round((n / t.total) * 100)}%` : "—");
 
   return (
@@ -52,6 +53,7 @@ export default async function ChequeosPage({ searchParams }) {
         <Stat valor={pct(t.escalera.algo)} label={`Compraron algo (${t.escalera.algo})`} />
         <Stat valor={pct(t.escalera.diagnostico)} label={`Diagnóstico 360 (${t.escalera.diagnostico})`} />
         <Stat valor={pct(t.escalera.completo)} label={`Improvement Completo (${t.escalera.completo})`} meta />
+        <Stat valor={`US$${gasto.toFixed(2)}`} label="Gastado en IA (mes)" />
       </section>
 
       <section className="chq-section">

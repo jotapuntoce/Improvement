@@ -6,8 +6,12 @@ import { requirePlatformAdmin } from "@/lib/auth.js";
 import { getChequeo, pesos, urlPdf } from "@/lib/chequeos.js";
 import {
   CANAL_LABEL,
+  ENLACES,
   ETAPAS,
   ETAPA_LABEL,
+  ETAPA_PROSPECTO_LABEL,
+  MOTOR_ACCION_LABEL,
+  MOTOR_ESTADO_LABEL,
   PRODUCTOS,
   PRODUCTO_LABEL,
   RESULTADOS,
@@ -16,7 +20,17 @@ import {
   nombreDe,
 } from "@/lib/chequeoDatos.js";
 import Formulario from "@/components/chequeos/Formulario.js";
-import { anotarContactoAction, cambiarEtapaAction, compraAction, pdfAction, proximaAccionAction } from "../actions.js";
+import {
+  anotarContactoAction,
+  aprobarAction,
+  armarAction,
+  cambiarEtapaAction,
+  compraAction,
+  datosPropioAction,
+  pdfAction,
+  proximaAccionAction,
+  rehacerAction,
+} from "../actions.js";
 
 const dia = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" });
 const momento = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -30,6 +44,7 @@ const TIPO_EVENTO = {
   llamada: "Llamada",
   nota: "Nota",
   compra: "Compra",
+  motor: "Motor",
 };
 const AUTOR = { prospecto: "el prospecto", jose_carlos: "Jose Carlos", improvement: "Improvement" };
 
@@ -38,7 +53,11 @@ function detalleDe(e) {
   if (e.tipo === "etapa") return `de ${ETAPA_LABEL[d.de]} a ${ETAPA_LABEL[d.a]}`;
   if (e.tipo === "compra") return `${PRODUCTO_LABEL[d.producto]} · ${pesos(d.monto)}`;
   if (e.tipo === "entrevista") return d.segundos ? `en ${Math.max(1, Math.round(d.segundos / 60))} min` : "";
-  return [d.resultado && RESULTADO_LABEL[d.resultado], d.nota].filter(Boolean).join(" · ");
+  if (e.tipo === "motor") {
+    const costo = d.costoUsd ? ` · US$${Number(d.costoUsd).toFixed(2)}` : "";
+    return [MOTOR_ACCION_LABEL[d.accion], d.nota && `"${d.nota}"`, d.mensaje].filter(Boolean).join(" · ") + costo;
+  }
+  return [d.resultado &&RESULTADO_LABEL[d.resultado], d.nota].filter(Boolean).join(" · ");
 }
 
 function suTiempo(c) {
@@ -119,13 +138,59 @@ export default async function ChequeoPage({ params }) {
         </section>
       )}
 
+      {c.origen === "propio" && (
+        <section className="chq-section">
+          <h3>Para que Improvement lo arme</h3>
+          <Formulario action={datosPropioAction.bind(null, c.id)} boton="Guardar enlaces y nota">
+            {ENLACES.map((red) => (
+              <input key={red} className="input" name={`enlace_${red}`} type="url" placeholder={red} defaultValue={c.enlaces?.[red] ?? ""} />
+            ))}
+            <textarea className="input" name="nota" rows={3} placeholder="Lo que sabes del negocio y de la persona" defaultValue={c.notas ?? ""} />
+          </Formulario>
+        </section>
+      )}
+
       <section className="chq-section">
-        <h3>El chequeo</h3>
+        <h3>El chequeo · {MOTOR_ESTADO_LABEL[c.motorEstado]}</h3>
+        {c.motorEstado === "armando" && <p className="chq-muted">Improvement lo está armando. Te llega un WhatsApp cuando esté; recarga en unos minutos.</p>}
+        {c.motorEstado === "error" && <p className="form-error">{c.motorError}</p>}
+        {c.etapaProspecto && <p className="chq-muted">Portada: {ETAPA_PROSPECTO_LABEL[c.etapaProspecto]}</p>}
         {pdf ? <iframe src={pdf} title={`Chequeo de ${nombreDe(c)}`} className="chq-pdf" /> : <p className="chq-muted">Todavía sin PDF.</p>}
+        {["sin_empezar", "en_fila", "error"].includes(c.motorEstado) && (
+          <Formulario action={armarAction.bind(null, c.id)} boton={c.motorEstado === "error" ? "Reintentar" : "Armar con Improvement"} />
+        )}
+        {c.motorEstado === "borrador" && (
+          <>
+            <Formulario action={aprobarAction.bind(null, c.id)} boton="Aprobar" />
+            <Formulario action={rehacerAction.bind(null, c.id)} boton="Rehacer con esta nota">
+              <input className="input" name="nota" placeholder="Qué cambiar (ej. no menciones precios)" required />
+            </Formulario>
+          </>
+        )}
         <Formulario action={pdfAction.bind(null, c.id)} boton={pdf ? "Reemplazar PDF" : "Subir PDF"}>
           <input className="input" type="file" name="pdf" accept="application/pdf" required />
         </Formulario>
       </section>
+
+      {c.notasInternas && (
+        <section className="chq-section">
+          <h3>Notas internas (solo tú)</h3>
+          <p><strong>Cómo escribe:</strong> {c.notasInternas.comoEscribe}</p>
+          <p><strong>Su tiempo:</strong> {c.notasInternas.tiempo}</p>
+          {c.notasInternas.sinConfirmar?.length > 0 && <p><strong>Sin confirmar:</strong> {c.notasInternas.sinConfirmar.join(" · ")}</p>}
+          <p><strong>Siguiente paso:</strong> {c.notasInternas.siguientePaso}</p>
+          {c.fuentes?.length > 0 && (
+            <p className="chq-muted">
+              Fuentes:{" "}
+              {c.fuentes.map((f) => (
+                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" style={{ marginRight: 12 }}>
+                  {f.que}
+                </a>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="chq-section">
         <h3>Avanzar</h3>
