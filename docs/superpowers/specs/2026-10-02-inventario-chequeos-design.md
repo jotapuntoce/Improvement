@@ -276,6 +276,10 @@ CLAUDE.md); las unitarias sí.
 ## Las siguientes piezas (fuera de este trabajo, cada una con su spec)
 
 1. **Las 3 preguntas**, para negocio y para emprendedor (se definen con el dueño).
+   - Negocio (dueño, 2026-10-05): "¿Por qué empezaste tu negocio? Cuéntanos un poco de tu historia." ·
+     "¿Qué parte de tu negocio te gustaría que caminara sin ti?" · "¿Qué quieres que tu negocio haga por tu vida?"
+     (persona → lo que no se ve desde afuera → destino).
+   - Emprendedor: por decidir, con otro molde.
 2. **El motor:** Improvement arma el chequeo solo, con lo de la landing o porque el dueño se lo pide.
 3. **El envío:** Gmail desde salinas@jotapuntoce.com (el dueño da el permiso de Google), con su video, la animación del
    regalo, el PDF y un mensaje de entrada personalizado. También para los chequeos propios que pida a Improvement; sin
