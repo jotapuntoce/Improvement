@@ -52,6 +52,8 @@ describe("ia", () => {
     expect(r1.error.code).toBe("RECHAZO");
     const r2 = await investigar({ sistema: "S", mensajes: [] }, { anthropic: falso(respuesta("max_tokens", [])) });
     expect(r2.error.code).toBe("MUY_LARGO");
+    const r3 = await investigar({ sistema: "S", mensajes: [] }, { anthropic: falso(respuesta("model_context_window_exceeded", [])) });
+    expect(r3.error.code).toBe("MUY_LARGO");
   });
 
   it("una excepción del proveedor no se lanza", async () => {

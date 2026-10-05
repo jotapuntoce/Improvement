@@ -76,7 +76,7 @@ export async function investigar({ sistema, mensajes }, { anthropic } = {}) {
       if (r.stop_reason === "refusal") {
         return { ok: false, error: { code: "RECHAZO", mensaje: `La IA no quiso armarlo (${r.stop_details?.category ?? "sin categoría"}).` }, uso };
       }
-      if (r.stop_reason === "max_tokens") return { ok: false, error: { code: "MUY_LARGO", mensaje: "La respuesta se cortó por larga." }, uso };
+      if (r.stop_reason === "max_tokens" || r.stop_reason === "model_context_window_exceeded") return { ok: false, error: { code: "MUY_LARGO", mensaje: "La respuesta se cortó por larga." }, uso };
       const texto = r.content.filter((b) => b.type === "text").at(-1)?.text ?? "";
       return { ok: true, data: { texto, mensajes: messages, modelo: r.model }, uso };
     }

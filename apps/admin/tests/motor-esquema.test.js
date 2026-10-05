@@ -24,4 +24,10 @@ describe("contenidoSchema", () => {
     expect(pastillas.length).toBeGreaterThan(0);
     expect(contenidoSchema.safeParse(sinPastillas).success).toBe(false);
   });
+
+  it("una fuente con url que no es http(s) no pasa", () => {
+    const k = contenidoMuestra("creciendo");
+    k.fuentes[0] = { ...k.fuentes[0], url: "javascript:alert(1)" };
+    expect(contenidoSchema.safeParse(k).success).toBe(false);
+  });
 });

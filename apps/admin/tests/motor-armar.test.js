@@ -105,6 +105,18 @@ describe("armarChequeo", () => {
     }
   }, 20_000);
 
+  it("un automático fallido cuenta para el tope", async () => {
+    process.env.CHEQUEOS_MOTOR_TOPE_DIA = "1";
+    try {
+      const a = await propio();
+      expect((await armarChequeo(a, {}, { investigar: responde("{}", "nada"), aPdf: pdfFalso })).error.code).toBe("MOTOR");
+      const b = await propio();
+      expect((await armarChequeo(b, {}, { investigar: responde(valido()), aPdf: pdfFalso })).error.code).toBe("EN_FILA");
+    } finally {
+      process.env.CHEQUEOS_MOTOR_TOPE_DIA = "1000";
+    }
+  }, 20_000);
+
   it("dos armados a la vez: solo uno corre", async () => {
     const id = await propio();
     const [a, b] = await Promise.all([

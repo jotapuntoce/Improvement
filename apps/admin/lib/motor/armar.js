@@ -13,20 +13,31 @@ import { htmlChequeo } from "./plantilla.js";
 
 const TOMABLES = ["sin_empezar", "en_fila", "borrador", "error"];
 // Un armado que lleva más de esto en "armando" se da por muerto (proceso caído) y se puede volver a tomar.
-const ARMANDO_ATORADO_MS = 15 * 60_000;
+export const ARMANDO_ATORADO_MS = 15 * 60_000;
 const tope = () => Number(process.env.CHEQUEOS_MOTOR_TOPE_DIA ?? 20);
 const accion = (a) => sql`${chequeoEvento.detalle}->>'accion' = ${a}`;
 
 const evento = (chequeoId, autor, detalle) => db.insert(chequeoEvento).values({ chequeoId, tipo: "motor", autor, detalle });
 
-// ponytail: cuenta los armados ya terminados; una ráfaga simultánea puede pasarse del tope por unos cuantos.
+// Cuenta los armados automáticos de las últimas 24 h (terminados o fallidos) más los que están armando ahora.
+// ponytail: leer y tomar no son atómicos; una ráfaga simultánea puede pasarse del tope por unos cuantos.
 async function automaticosUltimoDia() {
   const desde = new Date(Date.now() - 86_400_000);
-  const [r] = await db
-    .select({ n: count() })
-    .from(chequeoEvento)
-    .where(and(eq(chequeoEvento.tipo, "motor"), accion("armado"), sql`${chequeoEvento.detalle}->>'automatico' = 'true'`, gte(chequeoEvento.createdAt, desde)));
-  return r.n;
+  const [[ev], [en]] = await Promise.all([
+    db
+      .select({ n: count() })
+      .from(chequeoEvento)
+      .where(
+        and(
+          eq(chequeoEvento.tipo, "motor"),
+          sql`${chequeoEvento.detalle}->>'accion' in ('armado','error')`,
+          sql`${chequeoEvento.detalle}->>'automatico' = 'true'`,
+          gte(chequeoEvento.createdAt, desde),
+        ),
+      ),
+    db.select({ n: count() }).from(chequeo).where(eq(chequeo.motorEstado, "armando")),
+  ]);
+  return ev.n + en.n;
 }
 
 async function borradoresHechos(id) {
@@ -37,9 +48,9 @@ async function borradoresHechos(id) {
   return r.n;
 }
 
-async function fallar(c, mensaje, uso) {
+async function fallar(c, mensaje, uso, automatico) {
   await db.update(chequeo).set({ motorEstado: "error", motorError: mensaje, updatedAt: new Date() }).where(eq(chequeo.id, c.id));
-  await evento(c.id, "improvement", { accion: "error", mensaje, ...(uso && { uso, costoUsd: costoUsd(uso) }) });
+  await evento(c.id, "improvement", { accion: "error", mensaje, automatico, ...(uso && { uso, costoUsd: costoUsd(uso) }) });
   await avisar(`⚠️ El motor no pudo armar el Chequeo de ${quien(c)}: ${mensaje} · ${panelUrl(c.id)}`);
   return { ok: false, error: { code: "MOTOR", mensaje } };
 }
@@ -86,35 +97,39 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
 
     let r = await inv({ sistema: METODO, mensajes: [{ role: "user", content: mensajeDe(c, { nota }) }] });
     sumar(r.uso);
-    if (!r.ok) return fallar(c, r.error.mensaje, uso);
+    if (!r.ok) return fallar(c, r.error.mensaje, uso, !manual);
     let p = contenidoSchema.safeParse(extraerJson(r.data.texto) ?? {});
     if (!p.success) {
       r = await inv({ sistema: METODO, mensajes: [...r.data.mensajes, { role: "user", content: correccion(p.error) }] });
       sumar(r.uso);
-      if (!r.ok) return fallar(c, r.error.mensaje, uso);
+      if (!r.ok) return fallar(c, r.error.mensaje, uso, !manual);
       p = contenidoSchema.safeParse(extraerJson(r.data.texto) ?? {});
-      if (!p.success) return fallar(c, "La respuesta de la IA no tenía todas las piezas del Chequeo, ni al segundo intento.", uso);
+      if (!p.success) return fallar(c, "La respuesta de la IA no tenía todas las piezas del Chequeo, ni al segundo intento.", uso, !manual);
     }
     const k = p.data;
-    if (k.tipo !== c.tipo) return fallar(c, `La IA armó un Chequeo de ${k.tipo} y este es de ${c.tipo}.`, uso);
+    if (k.tipo !== c.tipo) return fallar(c, `La IA armó un Chequeo de ${k.tipo} y este es de ${c.tipo}.`, uso, !manual);
 
     const ruta = `${id}/borrador-${(await borradoresHechos(id)) + 1}.pdf`;
     const subido = await subirPdf(ruta, await pdf(htmlChequeo(c, k)));
-    if (!subido.ok) return fallar(c, `No se pudo guardar el PDF: ${subido.error.mensaje}`, uso);
+    if (!subido.ok) return fallar(c, `No se pudo guardar el PDF: ${subido.error.mensaje}`, uso, !manual);
 
     const { notasInternas, fuentes, ...contenido } = k;
-    await db.transaction(async (tx) => {
-      await tx
+    const cerrado = await db.transaction(async (tx) => {
+      const filas = await tx
         .update(chequeo)
         .set({ motorEstado: "borrador", motorError: null, contenido, notasInternas, fuentes, etapaProspecto: k.etapaProspecto, pdfPath: ruta, updatedAt: new Date() })
-        .where(eq(chequeo.id, id));
+        .where(and(eq(chequeo.id, id), eq(chequeo.motorEstado, "armando")))
+        .returning({ id: chequeo.id });
+      if (!filas.length) return false; // otra llamada retomó la fila mientras esta armaba
       await tx.insert(chequeoEvento).values({
         chequeoId: id,
         tipo: "motor",
         autor: "improvement",
-        detalle: { accion: nota ? "rehecho" : "armado", automatico: !manual, nota, pdfPath: ruta, uso, costoUsd: costoUsd(uso), modelo: MODELO, metodo: METODO_VERSION },
+        detalle: { accion: nota ? "rehecho" : "armado", automatico: !manual, nota, pdfPath: ruta, uso, costoUsd: costoUsd(uso), modelo: r.data.modelo ?? MODELO, metodo: METODO_VERSION },
       });
+      return true;
     });
+    if (!cerrado) return { ok: false, error: { code: "YA_ARMANDO" } };
     await avisar(`📝 Borrador listo: Chequeo de ${quien(c)}. Revísalo y apruébalo · ${panelUrl(id)}`);
     return { ok: true, data: { pdfPath: ruta } };
   } catch (e) {
@@ -122,7 +137,7 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
     try {
       if (tomada) {
         const [c] = await db.select().from(chequeo).where(eq(chequeo.id, id)).limit(1);
-        if (c) return await fallar(c, mensaje, uso);
+        if (c) return await fallar(c, mensaje, uso, !manual);
       }
     } catch {
       // la base también falló: se devuelve el resultado simple

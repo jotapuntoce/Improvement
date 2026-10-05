@@ -202,7 +202,7 @@ export async function guardarDatosPropio(id, input) {
   return { ok: true, data: null };
 }
 
-const e164 =(tel) => (tel.length === 10 ? `+52${tel}` : `+${tel}`);
+const e164 = (tel) => (tel.length === 10 ? `+52${tel}` : `+${tel}`);
 
 /**
  * Registra una compra. La primera vuelve al prospecto cliente: etapa `cliente` y su ficha en Clientes, una sola vez y

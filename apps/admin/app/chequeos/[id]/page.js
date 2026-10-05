@@ -19,6 +19,7 @@ import {
   etapaDe,
   nombreDe,
 } from "@/lib/chequeoDatos.js";
+import { ARMANDO_ATORADO_MS } from "@/lib/motor/armar.js";
 import Formulario from "@/components/chequeos/Formulario.js";
 import {
   anotarContactoAction,
@@ -57,7 +58,7 @@ function detalleDe(e) {
     const costo = d.costoUsd ? ` · US$${Number(d.costoUsd).toFixed(2)}` : "";
     return [MOTOR_ACCION_LABEL[d.accion], d.nota && `"${d.nota}"`, d.mensaje].filter(Boolean).join(" · ") + costo;
   }
-  return [d.resultado &&RESULTADO_LABEL[d.resultado], d.nota].filter(Boolean).join(" · ");
+  return [d.resultado && RESULTADO_LABEL[d.resultado], d.nota].filter(Boolean).join(" · ");
 }
 
 function suTiempo(c) {
@@ -69,12 +70,15 @@ function suTiempo(c) {
   return `${registro}; contestó la entrevista ${cuando}${min}.`;
 }
 
+const armandoAtorado = (c) => c.motorEstado === "armando" && Date.now() - new Date(c.updatedAt) > ARMANDO_ATORADO_MS;
+
 export default async function ChequeoPage({ params }) {
   await requirePlatformAdmin();
   const { id } = await params;
   const c = await getChequeo(id);
   if (!c) notFound();
   const pdf = await urlPdf(c.pdfPath);
+  const atorado = armandoAtorado(c);
   const enlaces = Object.entries(c.enlaces ?? {});
 
   return (
@@ -156,8 +160,8 @@ export default async function ChequeoPage({ params }) {
         {c.motorEstado === "error" && <p className="form-error">{c.motorError}</p>}
         {c.etapaProspecto && <p className="chq-muted">Portada: {ETAPA_PROSPECTO_LABEL[c.etapaProspecto]}</p>}
         {pdf ? <iframe src={pdf} title={`Chequeo de ${nombreDe(c)}`} className="chq-pdf" /> : <p className="chq-muted">Todavía sin PDF.</p>}
-        {["sin_empezar", "en_fila", "error"].includes(c.motorEstado) && (
-          <Formulario action={armarAction.bind(null, c.id)} boton={c.motorEstado === "error" ? "Reintentar" : "Armar con Improvement"} />
+        {(["sin_empezar", "en_fila", "error"].includes(c.motorEstado) || atorado) && (
+          <Formulario action={armarAction.bind(null, c.id)} boton={c.motorEstado === "error" || atorado ? "Reintentar" : "Armar con Improvement"} />
         )}
         {c.motorEstado === "borrador" && (
           <>

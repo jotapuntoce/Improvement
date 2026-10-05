@@ -21,7 +21,7 @@ const comun = {
   porQue: texto,
   bueno: lista,
   cierre: texto,
-  fuentes: z.array(z.object({ url: texto, que: texto })).default([]),
+  fuentes: z.array(z.object({ url: z.url({ protocol: /^https?$/ }), que: texto })).default([]),
   notasInternas: z.object({
     comoEscribe: texto,
     tiempo: texto,
