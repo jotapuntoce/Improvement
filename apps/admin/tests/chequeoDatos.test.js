@@ -57,6 +57,9 @@ describe("registroSchema", () => {
   });
   it("rechaza un canal que no existe", () => {
     expect(registroSchema.safeParse({ ...registro, canal: "radio" }).success).toBe(false);
+    // "directo" (prospecto del dueño, sin comisión) solo lo usa el panel
+    expect(registroSchema.safeParse({ ...registro, canal: "directo" }).success).toBe(false);
+    expect(propioSchema.safeParse({ tipo: "negocio", negocio: "B", giro: "g", ciudad: "c", canal: "directo" }).success).toBe(true);
   });
 });
 

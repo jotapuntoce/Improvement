@@ -783,7 +783,7 @@ export const chequeo = pgTable(
     check("chequeo_tipo_check", sql`${t.tipo} in ('negocio','emprendedor')`),
     check(
       "chequeo_canal_check",
-      sql`${t.canal} in ('anuncio_meta','referido','summum','tiktok','youtube','anuncio_google','conferencia','webinar','live','reel','otro')`,
+      sql`${t.canal} in ('anuncio_meta','referido','summum','tiktok','youtube','anuncio_google','conferencia','webinar','live','reel','otro','directo')`,
     ),
     check(
       "chequeo_etapa_check",

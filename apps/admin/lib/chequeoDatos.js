@@ -29,7 +29,10 @@ export const CANAL_LABEL = {
   live: "Live",
   reel: "Reel",
   otro: "Otro",
+  directo: "Prospecto mío (sin comisión)",
 };
+// "directo" solo existe en el panel: la landing nunca lo ofrece. "referido" + canalDetalle = a quién se le paga comisión.
+export const CANALES_PANEL = ["directo", ...CANALES];
 export const PRODUCTOS = ["kit", "base", "diagnostico_360", "completo", "director", "acabados", "become", "otro"];
 export const PRODUCTO_LABEL = {
   kit: "Kit Arranque",
@@ -108,6 +111,7 @@ export const propioSchema = conNegocio(
       .refine((c) => !c || z.email().safeParse(c).success, "Correo inválido")
       .transform((c) => (c ? normalizarCorreo(c) : null)),
     telefono: opcional.transform((t) => (t ? normalizarTelefono(t) : null)),
+    canal: z.enum(CANALES_PANEL),
     abrePuerta: opcional,
   }),
 );

@@ -162,6 +162,13 @@
       "when": 1790959367759,
       "tag": "0022_chequeo_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791216367077,
+      "tag": "0023_open_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

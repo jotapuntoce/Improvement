@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth.js";
 import { listarChequeos, tablero } from "@/lib/chequeos.js";
-import { CANALES, CANAL_LABEL, ETAPAS, ETAPA_LABEL, etapaDe, nombreDe } from "@/lib/chequeoDatos.js";
+import { CANALES_PANEL, CANAL_LABEL, ETAPAS, ETAPA_LABEL, etapaDe, nombreDe } from "@/lib/chequeoDatos.js";
 import Formulario from "@/components/chequeos/Formulario.js";
 import { crearPropioAction } from "./actions.js";
 
@@ -92,14 +92,14 @@ export default async function ChequeosPage({ searchParams }) {
           <input className="input" name="negocio" placeholder="Negocio (o nombre de la idea)" />
           <input className="input" name="giro" placeholder="Giro (o qué quiere emprender) *" required />
           <input className="input" name="ciudad" placeholder="Ciudad *" required />
-          <select className="input" name="canal" defaultValue="referido">
-            {CANALES.map((c) => (
+          <select className="input" name="canal" defaultValue="directo">
+            {CANALES_PANEL.map((c) => (
               <option key={c} value={c}>
                 {CANAL_LABEL[c]}
               </option>
             ))}
           </select>
-          <input className="input" name="canalDetalle" placeholder="Detalle del canal (quién lo refirió…)" />
+          <input className="input" name="canalDetalle" placeholder="Si es referido: quién lo recomendó (su comisión)" />
           <input className="input" name="abrePuerta" placeholder="Quién abre la puerta" />
           <input className="input" name="nombre" placeholder="Persona" />
           <input className="input" name="correo" type="email" placeholder="Correo" />
