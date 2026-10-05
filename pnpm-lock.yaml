@@ -26,6 +26,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 0.122.0
+        version: 0.122.0(zod@4.5.4)
       '@jotapuntoce/db':
         specifier: workspace:*
         version: link:../../packages/db

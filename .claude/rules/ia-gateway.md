@@ -2,11 +2,13 @@
 description: Un solo gateway de IA, model id nunca hardcodeado
 paths:
   - "apps/improvement/server/ai/**"
+  - "apps/admin/lib/ia.js"
+  - "apps/admin/lib/motor/**"
 ---
 
-- `@anthropic-ai/sdk` se importa en exactamente un archivo de todo el repo:
-  `apps/improvement/server/ai/gateway.ts`. Ningún componente, ruta ni Server Action importa el SDK
-  directo.
+- `@anthropic-ai/sdk` se importa en exactamente un archivo por app: `apps/improvement/server/ai/gateway.ts` y
+  `apps/admin/lib/ia.js` (admin no puede importar de apps/improvement). Ningún componente, ruta ni Server Action importa
+  el SDK directo.
 - Antes de escribir o modificar cualquier llamada al modelo, invoca la skill `claude-api` y copia el
   model id, precio y parámetros vigentes de ahí. Nunca escribas un id de modelo de memoria.
 - El model id vive en configuración/entorno, nunca inline en el call site.
@@ -17,6 +19,9 @@ paths:
   caracteres.
 - El límite de 10 solicitudes por org por hora se verifica **antes** de llamar al proveedor, no
   después.
+- Excepción documentada en admin: el motor del Chequeo guarda el uso y el costo en el evento `motor` de
+  `chequeo_evento`, no en `llm_calls` (que exige `org_id`, y los prospectos no tienen organización). Su tope es
+  `CHEQUEOS_MOTOR_TOPE_DIA` por día, no 10 por org por hora.
 
 ## Do not
 
