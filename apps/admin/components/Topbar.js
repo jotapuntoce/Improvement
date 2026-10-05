@@ -7,6 +7,8 @@ const TITLES = {
   "/": { title: "Recepción", subtitle: "", script: true },
   "/improvement": { title: "Improvement", subtitle: "Empresa digital · catálogo y productos" },
   "/planos": { title: "Planos", subtitle: "Expedientes por proyecto y ensambles" },
+  "/chequeos": { title: "Chequeos", subtitle: "Del chequeo gratis a Improvement Completo" },
+  "/clientes": { title: "Clientes", subtitle: "Quien ya compró algo" },
   "/company-requests": { title: "Solicitudes", subtitle: "Auto-registro de empresa de tus clientes" },
 };
 
