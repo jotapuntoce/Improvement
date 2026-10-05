@@ -174,8 +174,8 @@ rechaza.
 - **4 portadas por etapa** del prospecto, con el mensaje totalmente personalizado.
 - **La Plática** (nivel 0.5 de la escalera): 20 a 60 minutos, presencial o en línea, **$20 USD**, solo sobre la
   persona, con un cuestionario empático. **Quien la paga es cliente.**
-  - Que los $20 se abonen al 360 está recomendado (cumple la regla 2 de la escalera; es ~5 % del 360) y **falta que el
-    dueño lo confirme**.
+  - **Los $20 se abonan al Diagnóstico 360** (dueño, 2026-10-05): cumple la regla 2 de la escalera. Sigue las reglas
+    de abono: sin caducidad, personal y congelado.
   - La Plática es una pieza propia, por diseñar: cuestionario, agenda, cobro y dónde se anotan las respuestas.
 
 ## 8 · Pruebas
