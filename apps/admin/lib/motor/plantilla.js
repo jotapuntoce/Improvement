@@ -21,10 +21,13 @@ const e = (s) =>
 const linea = (d) =>
   `<svg viewBox="0 0 170 90" class="trazo" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}" style="stroke:var(--brand-navy)" stroke-width=".7"/></svg>`;
 
-/** Una portada por etapa: la frase a mano y el trazo de la ilustración. */
+// Flecha a mano que sube de la frase al boceto (decisión del dueño, 2026-10-05).
+const FLECHA = `<svg viewBox="0 0 20 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="stroke:var(--brand-amber-paper)" stroke-width="1.4"><path d="M11 22 C6 16 13 10 9 3 M9 3 l-4 4 M9 3 l3 5"/></svg>`;
+
+/** Una portada por etapa: la frase a mano (va abajo del boceto, señalándolo) y el trazo de la ilustración. */
 export const PORTADAS = {
   idea: { frase: "puede ser a lo que te dediques toda la vida.", trazo: linea("M20 70 C40 70 50 40 85 40 C120 40 130 20 150 18 M150 18 l-6 -2 M150 18 l-3 5") },
-  arrancando: { frase: "los primeros pasos ya se ven.", trazo: linea("M10 70 H50 L60 60 H90 L100 50 H130 L140 40 H165") },
+  arrancando: { frase: "ya está dando sus primeros pasos.", trazo: linea("M10 70 H50 L60 60 H90 L100 50 H130 L140 40 H165") },
   creciendo: { frase: "da para más.", trazo: linea("M0 62 H34 L38 56 L42 62 H50 L54 70 L59 30 L64 72 L68 62 H102 L114 54 L124 57 L136 40 L148 43 L166 16") },
   consolidado: { frase: "está listo para el siguiente piso.", trazo: linea("M30 80 V40 H70 V80 M70 80 V25 H110 V80 M110 80 V10 H150 V80 M20 80 H160") },
 };
@@ -39,6 +42,9 @@ const ESTILOS = `
   .foot { position: absolute; left: 20mm; right: 20mm; bottom: 12mm; display: flex; justify-content: space-between; font-size: 8pt; color: color-mix(in srgb, var(--brand-navy) 72%, var(--brand-ivory)); }
   .foot::before { content: ""; position: absolute; left: 0; right: 0; top: -4mm; height: .6mm; border-radius: 1mm; background: var(--brand-thread); }
   .trazo { width: 100%; margin-top: 14mm; }
+  .senal { text-align: center; font-size: 15pt; margin-top: -8mm; }
+  .senal svg { display: block; width: 10mm; height: 12mm; margin: 0 auto 1mm; }
+  .senal .hand { font-size: 1.5em; }
   .cover .block { margin-top: auto; background: var(--dept-imaginacion); border-radius: 4mm; padding: 14mm 12mm; }
   .cover h1 { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 46pt; line-height: .92; letter-spacing: -.045em; }
   .cover .for { margin-top: 6mm; font-size: 12.5pt; line-height: 1.4; }
@@ -79,7 +85,7 @@ export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
   const paginas = [
     pagina(
       `Chequeo · ${mes.format(fecha)}`,
-      `${portada.trazo}<div class="block"><h1>Chequeo de ${e(nombre)}</h1><p class="hand" style="font-size:22pt;margin-top:3mm">${e(portada.frase)}</p><div class="for">Preparado para <b>${e(para)}</b><br>${e(k.portada.dedicatoria)}</div></div><div class="meta"><div><b>Jose Carlos Salinas</b>Preparado por</div><div><b>${dia.format(fecha)}</b>Fecha</div><div><b>Un regalo</b>No cuesta nada</div></div>`,
+      `${portada.trazo}<p class="senal">${FLECHA}${e(c.tipo === "negocio" ? c.negocio : "Tu idea")} <span class="hand">${e(portada.frase)}</span></p><div class="block"><h1>Chequeo de ${e(nombre)}</h1><div class="for">Preparado para <b>${e(para)}</b><br>${e(k.portada.dedicatoria)}</div></div><div class="meta"><div><b>Jose Carlos Salinas</b>Preparado por</div><div><b>${dia.format(fecha)}</b>Fecha</div><div><b>Un regalo</b>No cuesta nada</div></div>`,
     ).replace('class="page"', 'class="page cover"'),
     pagina("Antes de empezar", `<h2>Por qué hicimos esto</h2><p>${e(k.porQue)}</p><div class="card" style="margin-top:8mm"><p>${e(k.portada.dedicatoria)}</p></div><p style="margin-top:6mm"><span class="hand">Con gusto,</span></p><p><b>Jose Carlos Salinas</b> · JotaPuntoCe</p>`),
   ];
