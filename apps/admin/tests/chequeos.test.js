@@ -156,7 +156,7 @@ describe("panel", () => {
     const [fila] = await db.select().from(chequeo).where(eq(chequeo.id, data.id));
     expect(fila.etapa).toBe("cliente");
     expect((await eventosDe(data.id)).filter((e) => e.tipo === "compra")).toHaveLength(2);
-  });
+  }, 20_000); // ~15 consultas seguidas contra el Supabase remoto
 
   it("tablero cuenta la escalera y por canal", async () => {
     const { data } = await registrar({ canal: "tiktok" });
