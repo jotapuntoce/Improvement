@@ -1,7 +1,7 @@
 // El motor del Chequeo: estados, tope, investigación, validación, plantilla, PDF, bitácora y avisos. Nunca lanza: todo
 // termina en borrador, en_fila o error, con su evento `motor`. Sin guard adentro (el guard vive en
 // app/chequeos/actions.js; la API lo llama tras validar la clave). Spec: 2026-10-05-motor-chequeo-design.md.
-import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { chequeo, chequeoEvento } from "@jotapuntoce/db/schema";
 import { db } from "../db.js";
 import { avisar, panelUrl, quien, subirPdf } from "../chequeos.js";
@@ -12,6 +12,8 @@ import { aPdf } from "./pdf.js";
 import { htmlChequeo } from "./plantilla.js";
 
 const TOMABLES = ["sin_empezar", "en_fila", "borrador", "error"];
+// Un armado que lleva más de esto en "armando" se da por muerto (proceso caído) y se puede volver a tomar.
+const ARMANDO_ATORADO_MS = 15 * 60_000;
 const tope = () => Number(process.env.CHEQUEOS_MOTOR_TOPE_DIA ?? 20);
 const accion = (a) => sql`${chequeoEvento.detalle}->>'accion' = ${a}`;
 
@@ -50,6 +52,11 @@ const correccion = (error) =>
 export async function armarChequeo(id, { manual = false, nota = null } = {}, deps = {}) {
   const inv = deps.investigar ?? investigar;
   const pdf = deps.aPdf ?? aPdf;
+  const uso = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, busquedas: 0, paginas: 0 };
+  const sumar = (u) => {
+    for (const k of Object.keys(uso)) uso[k] += u?.[k] ?? 0;
+  };
+  let tomada = false; // solo esta llamada puede marcar error si ella tomó la fila
   try {
     const [c] = await db.select().from(chequeo).where(eq(chequeo.id, id)).limit(1);
     if (!c) return { ok: false, error: { code: "NO_ENCONTRADO" } };
@@ -64,14 +71,18 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
     const tomado = await db
       .update(chequeo)
       .set({ motorEstado: "armando", motorError: null, updatedAt: new Date() })
-      .where(and(eq(chequeo.id, id), inArray(chequeo.motorEstado, TOMABLES)))
+      .where(
+        and(
+          eq(chequeo.id, id),
+          or(
+            inArray(chequeo.motorEstado, TOMABLES),
+            and(eq(chequeo.motorEstado, "armando"), lt(chequeo.updatedAt, new Date(Date.now() - ARMANDO_ATORADO_MS))),
+          ),
+        ),
+      )
       .returning({ id: chequeo.id });
     if (!tomado.length) return { ok: false, error: { code: "YA_ARMANDO" } };
-
-    const uso = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, busquedas: 0, paginas: 0 };
-    const sumar = (u) => {
-      for (const k of Object.keys(uso)) uso[k] += u?.[k] ?? 0;
-    };
+    tomada = true;
 
     let r = await inv({ sistema: METODO, mensajes: [{ role: "user", content: mensajeDe(c, { nota }) }] });
     sumar(r.uso);
@@ -107,9 +118,16 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
     await avisar(`📝 Borrador listo: Chequeo de ${quien(c)}. Revísalo y apruébalo · ${panelUrl(id)}`);
     return { ok: true, data: { pdfPath: ruta } };
   } catch (e) {
-    const [c] = await db.select().from(chequeo).where(eq(chequeo.id, id)).limit(1).catch(() => []);
-    if (c) return fallar(c, `Falla inesperada: ${e?.message ?? e}`);
-    return { ok: false, error: { code: "MOTOR", mensaje: String(e?.message ?? e) } };
+    const mensaje = `Falla inesperada: ${e?.message ?? e}`;
+    try {
+      if (tomada) {
+        const [c] = await db.select().from(chequeo).where(eq(chequeo.id, id)).limit(1);
+        if (c) return await fallar(c, mensaje, uso);
+      }
+    } catch {
+      // la base también falló: se devuelve el resultado simple
+    }
+    return { ok: false, error: { code: "MOTOR", mensaje } };
   }
 }
 

@@ -120,4 +120,21 @@ describe("armarChequeo", () => {
     const r = await armarChequeo(id, { manual: true }, { investigar: responde(JSON.stringify(contenidoMuestra("idea"))), aPdf: pdfFalso });
     expect(r.error.code).toBe("MOTOR");
   }, 20_000);
+
+  it("si el PDF lanza → error, y el costo ya gastado queda en la bitácora", async () => {
+    const id = await propio();
+    const r = await armarChequeo(id, { manual: true }, { investigar: responde(valido()), aPdf: async () => { throw new Error("chromium"); } });
+    expect(r.error.code).toBe("MOTOR");
+    expect((await fila(id)).motorEstado).toBe("error");
+    const ev = (await db.select().from(chequeoEvento).where(eq(chequeoEvento.chequeoId, id))).find((e) => e.detalle?.accion === "error");
+    expect(ev.detalle.costoUsd).toBeGreaterThan(0);
+  }, 20_000);
+
+  it("armando atorado (>15 min) se retoma; uno reciente da YA_ARMANDO", async () => {
+    const id = await propio();
+    await db.update(chequeo).set({ motorEstado: "armando", updatedAt: new Date(Date.now() - 20 * 60_000) }).where(eq(chequeo.id, id));
+    expect((await armarChequeo(id, { manual: true }, { investigar: responde(valido()), aPdf: pdfFalso })).ok).toBe(true);
+    await db.update(chequeo).set({ motorEstado: "armando", updatedAt: new Date() }).where(eq(chequeo.id, id));
+    expect((await armarChequeo(id, { manual: true }, { investigar: responde(valido()), aPdf: pdfFalso })).error.code).toBe("YA_ARMANDO");
+  }, 20_000);
 });
