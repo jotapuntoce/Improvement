@@ -10,10 +10,12 @@ import { contenidoSchema } from "./esquema.js";
 import { METODO, METODO_VERSION, mensajeDe } from "./metodo.js";
 import { aPdf } from "./pdf.js";
 import { htmlChequeo } from "./plantilla.js";
+import { recolectar } from "./recolector/index.js";
 
 const TOMABLES = ["sin_empezar", "en_fila", "borrador", "error"];
 // Un armado que lleva más de esto en "armando" se da por muerto (proceso caído) y se puede volver a tomar.
 export const ARMANDO_ATORADO_MS = 15 * 60_000;
+const EXPEDIENTE_VIGENTE_MS = 7 * 86_400_000;
 const tope = () => Number(process.env.CHEQUEOS_MOTOR_TOPE_DIA ?? 20);
 const accion = (a) => sql`${chequeoEvento.detalle}->>'accion' = ${a}`;
 
@@ -63,6 +65,7 @@ const correccion = (error) =>
 export async function armarChequeo(id, { manual = false, nota = null } = {}, deps = {}) {
   const inv = deps.investigar ?? investigar;
   const pdf = deps.aPdf ?? aPdf;
+  const rec = deps.recolectar ?? recolectar;
   const uso = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, busquedas: 0, paginas: 0 };
   const sumar = (u) => {
     for (const k of Object.keys(uso)) uso[k] += u?.[k] ?? 0;
@@ -95,7 +98,11 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
     if (!tomado.length) return { ok: false, error: { code: "YA_ARMANDO" } };
     tomada = true;
 
-    let r = await inv({ sistema: METODO, mensajes: [{ role: "user", content: mensajeDe(c, { nota }) }] });
+    const vigente = c.expediente?.fecha && Date.now() - new Date(c.expediente.fecha) < EXPEDIENTE_VIGENTE_MS;
+    const expediente = vigente ? c.expediente : await rec(c);
+    if (!vigente) await db.update(chequeo).set({ expediente }).where(eq(chequeo.id, id));
+
+    let r = await inv({ sistema: METODO, mensajes: [{ role: "user", content: mensajeDe(c, { nota, expediente }) }] });
     sumar(r.uso);
     if (!r.ok) return fallar(c, r.error.mensaje, uso, !manual);
     let p = contenidoSchema.safeParse(extraerJson(r.data.texto) ?? {});

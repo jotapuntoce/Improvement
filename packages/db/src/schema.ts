@@ -776,6 +776,8 @@ export const chequeo = pgTable(
     notasInternas: jsonb("notas_internas"),
     etapaProspecto: text("etapa_prospecto"),
     fuentes: jsonb("fuentes"),
+    // Lo que juntó el recolector (sitio e Instagram) para el motor; se reusa 7 días al rehacer.
+    expediente: jsonb("expediente"),
     aceptaAvisoAt: timestamp("acepta_aviso_at", { withTimezone: true }),
     aceptaCorreos: boolean("acepta_correos").notNull().default(false),
     aceptaCorreosAt: timestamp("acepta_correos_at", { withTimezone: true }),

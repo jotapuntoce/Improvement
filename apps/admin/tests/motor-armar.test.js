@@ -149,4 +149,20 @@ describe("armarChequeo", () => {
     await db.update(chequeo).set({ motorEstado: "armando", updatedAt: new Date() }).where(eq(chequeo.id, id));
     expect((await armarChequeo(id, { manual: true }, { investigar: responde(valido()), aPdf: pdfFalso })).error.code).toBe("YA_ARMANDO");
   }, 20_000);
+
+  it("recolecta, guarda el expediente, lo manda a la IA y lo reusa al rehacer", async () => {
+    const id = await propio();
+    let veces = 0;
+    const recolectar = async () => {
+      veces += 1;
+      return { fecha: new Date().toISOString(), sitio: { ok: true, data: { url: "https://ejemplo.com" } }, instagram: { ok: false, motivo: "No dio su Instagram." } };
+    };
+    const inv = responde(valido());
+    await armarChequeo(id, { manual: true }, { investigar: inv, aPdf: pdfFalso, recolectar });
+    expect(veces).toBe(1);
+    expect((await fila(id)).expediente.sitio.data.url).toBe("https://ejemplo.com");
+    expect(inv.llamadas[0].mensajes[0].content).toContain("No se pudo ver: instagram — No dio su Instagram.");
+    await armarChequeo(id, { manual: true, nota: "Más corto" }, { investigar: responde(valido()), aPdf: pdfFalso, recolectar });
+    expect(veces).toBe(1);
+  }, 20_000);
 });
