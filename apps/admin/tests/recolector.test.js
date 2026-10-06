@@ -48,4 +48,17 @@ describe("recolectar con expediente previo", () => {
     await recolectar(C, { previo: { ...previoBase(), fecha: viejo }, ...f });
     expect(f.llamadas.sort()).toEqual(["instagram", "sitio"]);
   });
+
+  it("google busca por negocio y ciudad, y se reusa si no cambian", async () => {
+    const llamadas = [];
+    const google = async (q) => (llamadas.push(q), OK("g"));
+    const c = { tipo: "negocio", negocio: "Boreal", ciudad: "SLP", enlaces: C.enlaces };
+    const r = await recolectar(c, { ...fakes(), google });
+    expect(llamadas).toEqual(["Boreal, SLP"]);
+    expect(r.enlaces.google).toBe("Boreal, SLP");
+    await recolectar(c, { previo: r, ...fakes(), google });
+    expect(llamadas).toHaveLength(1);
+    await recolectar({ ...c, ciudad: "CDMX" }, { previo: r, ...fakes(), google });
+    expect(llamadas).toEqual(["Boreal, SLP", "Boreal, CDMX"]);
+  });
 });

@@ -32,3 +32,7 @@
 - **Dueño:** "del diseño lo que dice dato y estimación ponlo en la esquina superior derecha de cada sintoma."
 - **Dueño:** "cuando la busco yo si se puede ver y necesito que tu hagas ese chequeo."
 - **Hecho:** la etiqueta Dato/Estimación va en la esquina superior derecha de cada tarjeta. Claude buscó a Boreal en Google: 4.8 con 10 opiniones (ambiente, canchas "increíbles", iluminación de noche, "el studio 10/10"; dos dicen que es el mejor club de pádel de San Luis) y 4 canchas. Entró a "Primero, lo bueno" → borrador-3.
+
+## Ronda 7 · Primero, lo bueno con calidez
+- **Dueño:** "sí, agrégalo al recolector. primero lo bueno quiero que pongas en la parte de abajo los comentarios positivos de los clientes. agragegle íconos para que se vea de una forma visual no solo texto para que no sea tedioso para el prospecto, los síntomas y la receta de los sintomas lo veo correcto solo es la parte de primero lo bueno porque es importante reconocerle sus logros hacerle sentir bien con ese acercameinto calido y empático."
+- **Hecho:** Google entra al recolector por la API oficial de Places (calificación, opiniones y hasta 5 reseñas; falta la llave GOOGLE_PLACES_API_KEY). "Primero, lo bueno" lleva un ícono por cifra, el patrón en un recuadro ámbar y abajo hasta 4 reseñas reales de 5 estrellas copiadas tal cual, con nombre de pila. Con la gráfica de Instagram solo caben 2. Método 2026-10-06.2 → borrador-4.

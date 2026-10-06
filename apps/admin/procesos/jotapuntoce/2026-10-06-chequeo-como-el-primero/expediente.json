@@ -28,8 +28,8 @@
       "pie": "¿Por qué hice esto?, en primera persona y conjugado para las socias"
     },
     {
-      "archivo": "capturas/99-despues-pag3.png",
-      "pie": "Primero, lo bueno: felicitación con datos y sus propias palabras"
+      "archivo": "capturas/03-v4-lo-bueno.png",
+      "pie": "Primero, lo bueno con íconos y opiniones de sus clientes"
     },
     {
       "archivo": "capturas/99-despues-pag4.png",
@@ -135,6 +135,26 @@
           "pie": "Etiqueta en la esquina"
         }
       ]
+    },
+    {
+      "n": 7,
+      "titulo": "Primero, lo bueno con calidez",
+      "pedido": [
+        "primero lo bueno quiero que pongas en la parte de abajo los comentarios positivos de los clientes. agragegle íconos para que se vea de una forma visual no solo texto para que no sea tedioso para el prospecto",
+        "es importante reconocerle sus logros hacerle sentir bien con ese acercameinto calido y empático."
+      ],
+      "cambios": [
+        "Google en el recolector (API de Places)",
+        "Un ícono por cifra y el patrón en recuadro ámbar",
+        "Reseñas reales de 5 estrellas con nombre de pila"
+      ],
+      "decision": "Pendiente de revisión del dueño",
+      "capturas": [
+        {
+          "archivo": "capturas/03-v4-lo-bueno.png",
+          "pie": "Primero, lo bueno con íconos y opiniones"
+        }
+      ]
     }
   ],
   "versiones": [
@@ -151,6 +171,11 @@
     {
       "id": "borrador-3",
       "que": "Google 4.8 y etiqueta en la esquina",
+      "estado": "reemplazada"
+    },
+    {
+      "id": "borrador-4",
+      "que": "Íconos, patrón en recuadro y opiniones de Google",
       "estado": "en revisión"
     }
   ],
@@ -178,11 +203,16 @@
     {
       "ruta": "packages/db/migrations/0025_little_lorna_dane.sql",
       "cambio": "Columna chequeo.expediente"
+    },
+    {
+      "ruta": "apps/admin/lib/motor/recolector/google.js",
+      "cambio": "Nuevo: Google por la API de Places"
     }
   ],
   "pendientes": [
     "Configurar Meta (META_IG_USER_ID y META_ACCESS_TOKEN) para tener las publicaciones con likes",
     "Endurecer la protección de direcciones internas del recolector antes de encender el motor automático",
-    "Llave de la API de Anthropic para que el motor arme solo"
+    "Llave de la API de Anthropic para que el motor arme solo",
+    "Llave de Google Places (GOOGLE_PLACES_API_KEY) para que el motor traiga las reseñas solo"
   ]
 }

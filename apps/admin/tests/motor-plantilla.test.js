@@ -80,4 +80,17 @@ describe("plantilla v2", () => {
     expect(html).toContain("data:image/svg+xml;base64,");
     expect(veces(html, '<section class="page')).toBe(6);
   });
+
+  it("lo bueno lleva íconos y las opiniones de sus clientes con nombre de pila", () => {
+    const html = negocio();
+    expect(veces(html, `class="ico"`)).toBe(2);
+    expect(html).toContain("Lo que dicen quienes ya te visitan");
+    expect(html).toContain("<q>Volvería solo por el pan de la abuela.</q>");
+    expect(html).toContain("Marta R. · en Google");
+    expect(html).not.toContain("ruiz");
+    expect(html).toContain("Luis T. · en Google");
+    const sin = contenidoMuestra("creciendo");
+    delete sin.bueno.opiniones;
+    expect(negocio(sin)).not.toContain(`class="ops"`);
+  });
 });

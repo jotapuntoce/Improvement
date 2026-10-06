@@ -24,6 +24,29 @@ const linea = (d) =>
 // Flecha a mano que sube de la frase al boceto (decisión del dueño, 2026-10-05).
 const FLECHA = `<svg viewBox="0 0 20 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="stroke:var(--brand-amber-paper)" stroke-width="1.4"><path d="M11 22 C6 16 13 10 9 3 M9 3 l-4 4 M9 3 l3 5"/></svg>`;
 
+// Íconos de línea para las cifras de "Primero, lo bueno" (la IA elige el nombre; esquema.js, ICONOS_KPI).
+const ICONOS = {
+  estrella: "M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z",
+  calendario: "M4.5 6.5h15v13h-15z M4.5 10.5h15 M8.5 4v4 M15.5 4v4",
+  comunidad: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5 M16 11a2.5 2.5 0 1 0 0-5 M17 14c2 .4 3.2 2 3.5 5",
+  corazon: "M12 19.5s-7.5-4.6-7.5-10A4 4 0 0 1 12 7.2a4 4 0 0 1 7.5 2.3c0 5.4-7.5 10-7.5 10z",
+  crecimiento: "M4 17l5.5-5.5 3.5 3.5 7-7 M14.5 8H20v5.5",
+  lugar: "M12 20.5s6-5.6 6-10.5a6 6 0 0 0-12 0c0 4.9 6 10.5 6 10.5z M12 12.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z",
+  trofeo: "M7.5 4.5h9v4a4.5 4.5 0 0 1-9 0z M7.5 6.5H4.5c0 2.5 1.3 4 3.3 4.3 M16.5 6.5h3c0 2.5-1.3 4-3.3 4.3 M12 13v3.5 M8.5 19.5h7 M10 16.5h4v3h-4z",
+  mensaje: "M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z",
+};
+const icono = (n) =>
+  ICONOS[n]
+    ? `<i class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" aria-hidden="true"><path d="${ICONOS[n]}"/></svg></i>`
+    : "";
+const ESTRELLA = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONOS.estrella}"/></svg>`;
+// "Valentina Gaytan" → "Valentina G.": su nombre de pila, nunca el apellido completo.
+const autorCorto = (a) => {
+  const [n = "", ap] = String(a).trim().split(/\s+/).filter((p, i) => i === 0 || !/^(de|del|la|las|los|y)$/i.test(p));
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  return ap ? `${cap(n)} ${ap[0].toUpperCase()}.` : cap(n);
+};
+
 /** Una portada por etapa: la frase a mano (va abajo del boceto, señalándolo) y el trazo de la ilustración. */
 export const PORTADAS = {
   idea: { frase: "puede ser a lo que te dediques toda la vida.", trazo: linea("M20 70 C40 70 50 40 85 40 C120 40 130 20 150 18 M150 18 l-6 -2 M150 18 l-3 5") },
@@ -68,6 +91,14 @@ const ESTILOS = `
   .lead { font-size: 14pt; font-weight: 400; letter-spacing: -.02em; line-height: 1.32; margin-bottom: 7mm; }
   .cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 7mm; }
   .kpi { border-top: .4mm solid var(--brand-navy); padding-top: 3mm; }
+  .kpi .ico { display: flex; align-items: center; justify-content: center; width: 10mm; height: 10mm; border-radius: 50%; margin-bottom: 2mm; background: color-mix(in srgb, var(--brand-amber) 22%, transparent); }
+  .kpi .ico svg { width: 5.6mm; height: 5.6mm; stroke: var(--brand-navy); }
+  .patron { margin-top: 7mm; padding: 4mm 5mm; border-left: 1mm solid var(--brand-amber); background: color-mix(in srgb, var(--brand-amber) 9%, transparent); border-radius: 0 3mm 3mm 0; }
+  .ops { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 2mm; }
+  .op { background: var(--brand-navy); color: var(--brand-ivory); border-radius: 3mm; padding: 4mm 4.5mm; display: flex; flex-direction: column; gap: 2mm; }
+  .op .stars svg { width: 3.4mm; height: 3.4mm; fill: var(--brand-amber); margin-right: .4mm; }
+  .op q { font-size: 10pt; line-height: 1.4; }
+  .op span { font-size: 8.4pt; margin-top: auto; color: color-mix(in srgb, var(--brand-ivory) 75%, var(--brand-navy)); }
   .kpi b { display: block; font-size: 22pt; font-weight: 300; letter-spacing: -.03em; }
   .kpi span { font-size: 9pt; line-height: 1.35; display: block; color: color-mix(in srgb, var(--brand-navy) 72%, var(--brand-ivory)); }
   .num { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 13pt; color: var(--brand-amber-paper); margin-right: 2mm; }
@@ -123,13 +154,21 @@ export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
   const acciones = (xs) =>
     xs.map((a, i) => `<div class="pill"><h3><span class="num">${i + 1}</span>${e(a.titulo)}</h3><p>${e(a.como)}</p></div>`).join("");
   const kpis = (xs) =>
-    xs.length ? `<div class="cols">${xs.map((f) => `<div class="kpi"><b>${e(f.valor)}</b><span>${e(f.texto)}</span></div>`).join("")}</div>` : "";
+    xs.length ? `<div class="cols">${xs.map((f) => `<div class="kpi">${icono(f.icono)}<b>${e(f.valor)}</b><span>${e(f.texto)}</span></div>`).join("")}</div>` : "";
   const barras = (cx) => {
     const max = Math.max(1, ...cx.items.map((i) => i.valor));
     return `<h3 style="margin-top:9mm">${e(cx.titulo)}</h3><div class="bars">${cx.items
       .map((i) => `<div class="bar"><span>${e(i.que)}</span><i style="width:${Math.round((i.valor / max) * 100)}%"></i><em>${Number(i.valor)}</em></div>`)
       .join("")}</div>`;
   };
+  // Con la gráfica de Instagram en la misma hoja, solo caben 2 opiniones.
+  const opinionesDe = (o, caben) =>
+    o
+      ? `<h3 style="margin-top:8mm">${e(o.titulo)}</h3><div class="ops">${o.items
+          .slice(0, caben)
+          .map((x) => `<div class="op"><div class="stars">${ESTRELLA.repeat(x.estrellas)}</div><q>${e(x.texto)}</q><span>${e(autorCorto(x.autor))} · en Google</span></div>`)
+          .join("")}</div>`
+      : "";
   const platicamos = `<div class="yellow"><h2>¿Lo platicamos?</h2><p>${e(k.cierre)}</p><p class="contacto">${CONTACTO}</p></div>`;
 
   const paginas = [
@@ -145,7 +184,7 @@ export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
     paginas.push(
       pagina(
         "Lo que ya funciona",
-        `<h2>Primero, lo bueno</h2>${guiaDe(b.guia)}${kpis(b.felicitacion)}${b.conecta ? barras(b.conecta) : ""}<p style="margin-top:7mm">${e(b.patron)}</p>`,
+        `<h2>Primero, lo bueno</h2>${guiaDe(b.guia)}${kpis(b.felicitacion)}${b.conecta ? barras(b.conecta) : ""}<p class="patron">${e(b.patron)}</p>${opinionesDe(b.opiniones, b.conecta ? 2 : 4)}`,
       ),
       pagina(
         "Los síntomas",

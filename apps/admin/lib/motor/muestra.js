@@ -84,8 +84,8 @@ export function contenidoMuestra(etapa = "creciendo") {
     bueno: {
       guia: { texto: "Tienes algo que no se compra:", mano: "gente que quiere volver." },
       felicitacion: [
-        { valor: "4.7", texto: "de calificación en Google." },
-        { valor: "≈ 3 %", texto: "de tus seguidores reacciona en cada publicación." },
+        { valor: "4.7", texto: "de calificación en Google.", icono: "estrella" },
+        { valor: "≈ 3 %", texto: "de tus seguidores reacciona en cada publicación.", icono: "comunidad" },
       ],
       conecta: {
         titulo: "Lo que más conecta con tu gente",
@@ -95,6 +95,13 @@ export function contenidoMuestra(etapa = "creciendo") {
         ],
       },
       patron: "Lo que más mueve es la historia de tu familia. Eso ya es tu mejor activo.",
+      opiniones: {
+        titulo: "Lo que dicen quienes ya te visitan",
+        items: [
+          { texto: "El mejor café de la colonia, y te atienden como en casa.", autor: "marta ruiz", estrellas: 5 },
+          { texto: "Volvería solo por el pan de la abuela.", autor: "luis de la torre", estrellas: 4 },
+        ],
+      },
     },
     sintomas: {
       guia: { texto: "Dos síntomas. Ninguno es grave, pero", mano: "juntos cuestan." },
