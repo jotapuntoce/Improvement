@@ -16,8 +16,8 @@ const agrupar = (posts, clave, nombre) =>
     .sort((a, b) => String(a[nombre]).localeCompare(String(b[nombre])));
 
 export function resumir(bd) {
-  const posts = (bd.media?.data ?? []).map((m) => {
-    const likes = m.like_count ?? 0;
+  const todos = (bd.media?.data ?? []).map((m) => {
+    const likes = m.hasOwnProperty("like_count") ? m.like_count : null;
     const comentarios = m.comments_count ?? 0;
     return {
       texto: (m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 140),
@@ -25,10 +25,12 @@ export function resumir(bd) {
       tipo: TIPO[m.media_type] ?? String(m.media_type ?? "").toLowerCase(),
       likes,
       comentarios,
-      interacciones: likes + comentarios,
+      interacciones: likes !== null ? likes + comentarios : null,
       url: m.permalink,
     };
   });
+  const posts = todos.filter((p) => p.likes !== null);
+  const likesOcultos = todos.length - posts.length;
   const prom = promedio(posts);
   const seguidores = bd.followers_count ?? null;
   return {
@@ -36,7 +38,8 @@ export function resumir(bd) {
     seguidores,
     publicaciones: bd.media_count ?? null,
     bio: bd.biography ?? "",
-    analizadas: posts.length,
+    analizadas: todos.length,
+    likesOcultos,
     promedio: prom,
     tasa: seguidores ? Math.round((prom / seguidores) * 1000) / 10 : null, // % de seguidores que reacciona por post
     top: [...posts].sort((a, b) => b.interacciones - a.interacciones).slice(0, 6),
@@ -54,7 +57,8 @@ export async function recolectarInstagram(url, { fetch: f = fetch, env = process
   const campos = `business_discovery.username(${usuario}){username,followers_count,media_count,biography,media.limit(50){caption,like_count,comments_count,timestamp,media_type,permalink}}`;
   const u = `https://graph.facebook.com/${env.META_IG_USER_ID}?fields=${encodeURIComponent(campos)}&access_token=${encodeURIComponent(env.META_ACCESS_TOKEN)}`;
   try {
-    const cuerpo = await (await f(u)).json();
+    const opts = { signal: AbortSignal.timeout(15_000) };
+    const cuerpo = await (await f(u, opts)).json();
     if (cuerpo.error) return { ok: false, motivo: `Meta respondió: ${cuerpo.error.message} (¿cuenta personal o privada?).` };
     if (!cuerpo.business_discovery) return { ok: false, motivo: "Meta no devolvió la cuenta." };
     return { ok: true, data: resumir(cuerpo.business_discovery) };

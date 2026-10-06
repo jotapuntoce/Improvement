@@ -33,6 +33,15 @@ const responde = (cuerpo) => {
   f.llamadas = llamadas;
   return f;
 };
+const respondeConOpts = (cuerpo) => {
+  const llamadas = [];
+  const f = async (u, opts) => {
+    llamadas.push({ u, opts });
+    return { json: async () => cuerpo };
+  };
+  f.llamadas = llamadas;
+  return f;
+};
 
 describe("instagram", () => {
   it("usuarioDe saca el usuario del enlace", () => {
@@ -85,5 +94,44 @@ describe("instagram", () => {
     });
     expect(caida).toMatchObject({ ok: false });
     expect(await recolectarInstagram(undefined, { env: ENV })).toEqual({ ok: false, motivo: "No dio su Instagram." });
+  });
+
+  it("likes ocultos no bajan el promedio", () => {
+    const BDOcultos = {
+      ...BD,
+      media: {
+        data: [
+          ...BD.media.data,
+          { caption: "sin likes", comments_count: 50, timestamp: "2026-09-20T10:00:00+0000", media_type: "IMAGE", permalink: "https://www.instagram.com/p/x/" },
+        ],
+      },
+    };
+    const r = resumir(BDOcultos);
+    expect(r.likesOcultos).toBe(1);
+    expect(r.analizadas).toBe(5);
+    expect(r.promedio).toBe(45);
+    expect(r.top[0].interacciones).toBe(110);
+  });
+
+  it("pasa un timeout de 15 segundos a fetch", async () => {
+    const f = respondeConOpts({ business_discovery: BD, id: "178" });
+    const r = await recolectarInstagram("https://www.instagram.com/club/", { fetch: f, env: ENV });
+    expect(r.ok).toBe(true);
+    expect(f.llamadas[0].opts.signal).toBeDefined();
+  });
+
+  it("nunca expone el token en motivo", async () => {
+    const personalWithError = await recolectarInstagram("https://www.instagram.com/club/", {
+      fetch: responde({ error: { message: "Invalid user id", code: 110 } }),
+      env: ENV,
+    });
+    expect(JSON.stringify(personalWithError)).not.toContain("tok");
+    const redException = await recolectarInstagram("https://www.instagram.com/club/", {
+      fetch: async () => {
+        throw new Error("Network failed");
+      },
+      env: ENV,
+    });
+    expect(JSON.stringify(redException)).not.toContain("tok");
   });
 });
