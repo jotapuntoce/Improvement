@@ -10,8 +10,26 @@ const TEXTO_MAX = 2500;
 const PLAZO_MS = 60_000;
 // Textos de enlace que sí deben llevar al inicio: vacío, "logo", "inicio", "home", "página principal".
 const VAN_AL_INICIO = /^$|logo|inicio|home|p[aá]gina principal/i;
-const NO_HTML = /.(pdf|jpe?g|png|webp|gif|zip|docx?|xlsx?|mp4)$/i;
+const NO_HTML = /\.(pdf|jpe?g|png|webp|gif|zip|docx?|xlsx?|mp4)$/i;
 const BLOQUEO = [401, 403, 429]; // la página existe, solo rechazó al robot
+
+// Direcciones que el recolector nunca debe visitar (el enlace lo escribe el prospecto).
+const PRIVADA = /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0$)/;
+const IPV6_PRIVADA = /^(::1?$|f[cd][0-9a-f]{2}:|fe[89ab][0-9a-f]:)/i;
+// ponytail: solo revisa el texto del host; un dominio que resuelva a una IP privada (DNS rebinding) pasa. Resolver el DNS antes de abrir si hace falta.
+function permitida(url, conHook) {
+  let x;
+  try {
+    x = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!["http:", "https:"].includes(x.protocol)) return false;
+  const h = x.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return false;
+  if (h.endsWith(".test") && conHook) return true; // las pruebas sirven su sitio falso con ctx.route
+  return !PRIVADA.test(h) && !IPV6_PRIVADA.test(h);
+}
 
 const limpia = (u) => {
   const x = new URL(u);
@@ -22,6 +40,7 @@ const limpia = (u) => {
 const unicos = (xs) => [...new Set(xs)];
 
 export async function recolectarSitio(url, { alPrepararContexto } = {}) {
+  if (!permitida(url, !!alPrepararContexto)) return { ok: false, motivo: "Dirección no permitida." };
   let navegador;
   try {
     navegador = await chromium.launch();
@@ -38,14 +57,27 @@ export async function recolectarSitio(url, { alPrepararContexto } = {}) {
 
     const enlaces = (
       await page.$$eval("a[href]", (as) =>
-        as.map((a) => ({ texto: (a.innerText || a.getAttribute("aria-label") || "").trim().slice(0, 40), href: a.href })),
+        as.map((a) => ({
+          texto: (
+            a.innerText ||
+            a.getAttribute("aria-label") ||
+            a.getAttribute("title") ||
+            a.querySelector("img[alt]")?.getAttribute("alt") ||
+            a.className?.toString().match(/(instagram|facebook|tiktok|youtube|whatsapp|blog|comunidad)/i)?.[1] ||
+            ""
+          )
+            .trim()
+            .slice(0, 40),
+          href: a.href,
+        })),
       )
     ).filter((a) => a.href.startsWith("http"));
 
     // Solo el href crudo exactamente igual al inicio: sin ancla, sin query, y que no sea el logo/nombre del sitio.
     const nombreSitio = (await page.title()).toLowerCase();
     const esInicioPuro = (h) => {
-      if (h.includes("#") || h.includes("?")) return false;
+      const sinAncla = h.endsWith("#") ? h.slice(0, -1) : h; // "#" suelto regresa al inicio; "#contacto" no
+      if (sinAncla.includes("#") || sinAncla.includes("?")) return false;
       const x = new URL(h);
       return x.origin === origen && (x.pathname === "/" || x.pathname === "");
     };
@@ -63,7 +95,8 @@ export async function recolectarSitio(url, { alPrepararContexto } = {}) {
       if (NO_HTML.test(destino)) {
         // fetch desde la página (mismo origen): pasa por ctx.route en pruebas; ctx.request lo saltaría.
         const st = await page.evaluate((u) => fetch(u).then((x) => x.status), destino).catch(() => 0);
-        if (st === 0 || st >= 400) enlacesRotos.push({ texto: enlace?.texto ?? "", href: enlace?.href ?? destino, status: st });
+        if (st === 0) bloqueados.push({ href: destino, status: 0 }); // CSP o fetch caído: no sabemos si está roto
+        else if (st >= 400) enlacesRotos.push({ texto: enlace?.texto ?? "", href: enlace?.href ?? destino, status: st });
         continue;
       }
       const resp = await page.goto(destino, { waitUntil: "load" }).catch(() => null);

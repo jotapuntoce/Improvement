@@ -41,6 +41,7 @@ describe("método", () => {
     };
     const m = mensajeDe(CHEQUEO_MUESTRA, { expediente });
     expect(m).toContain("## Expediente");
+    expect(m).toContain("Fecha de hoy: 2026-10-05");
     expect(m).toContain("https://ejemplo.com/blog");
     expect(m).toContain("No se pudo ver: instagram — Instagram sin configurar");
   });

@@ -15,7 +15,6 @@ import { recolectar } from "./recolector/index.js";
 const TOMABLES = ["sin_empezar", "en_fila", "borrador", "error"];
 // Un armado que lleva más de esto en "armando" se da por muerto (proceso caído) y se puede volver a tomar.
 export const ARMANDO_ATORADO_MS = 15 * 60_000;
-const EXPEDIENTE_VIGENTE_MS = 7 * 86_400_000;
 const tope = () => Number(process.env.CHEQUEOS_MOTOR_TOPE_DIA ?? 20);
 const accion = (a) => sql`${chequeoEvento.detalle}->>'accion' = ${a}`;
 
@@ -98,9 +97,8 @@ export async function armarChequeo(id, { manual = false, nota = null } = {}, dep
     if (!tomado.length) return { ok: false, error: { code: "YA_ARMANDO" } };
     tomada = true;
 
-    const vigente = c.expediente?.fecha && Date.now() - new Date(c.expediente.fecha) < EXPEDIENTE_VIGENTE_MS;
-    const expediente = vigente ? c.expediente : await rec(c);
-    if (!vigente) await db.update(chequeo).set({ expediente }).where(eq(chequeo.id, id));
+    const expediente = await rec(c, { previo: c.expediente });
+    await db.update(chequeo).set({ expediente }).where(eq(chequeo.id, id));
 
     let r = await inv({ sistema: METODO, mensajes: [{ role: "user", content: mensajeDe(c, { nota, expediente }) }] });
     sumar(r.uso);

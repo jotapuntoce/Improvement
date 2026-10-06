@@ -9,7 +9,7 @@ export function usuarioDe(url) {
   return m && !NO_SON_USUARIOS.includes(m[1].toLowerCase()) ? m[1] : null;
 }
 
-const promedio = (xs) => (xs.length ? Math.round(xs.reduce((s, p) => s + p.interacciones, 0) / xs.length) : 0);
+const promedio = (xs) => (xs.length ? Math.round(xs.reduce((s, p) => s + p.interacciones, 0) / xs.length) : null);
 const agrupar = (posts, clave, nombre) =>
   Object.entries(Object.groupBy(posts, clave))
     .map(([k, xs]) => ({ [nombre]: k, posts: xs.length, promedio: promedio(xs) }))
@@ -17,7 +17,7 @@ const agrupar = (posts, clave, nombre) =>
 
 export function resumir(bd) {
   const todos = (bd.media?.data ?? []).map((m) => {
-    const likes = m.hasOwnProperty("like_count") ? m.like_count : null;
+    const likes = Object.hasOwn(m, "like_count") ? m.like_count : null;
     const comentarios = m.comments_count ?? 0;
     return {
       texto: (m.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 140),
@@ -41,7 +41,7 @@ export function resumir(bd) {
     analizadas: todos.length,
     likesOcultos,
     promedio: prom,
-    tasa: seguidores ? Math.round((prom / seguidores) * 1000) / 10 : null, // % de seguidores que reacciona por post
+    tasa: seguidores && prom !== null ? Math.round((prom / seguidores) * 1000) / 10 : null, // % de seguidores que reacciona por post
     top: [...posts].sort((a, b) => b.interacciones - a.interacciones).slice(0, 6),
     porMes: agrupar(posts, (p) => p.fecha.slice(0, 7), "mes"),
     porTipo: agrupar(posts, (p) => p.tipo, "tipo"),

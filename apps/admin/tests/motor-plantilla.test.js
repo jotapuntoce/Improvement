@@ -31,6 +31,11 @@ describe("plantilla v2", () => {
     expect(idea).toContain("Tu idea tiene el potencial que le viste al inicio.");
   });
 
+  it("el encabezado de la receta sigue el trato", () => {
+    expect(negocio()).toContain("Lo que puedes hacer desde mañana");
+    expect(negocio({ ...contenidoMuestra("creciendo"), trato: "ustedes" })).toContain("Lo que pueden hacer desde mañana");
+  });
+
   it("cada sección abre con su guía y su frase a mano", () => {
     const html = negocio();
     expect(html).toContain('<p class="lead">Tienes algo que no se compra: <span class="hand">gente que quiere volver.</span></p>');

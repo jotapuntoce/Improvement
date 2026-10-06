@@ -153,9 +153,16 @@ describe("armarChequeo", () => {
   it("recolecta, guarda el expediente, lo manda a la IA y lo reusa al rehacer", async () => {
     const id = await propio();
     let veces = 0;
-    const recolectar = async () => {
+    // El falso respeta `previo` como el real: misma pieza ok y mismos enlaces, no se vuelve a juntar.
+    const recolectar = async (c, { previo } = {}) => {
+      if (previo?.sitio?.ok && previo.enlaces?.sitio === c.enlaces?.sitio) return { ...previo, fecha: new Date().toISOString() };
       veces += 1;
-      return { fecha: new Date().toISOString(), sitio: { ok: true, data: { url: "https://ejemplo.com" } }, instagram: { ok: false, motivo: "No dio su Instagram." } };
+      return {
+        fecha: new Date().toISOString(),
+        enlaces: { sitio: c.enlaces?.sitio, instagram: c.enlaces?.instagram },
+        sitio: { ok: true, data: { url: "https://ejemplo.com" } },
+        instagram: { ok: false, motivo: "No dio su Instagram." },
+      };
     };
     const inv = responde(valido());
     await armarChequeo(id, { manual: true }, { investigar: inv, aPdf: pdfFalso, recolectar });

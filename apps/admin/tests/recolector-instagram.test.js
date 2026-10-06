@@ -113,6 +113,13 @@ describe("instagram", () => {
     expect(r.top[0].interacciones).toBe(110);
   });
 
+  it("todos los likes ocultos: promedio y tasa son null", () => {
+    const r = resumir({ ...BD, media: { data: BD.media.data.map(({ like_count, ...m }) => m) } });
+    expect(r.likesOcultos).toBe(4);
+    expect(r.promedio).toBeNull();
+    expect(r.tasa).toBeNull();
+  });
+
   it("pasa un timeout de 15 segundos a fetch", async () => {
     const f = respondeConOpts({ business_discovery: BD, id: "178" });
     const r = await recolectarInstagram("https://www.instagram.com/club/", { fetch: f, env: ENV });

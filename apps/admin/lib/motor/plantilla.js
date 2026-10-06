@@ -157,7 +157,7 @@ export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
       ),
       pagina(
         "La receta",
-        `<h2>Lo que pueden hacer desde mañana</h2>${guiaDe(r.guia)}${acciones(r.items)}${r.dimensionar ? `<p class="note">Para dimensionar: ${e(r.dimensionar.texto)} <i>(supuesto: ${e(r.dimensionar.supuesto)})</i></p>` : ""}`,
+        `<h2>Lo que ${k.trato === "ustedes" ? "pueden" : "puedes"} hacer desde mañana</h2>${guiaDe(r.guia)}${acciones(r.items)}${r.dimensionar ? `<p class="note">Para dimensionar: ${e(r.dimensionar.texto)} <i>(supuesto: ${e(r.dimensionar.supuesto)})</i></p>` : ""}`,
       ),
       pagina(
         "Lo que no se ve desde afuera",

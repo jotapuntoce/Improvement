@@ -3,7 +3,7 @@ import { recolectarSitio } from "../lib/motor/recolector/sitio.js";
 
 // Un sitio de mentira servido por Chromium mismo: nunca sale a internet.
 const PAGINAS = {
-  "/": `<html><body><nav><a href="/precios">Precios</a><a href="/torneos">Torneos</a><a href="/roto">Clínicas</a><a href="/">Instagram</a><a href="/">Inicio</a><a href="#contacto">Contacto</a><a href="/?lang=en">English</a><a href="/" aria-label="Logo"></a><a href="/menu.pdf">Menú</a><a href="/privado">Privado</a></nav><h1>Club de prueba</h1><div style="width:900px">ancho fijo</div></body></html>`,
+  "/": `<html><body><nav><a href="/precios">Precios</a><a href="/torneos">Torneos</a><a href="/roto">Clínicas</a><a href="/">Instagram</a><a href="/">Inicio</a><a href="#contacto">Contacto</a><a href="/?lang=en">English</a><a href="/" aria-label="Logo"></a><a href="/menu.pdf">Menú</a><a href="/privado">Privado</a><a href="#"><img alt="Blog"></a><a href="/" class="icon-instagram"></a></nav><h1>Club de prueba</h1><div style="width:900px">ancho fijo</div></body></html>`,
   "/precios": `<html><head><title>Precios</title></head><body>Cancha $400 por hora y media. Clase $200.</body></html>`,
   "/torneos": `<html><body>Muy pronto, en este feed encontrarás cada torneo.</body></html>`,
 };
@@ -24,12 +24,22 @@ describe("recolectarSitio", () => {
     expect(precios.precios).toEqual(["$400", "$200"]);
     expect(r.data.paginas.find((p) => p.url.endsWith("/torneos")).pendientes).toEqual(["Muy pronto"]);
     expect(r.data.enlacesRotos).toEqual([{ texto: "Clínicas", href: "https://prueba.test/roto", status: 404 }]);
-    expect(r.data.regresanAlInicio).toEqual([{ texto: "Instagram", href: "https://prueba.test/" }]);
+    expect(r.data.regresanAlInicio).toEqual([
+      { texto: "Instagram", href: "https://prueba.test/" },
+      { texto: "Blog", href: "https://prueba.test/#" },
+      { texto: "instagram", href: "https://prueba.test/" },
+    ]);
     expect(r.data.bloqueados).toEqual([{ href: "https://prueba.test/privado", status: 403 }]);
     expect(r.data.paginas.some((p) => p.url.endsWith("/menu.pdf"))).toBe(false);
     expect(r.data.celular.seSaleDeLado).toBe(true);
     expect(r.data.celular.medido).toBe(true);
   }, 60_000);
+
+  it("rechaza direcciones que no son un sitio público", async () => {
+    for (const u of ["file:///etc/passwd", "http://localhost:3100", "http://169.254.169.254/", "http://[::1]/", "http://192.168.1.5/"]) {
+      expect(await recolectarSitio(u)).toEqual({ ok: false, motivo: "Dirección no permitida." });
+    }
+  });
 
   it("un sitio que no abre es un motivo, no una excepción", async () => {
     const r = await recolectarSitio("https://prueba.test/nada", { alPrepararContexto: servir });
