@@ -57,9 +57,10 @@ const ESTILOS = `
   ul { padding-left: 5mm; }
   li + li { margin-top: 2mm; }
   h3 { font-size: 11.5pt; font-weight: 600; margin: 0 0 1.5mm; }
-  .card { border: .3mm solid color-mix(in srgb, var(--brand-navy) 18%, transparent); border-radius: 3mm; padding: 3.2mm 5mm; }
+  .card { position: relative; border: .3mm solid color-mix(in srgb, var(--brand-navy) 18%, transparent); border-radius: 3mm; padding: 3.2mm 5mm; }
+  .card h3 { padding-right: 26mm; }
   .card + .card { margin-top: 2.6mm; }
-  .tag { display: inline-block; font-size: 7.5pt; letter-spacing: .1em; text-transform: uppercase; border: .3mm solid color-mix(in srgb, var(--brand-navy) 25%, transparent); border-radius: 10mm; padding: .6mm 2.4mm; margin-left: 2mm; }
+  .tag { display: inline-block; font-size: 7.5pt; letter-spacing: .1em; text-transform: uppercase; border: .3mm solid color-mix(in srgb, var(--brand-navy) 25%, transparent); border-radius: 10mm; padding: .6mm 2.4mm; position: absolute; top: 3.2mm; right: 5mm; }
   .pill { background: var(--brand-navy); color: var(--brand-ivory); border-radius: 3mm; padding: 4.5mm 5mm; }
   .pill + .pill { margin-top: 3mm; }
   .yellow { background: var(--dept-imaginacion); border-radius: 4mm; padding: 10mm; margin-top: auto; margin-bottom: 4mm; }

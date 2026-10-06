@@ -27,3 +27,8 @@
 - El recolector real encontró solo: Instagram, Blog y "Únete a la Comunidad" regresan al inicio; Torneos "Muy pronto"; menú de Serenna "PROXIMAMENTE"; clínicas "acércate directamente a recepción"; en celular la página se sale de lado (980 px en 390).
 - Con ese expediente, sin mirar el original, se escribió el contenido v2 y el motor armó borrador-2.
 - Falta: Instagram con cifras (token de Meta) y la calificación de Google, que no apareció en la búsqueda.
+
+## Ronda 6 · Etiqueta y Google
+- **Dueño:** "del diseño lo que dice dato y estimación ponlo en la esquina superior derecha de cada sintoma."
+- **Dueño:** "cuando la busco yo si se puede ver y necesito que tu hagas ese chequeo."
+- **Hecho:** la etiqueta Dato/Estimación va en la esquina superior derecha de cada tarjeta. Claude buscó a Boreal en Google: 4.8 con 10 opiniones (ambiente, canchas "increíbles", iluminación de noche, "el studio 10/10"; dos dicen que es el mejor club de pádel de San Luis) y 4 canchas. Entró a "Primero, lo bueno" → borrador-3.
