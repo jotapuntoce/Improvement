@@ -186,14 +186,16 @@ se representa el nivel con los pisos de su edificio pero internamente ya tiene t
 la vista de CRM Y ERP."
 
 **Por fuera, el edificio.** Lo decide el dato, nunca el cliente (`Expertos\render-3d-web\05-manual.md`, A):
-- **Altura** = `organization.floor`, la escala real. Al subir de piso, el edificio crece.
+- **Piso** = `organization.floor`, la escala real. En esta pieza el letrero dice "Piso N · paso del proceso". Que la
+  altura del 3D crezca con el piso va con el trabajo del edificio (manual, A–F), porque hoy la forma la decide el giro.
 - **Cuartos** = las áreas que salieron del diagnóstico.
-- **Cuarto en obra** = una etapa del piso con madurez baja (1–2) en sus dimensiones.
+- **Cuarto en obra** = una etapa del piso con madurez baja (1–2) en sus dimensiones (va con el trabajo del edificio).
 - **Paso del proceso** (Arranque … Autonomía): se lee en el letrero o en el panel.
 
 **Lo que el dueño personaliza al aprobar.** Antes de aprobar, su oficina solo le muestra el diagnóstico. Al
 aprobar se le abren:
-- las 5 decisiones guiadas del edificio (manual, B): fachada, paleta, entorno, letrero y detalle;
+- en esta pieza, "Personaliza tu empresa digital" lleva a la configuración que ya existe (nombres de sección,
+  acento, slogan); las 5 decisiones guiadas del edificio (manual, B) se construyen con el trabajo del edificio;
 - los nombres de sus secciones (`section_labels`, que ya existe).
 Improvement las propone desde su giro y su marca, y él solo ajusta.
 
@@ -240,7 +242,7 @@ pieza 3 (ERP). Así, cuando existan, cada empresa abre su CRM y su ERP ya person
 - Integración contra Supabase:
   - `saveDiagnosisResult` y `approveDiagnosis` crean exactamente las filas esperadas;
   - `approveDiagnosis` es idempotente y guarda `org_digital_config`;
-  - el edificio toma su altura de `organization.floor`;
+  - el letrero del edificio muestra el piso y el paso del proceso;
   - la RLS del dueño frente al empleado en las dos tablas nuevas.
 - Prueba real: la casa recorre `listo → aprobado` con el diagnóstico de JotaPuntoCe; su edificio muestra el piso 1, su
   oficina muestra los
