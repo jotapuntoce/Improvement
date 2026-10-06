@@ -1,0 +1,44 @@
+{
+  "proyecto": "JotaPuntoCe",
+  "pieza": "Chequeo como el primero",
+  "slug": "chequeo-como-el-primero",
+  "fecha": "2026-10-06",
+  "resumen": "El motor del Chequeo ahora junta evidencia real antes de escribir (sitio recorrido en un navegador, Instagram por la API de Meta), usa el molde de 6 páginas del primer Chequeo de Boreal y la página 2 en primera persona del dueño.",
+  "antes": [
+    { "archivo": "capturas/00-antes-portada.png", "pie": "Portada v1: la frase a mano dentro del bloque amarillo, casi no se leía" },
+    { "archivo": "capturas/00-antes-lo-bueno.png", "pie": "Borrador-1: \"lo bueno\" como lista suelta, sin felicitación ni análisis" },
+    { "archivo": "capturas/00-antes-sintomas.png", "pie": "Borrador-1: síntomas con \"lo que cuesta\", sin \"lo que vimos\" ni \"por qué importa\"" }
+  ],
+  "despues": [
+    { "archivo": "capturas/99-despues-pag1.png", "pie": "Portada aprobada" },
+    { "archivo": "capturas/99-despues-pag2.png", "pie": "¿Por qué hice esto?, en primera persona y conjugado para las socias" },
+    { "archivo": "capturas/99-despues-pag3.png", "pie": "Primero, lo bueno: felicitación con datos y sus propias palabras" },
+    { "archivo": "capturas/99-despues-pag4.png", "pie": "Cinco síntomas con lo que vimos y por qué importa" },
+    { "archivo": "capturas/99-despues-pag5.png", "pie": "Una receta por síntoma y Para dimensionar" },
+    { "archivo": "capturas/99-despues-pag6.png", "pie": "La parte que no se ve y ¿Lo platicamos?" }
+  ],
+  "rondas": [
+    { "n": 1, "titulo": "Portadas", "pedido": ["la frase que va con la letra de firma a mano, sacala del rectángulo en ambar y que se vea a centrado abajo del boceto señalando el boceto"], "cambios": ["Frase a mano bajo el boceto con flecha", "Arrancando: \"ya está dando sus primeros pasos.\""], "decision": "sí, así quedan; guárdalas", "capturas": [{ "archivo": "capturas/01-v1-portada-aprobada.png", "pie": "Portada aprobada" }] },
+    { "n": 2, "titulo": "Primer borrador del motor", "pedido": ["se ve genérico, sin chiste, hecho sin amor", "quiero que este transmitido tal cual como el primer chuequeo"], "cambios": ["Se corrigió en el panel que Boreal llegó por el dueño"], "decision": "Rehacer con el molde y la voz del primero", "capturas": [{ "archivo": "capturas/00-antes-lo-bueno.png", "pie": "Borrador-1" }] },
+    { "n": 3, "titulo": "Cómo obtener el resultado del primero", "pedido": ["ve como hacerle para obtener ese resultado hecho con el motor", "A, si tengo mi cuenta de jotapuntoce", "te doy permiso de que hagas todo tu sin problema"], "cambios": ["Recolector del sitio e Instagram", "Molde de 6 páginas", "Método v2 con el primer Chequeo como ejemplo"], "decision": "Diseño aprobado; se construyó con un ayudante por tarea", "capturas": [] },
+    { "n": 4, "titulo": "Validación con Boreal", "pedido": [], "cambios": ["El recolector encontró los mismos hallazgos del primero en el sitio", "Borrador-2 armado por el motor real"], "decision": "Pendiente de revisión del dueño", "capturas": [{ "archivo": "capturas/99-despues-pag4.png", "pie": "Síntomas v2" }] }
+  ],
+  "versiones": [
+    { "id": "borrador-1", "que": "Motor v1 con lectura de texto y molde pobre", "estado": "descartada" },
+    { "id": "borrador-2", "que": "Motor v2 con recolector y molde del primero", "estado": "en revisión" }
+  ],
+  "archivos": [
+    { "ruta": "apps/admin/lib/motor/recolector/", "cambio": "Nuevo: sitio (Chromium), Instagram (Meta) y el expediente" },
+    { "ruta": "apps/admin/lib/motor/esquema.js", "cambio": "Esquema v2 con guías, síntomas, recetas y preguntas" },
+    { "ruta": "apps/admin/lib/motor/plantilla.js", "cambio": "6 páginas como el original; página 2 del dueño" },
+    { "ruta": "apps/admin/lib/motor/metodo.js", "cambio": "Método v2 con el primer Chequeo como ejemplo" },
+    { "ruta": "apps/admin/lib/motor/armar.js", "cambio": "Recolecta y guarda el expediente antes de la IA" },
+    { "ruta": "packages/db/migrations/0025_little_lorna_dane.sql", "cambio": "Columna chequeo.expediente" }
+  ],
+  "pendientes": [
+    "Configurar Meta (META_IG_USER_ID y META_ACCESS_TOKEN) para tener las publicaciones con likes",
+    "Calificación de Google: no apareció en la búsqueda",
+    "Endurecer la protección de direcciones internas del recolector antes de encender el motor automático",
+    "Llave de la API de Anthropic para que el motor arme solo"
+  ]
+}
