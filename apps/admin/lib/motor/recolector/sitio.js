@@ -8,8 +8,10 @@ const PRECIO = /\$\s?\d[\d,]*(?:\.\d+)?/g;
 const MAX_PAGINAS = 12;
 const TEXTO_MAX = 2500;
 const PLAZO_MS = 60_000;
-// Textos de enlace que sí deben llevar al inicio (el logo no tiene texto).
-const VAN_AL_INICIO = /^(inicio|home|)$/i;
+// Textos de enlace que sí deben llevar al inicio: vacío, "logo", "inicio", "home", "página principal".
+const VAN_AL_INICIO = /^$|logo|inicio|home|p[aá]gina principal/i;
+const NO_HTML = /.(pdf|jpe?g|png|webp|gif|zip|docx?|xlsx?|mp4)$/i;
+const BLOQUEO = [401, 403, 429]; // la página existe, solo rechazó al robot
 
 const limpia = (u) => {
   const x = new URL(u);
@@ -40,20 +42,38 @@ export async function recolectarSitio(url, { alPrepararContexto } = {}) {
       )
     ).filter((a) => a.href.startsWith("http"));
 
+    // Solo el href crudo exactamente igual al inicio: sin ancla, sin query, y que no sea el logo/nombre del sitio.
+    const nombreSitio = (await page.title()).toLowerCase();
+    const esInicioPuro = (h) => {
+      if (h.includes("#") || h.includes("?")) return false;
+      const x = new URL(h);
+      return x.origin === origen && (x.pathname === "/" || x.pathname === "");
+    };
     const regresanAlInicio = enlaces
-      .filter((a) => limpia(a.href) === inicio && !VAN_AL_INICIO.test(a.texto))
+      .filter((a) => esInicioPuro(a.href) && !VAN_AL_INICIO.test(a.texto) && !(nombreSitio && nombreSitio.includes(a.texto.toLowerCase())))
       .map((a) => ({ texto: a.texto, href: a.href }));
 
     const internas = unicos(enlaces.map((a) => limpia(a.href)).filter((h) => h.startsWith(origen) && h !== inicio)).slice(0, MAX_PAGINAS);
     const paginas = [];
     const enlacesRotos = [];
+    const bloqueados = [];
     for (const destino of [inicio, ...internas]) {
       if (Date.now() > plazo) break; // ponytail: plazo total fijo; sitios lentos quedan a medias, sin fallar
+      const enlace = enlaces.find((x) => limpia(x.href) === destino);
+      if (NO_HTML.test(destino)) {
+        // fetch desde la página (mismo origen): pasa por ctx.route en pruebas; ctx.request lo saltaría.
+        const st = await page.evaluate((u) => fetch(u).then((x) => x.status), destino).catch(() => 0);
+        if (st === 0 || st >= 400) enlacesRotos.push({ texto: enlace?.texto ?? "", href: enlace?.href ?? destino, status: st });
+        continue;
+      }
       const resp = await page.goto(destino, { waitUntil: "load" }).catch(() => null);
       const status = resp?.status() ?? 0;
+      if (BLOQUEO.includes(status)) {
+        bloqueados.push({ href: destino, status });
+        continue;
+      }
       if (!resp || status >= 400) {
-        const a = enlaces.find((x) => limpia(x.href) === destino);
-        enlacesRotos.push({ texto: a?.texto ?? "", href: a?.href ?? destino, status });
+        enlacesRotos.push({ texto: enlace?.texto ?? "", href: enlace?.href ?? destino, status });
         continue;
       }
       const texto = (await page.innerText("body").catch(() => "")).replace(/\s+/g, " ").trim();
@@ -63,7 +83,7 @@ export async function recolectarSitio(url, { alPrepararContexto } = {}) {
         status,
         texto: texto.slice(0, TEXTO_MAX),
         precios: unicos(texto.match(PRECIO) ?? []).map((p) => p.replace(/\s/g, "")),
-        pendientes: unicos(texto.match(PENDIENTES) ?? []),
+        pendientes: (texto.match(PENDIENTES) ?? []).filter((p, i, xs) => xs.findIndex((q) => q.toLowerCase() === p.toLowerCase()) === i),
       });
     }
 
@@ -78,7 +98,14 @@ export async function recolectarSitio(url, { alPrepararContexto } = {}) {
 
     return {
       ok: true,
-      data: { url: inicio, paginas, enlacesRotos, regresanAlInicio, celular: { ...celular, seSaleDeLado: celular.anchoPagina > celular.anchoPantalla + 2 } },
+      data: {
+        url: inicio,
+        paginas,
+        enlacesRotos,
+        bloqueados,
+        regresanAlInicio,
+        celular: { ...celular, medido: celular.anchoPagina > 0, seSaleDeLado: celular.anchoPagina > celular.anchoPantalla + 2 },
+      },
     };
   } catch (e) {
     return { ok: false, motivo: `No se pudo recorrer el sitio: ${e?.message ?? e}` };
