@@ -14,11 +14,16 @@ panel), pieza 1 de 2. La pieza 2 es el CRM de cada empresa.
    - Improvement lo evalúa;
    - el dueño lo aprueba con un clic;
    - al aprobarse quedan cargadas sus áreas, necesidades, objetivos y memoria.
-2. **La casa:** JotaPuntoCe como una empresa más del motor, con Jose Carlos como dueño, y una tarjeta en el panel
+2. **Con el diagnóstico aprobado, el dueño empieza a personalizar su empresa digital** (sección 6):
+   - **por fuera**, el edificio representa su nivel con sus pisos;
+   - **por dentro**, ya trae toda su empresa personalizada: la configuración de su CRM y su ERP sale del
+     diagnóstico.
+3. **La casa:** JotaPuntoCe como una empresa más del motor, con Jose Carlos como dueño, y una tarjeta en el panel
    admin que la abre. Es la primera empresa que recorre el camino completo.
 
 **No se construye aquí:**
-- El CRM (pieza 2).
+- Las pantallas del CRM (pieza 2) y del ERP (pieza 3). Esta pieza deja lista la configuración que esas pantallas
+  van a leer.
 - Juntar las ramas `panel-clientes-platform-admin` y `chequeos` a `main` (se hace antes de ejecutar este plan).
 - Las APIs para uso externo: la evaluación con la API de Anthropic, Meta, Google y la landing. Por decisión del
   dueño se ven "al final una vez que ya este listo para lanzamiento al público".
@@ -125,7 +130,10 @@ las lee y escribe. Un empleado no ve el diagnóstico de su empresa.
   patogenos: [{ titulo, detalle, area, gravedad: 1..3, impacto, sintoma, dimension, summum: boolean }],
   blueprint: { d30: [objetivo], d90: [objetivo], d365: [objetivo] },
   criteriosParaSubir: [""],
-  memoria: [{ pregunta?, respuesta }] }
+  memoria: [{ pregunta?, respuesta }],
+  empresaDigital: {                                                   // la empresa por dentro (sección 6)
+    crm: { etapas: [{ nombre, queSeRegistra }], camposPorContacto: [""], comoLlegan: [""] },  // su cadena, con sus nombres
+    erp: { modulos: [{ modulo, porque }] } } }                        // solo lo que su piso y su madurez piden
 // objetivo = { titulo, patogeno, area, peso: 0..100, tipo: "ipa"|"non_ipa", evidencia, fecha }
 ```
 Los patógenos se ordenan con la regla fija: caja en riesgo → gravedad 3 → lo que desbloquea → resultado rápido y
@@ -164,13 +172,44 @@ visible. La UI los muestra en ese orden.
    - las necesidades con `diagnosis_id`;
    - los objetivos del blueprint con su necesidad, área, peso, tipo, evidencia y fecha;
    - la memoria con `topic='diagnostico'`;
-   - `organization.floor` y `evolution_level`.
+   - `organization.floor` y `evolution_level`;
+   - la configuración de su empresa por dentro (`org_digital_config`, sección 6).
 
    Al final pasa a `aprobado`. Repetir el clic no duplica nada.
 7. **Sube de piso.** Jose Carlos (o el dueño, cuando se cumplan los criterios) abre el diagnóstico del piso
    siguiente. El anterior queda aprobado como historia.
 
-## 6 · La casa
+## 6 · Después de aprobar: su empresa digital se personaliza
+
+Pedido del dueño: "con este diagnóstico el dueño de la empresa ya puede empezar a personalizar su empresa digital,
+se representa el nivel con los pisos de su edificio pero internamente ya tiene toda su empresa personalizada que es
+la vista de CRM Y ERP."
+
+**Por fuera, el edificio.** Lo decide el dato, nunca el cliente (`Expertos\render-3d-web\05-manual.md`, A):
+- **Altura** = `organization.floor`, la escala real. Al subir de piso, el edificio crece.
+- **Cuartos** = las áreas que salieron del diagnóstico.
+- **Cuarto en obra** = una etapa del piso con madurez baja (1–2) en sus dimensiones.
+- **Paso del proceso** (Arranque … Autonomía): se lee en el letrero o en el panel.
+
+**Lo que el dueño personaliza al aprobar.** Antes de aprobar, su oficina solo le muestra el diagnóstico. Al
+aprobar se le abren:
+- las 5 decisiones guiadas del edificio (manual, B): fachada, paleta, entorno, letrero y detalle;
+- los nombres de sus secciones (`section_labels`, que ya existe).
+Improvement las propone desde su giro y su marca, y él solo ajusta.
+
+**Por dentro, su CRM y su ERP.** El diagnóstico ya sabe cómo vende y cómo opera, así que la empresa no llega en
+blanco. Tabla nueva `org_digital_config`, una fila por empresa (RLS: dueño lee y escribe; empleados leen la parte
+que su permiso les abre):
+- **CRM:** su cadena de venta con los nombres que usa el dueño, qué se registra en cada etapa, los campos por contacto
+  y cómo le llegan los clientes. Sale de la dimensión 7 (Ventas) y de la 6 (Marketing).
+- **ERP:** los módulos que su piso y su madurez piden, cada uno con su porqué. Por ejemplo, caja y cobranza si las
+  Finanzas salieron en 1–2, inventario solo si vende producto y proveedores solo si la dimensión 10 aplica. Se
+  enciende por etapa: a un nano no se le arma el ERP de una mediana.
+
+Esta pieza **guarda** esa configuración al aprobar. Las pantallas que la muestran son la pieza 2 (CRM) y la
+pieza 3 (ERP). Así, cuando existan, cada empresa abre su CRM y su ERP ya personalizados, sin capturar nada.
+
+## 7 · La casa
 
 - **La fila de JotaPuntoCe:** `is_home = true`, `floor = 1` y Jose Carlos como `owner`. La crea un script de datos
   (`packages/db/src/seed-casa.ts`), no código del motor. Ningún archivo de `server/**` la nombra; el admin la
@@ -181,7 +220,7 @@ visible. La UI los muestra en ese orden.
   lo guarda directo en `listo` (sin el paso 2, porque las respuestas ya existen) y Jose Carlos lo aprueba desde su
   oficina. Es la primera prueba del camino completo.
 
-## 7 · Errores y bordes
+## 8 · Errores y bordes
 
 | Caso | Qué pasa |
 |---|---|
@@ -192,7 +231,7 @@ visible. La UI los muestra en ese orden.
 | Pregunta apagada por la escala | No se muestra; la dimensión sale con `madurez: null` y su razón |
 | Lectura directa por PostgREST con el JWT de un empleado | La RLS solo deja pasar al dueño de esa organización |
 
-## 8 · Pruebas
+## 9 · Pruebas
 
 - Unitarias:
   - `diagnosisResultSchema` (válido, faltantes, rangos);
@@ -200,13 +239,15 @@ visible. La UI los muestra en ese orden.
   - el orden de los patógenos.
 - Integración contra Supabase:
   - `saveDiagnosisResult` y `approveDiagnosis` crean exactamente las filas esperadas;
-  - `approveDiagnosis` es idempotente;
+  - `approveDiagnosis` es idempotente y guarda `org_digital_config`;
+  - el edificio toma su altura de `organization.floor`;
   - la RLS del dueño frente al empleado en las dos tablas nuevas.
-- Prueba real: la casa recorre `listo → aprobado` con el diagnóstico de JotaPuntoCe y su oficina muestra los
+- Prueba real: la casa recorre `listo → aprobado` con el diagnóstico de JotaPuntoCe; su edificio muestra el piso 1, su
+  oficina muestra los
   objetivos.
 - Gate: `pnpm lint && pnpm typecheck && pnpm test`.
 
-## 9 · Costo
+## 10 · Costo
 
 - **Hoy:** $0. La evaluación la hace Claude en el chat, y contestar y aprobar no usa IA.
 - **Con API (al lanzamiento):** $3–6 USD por diagnóstico, según `costos.md` §2.
