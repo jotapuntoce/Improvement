@@ -64,10 +64,49 @@ const ESTILOS = `
   .pill + .pill { margin-top: 3mm; }
   .yellow { background: var(--dept-imaginacion); border-radius: 4mm; padding: 10mm; margin-top: auto; margin-bottom: 4mm; }
   .yellow h2 { margin-top: 0; }
+  .lead { font-size: 14pt; font-weight: 400; letter-spacing: -.02em; line-height: 1.32; margin-bottom: 7mm; }
+  .cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 7mm; }
+  .kpi { border-top: .4mm solid var(--brand-navy); padding-top: 3mm; }
+  .kpi b { display: block; font-size: 22pt; font-weight: 300; letter-spacing: -.03em; }
+  .kpi span { font-size: 9pt; line-height: 1.35; display: block; color: color-mix(in srgb, var(--brand-navy) 72%, var(--brand-ivory)); }
+  .num { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 13pt; color: var(--brand-amber-paper); margin-right: 2mm; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .row p { font-size: 9.4pt; line-height: 1.45; }
+  .label { font-size: 7.8pt; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1mm; color: color-mix(in srgb, var(--brand-navy) 72%, var(--brand-ivory)); }
+  .pill h3 { color: var(--brand-ivory); }
+  .pill p { color: color-mix(in srgb, var(--brand-ivory) 85%, var(--brand-navy)); font-size: 9.8pt; }
+  .pill .num { color: var(--brand-amber); }
+  .bars { margin-top: 2mm; }
+  .bar { display: grid; grid-template-columns: 58mm 1fr 12mm; align-items: center; gap: 3mm; font-size: 9.3pt; margin-top: 2.2mm; }
+  .bar i { display: block; height: 3.2mm; border-radius: 2mm; background: var(--brand-navy); }
+  .bar em { font-style: normal; font-weight: 600; text-align: right; }
+  .note { font-size: 8.6pt !important; margin-top: 4mm; color: color-mix(in srgb, var(--brand-navy) 72%, var(--brand-ivory)); }
+  .sign { margin-top: 8mm; }
+  .sign .hand { font-size: 20pt; }
+  .q { padding-left: 5mm; margin-top: 4mm; }
+  .q li { margin-bottom: 2mm; }
+  .contacto { margin-top: 4mm; font-size: 9pt !important; }
 `;
 
 const mes = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
 const dia = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+const CONTACTO = "Jose Carlos Salinas · WhatsApp 444 849 6561 · salinas@jotapuntoce.com";
+const mayuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const guiaDe = (g) => `<p class="lead">${e(g.texto)} <span class="hand">${e(g.mano)}</span>${g.despues ? ` ${e(g.despues)}` : ""}</p>`;
+
+// La página 2: texto del dueño (2026-10-05), no de la IA. Solo cambia la conjugación (tú / ustedes) y negocio / idea.
+function porQueHice(c, k) {
+  const idea = c.tipo !== "negocio";
+  const ustedes = k.trato === "ustedes";
+  const suyo = idea ? (ustedes ? "su idea" : "tu idea") : ustedes ? "su negocio" : "tu negocio";
+  const nombre = idea ? suyo : `<b>${e(c.negocio)}</b>`;
+  const lo = idea ? "la" : "lo";
+  return `<h2>¿Por qué hice esto?</h2>
+<p>Revisé ${nombre} porque mi objetivo es ayudar a los dueños y emprendedores a que la visión que tuvieron se cumpla. Ayudar está en mi gen: es mi propósito y lo que me gusta hacer.</p>
+<p>Primero vi ${nombre} como ${lo} vería un prospecto que ${idea ? "la descubre" : "los descubre"} hoy, analizando todo lo que se ve desde afuera, y me encantaría ver${lo} desde adentro. ${mayuscula(suyo)} tiene el potencial que ${ustedes ? "le vieron" : "le viste"} al inicio. Yo también lo veo, y quiero que ese potencial de verdad explote, porque me reflejo en ${suyo}.</p>
+<div class="sign"><p><span class="hand">Con gusto,</span></p><p><b>Jose Carlos Salinas</b> · JotaPuntoCe</p></div>`;
+}
 
 export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
   const { tokens, monograma } = losRecursos();
@@ -79,41 +118,59 @@ export function htmlChequeo(c, k, { fecha = new Date() } = {}) {
     n += 1;
     return `<section class="page"><div class="head"><img src="${monograma}" alt="J·C"><span>${e(titulo)}</span></div>${cuerpo}<div class="foot"><span>Hecho solo para ${e(c.negocio ?? para)}</span><span>${n}</span></div></section>`;
   };
-  const lista = (xs) => `<ul>${xs.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`;
-  const acciones = (xs) => xs.map((a, i) => `<div class="pill"><h3>${i + 1}. ${e(a.titulo)}</h3><p>${e(a.como)}</p></div>`).join("");
+  const lista = (xs, clase = "") => `<ul class="${clase}">${xs.map((x) => `<li>${e(x)}</li>`).join("")}</ul>`;
+  const acciones = (xs) =>
+    xs.map((a, i) => `<div class="pill"><h3><span class="num">${i + 1}</span>${e(a.titulo)}</h3><p>${e(a.como)}</p></div>`).join("");
+  const kpis = (xs) =>
+    xs.length ? `<div class="cols">${xs.map((f) => `<div class="kpi"><b>${e(f.valor)}</b><span>${e(f.texto)}</span></div>`).join("")}</div>` : "";
+  const barras = (cx) => {
+    const max = Math.max(1, ...cx.items.map((i) => i.valor));
+    return `<h3 style="margin-top:9mm">${e(cx.titulo)}</h3><div class="bars">${cx.items
+      .map((i) => `<div class="bar"><span>${e(i.que)}</span><i style="width:${Math.round((i.valor / max) * 100)}%"></i><em>${Number(i.valor)}</em></div>`)
+      .join("")}</div>`;
+  };
+  const platicamos = `<div class="yellow"><h2>¿Lo platicamos?</h2><p>${e(k.cierre)}</p><p class="contacto">${CONTACTO}</p></div>`;
 
   const paginas = [
     pagina(
       `Chequeo · ${mes.format(fecha)}`,
       `${portada.trazo}<p class="senal">${FLECHA}${e(c.tipo === "negocio" ? c.negocio : "Tu idea")} <span class="hand">${e(portada.frase)}</span></p><div class="block"><h1>Chequeo de ${e(nombre)}</h1><div class="for">Preparado para <b>${e(para)}</b><br>${e(k.portada.dedicatoria)}</div></div><div class="meta"><div><b>Jose Carlos Salinas</b>Preparado por</div><div><b>${dia.format(fecha)}</b>Fecha</div><div><b>Un regalo</b>No cuesta nada</div></div>`,
     ).replace('class="page"', 'class="page cover"'),
-    pagina("Antes de empezar", `<h2>Por qué hicimos esto</h2><p>${e(k.porQue)}</p><div class="card" style="margin-top:8mm"><p>${e(k.portada.dedicatoria)}</p></div><p style="margin-top:6mm"><span class="hand">Con gusto,</span></p><p><b>Jose Carlos Salinas</b> · JotaPuntoCe</p>`),
+    pagina("Antes de empezar", porQueHice(c, k)),
   ];
 
   if (k.tipo === "negocio") {
+    const { bueno: b, sintomas: s, recetas: r, noSeVe: x } = k;
     paginas.push(
-      pagina("Lo que ya funciona", `<h2>Primero, lo bueno</h2>${lista(k.bueno)}`),
       pagina(
-        "Lo que se ve desde afuera",
-        `<h2>Lo que se ve desde afuera</h2>${k.patogenos
+        "Lo que ya funciona",
+        `<h2>Primero, lo bueno</h2>${guiaDe(b.guia)}${kpis(b.felicitacion)}${b.conecta ? barras(b.conecta) : ""}<p style="margin-top:7mm">${e(b.patron)}</p>`,
+      ),
+      pagina(
+        "Los síntomas",
+        `<h2 style="margin-top:9mm">Lo que se ve desde afuera</h2>${guiaDe(s.guia)}${s.items
           .map(
-            (p) =>
-              `<div class="card"><h3>${e(p.titulo)}<span class="tag">${p.marca === "dato" ? "Dato" : "Estimación"}</span></h3><p>${e(p.evidencia)}</p><p><b>Lo que cuesta:</b> ${e(p.costo)}${p.supuesto ? ` <i>(supuesto: ${e(p.supuesto)})</i>` : ""}</p></div>`,
+            (p, i) =>
+              `<div class="card"><h3><span class="num">${i + 1}</span>${e(p.titulo)}<span class="tag">${p.marca === "dato" ? "Dato" : "Estimación"}</span></h3><div class="row"><div><div class="label">Lo que vimos</div><p>${e(p.vimos)}</p></div><div><div class="label">Por qué importa</div><p>${e(p.importa)}${p.supuesto ? ` <i>(supuesto: ${e(p.supuesto)})</i>` : ""}</p></div></div></div>`,
           )
           .join("")}`,
       ),
-      pagina("Desde mañana", `<h2>Lo que pueden hacer desde mañana</h2>${acciones(k.pastillas)}`),
-      pagina("Lo que sigue", `<h2>La parte que no se ve</h2><p>${e(k.noSeVe)}</p><div class="yellow"><h2>¿Lo platicamos?</h2><p>${e(k.cierre)}</p></div>`),
+      pagina(
+        "La receta",
+        `<h2>Lo que pueden hacer desde mañana</h2>${guiaDe(r.guia)}${acciones(r.items)}${r.dimensionar ? `<p class="note">Para dimensionar: ${e(r.dimensionar.texto)} <i>(supuesto: ${e(r.dimensionar.supuesto)})</i></p>` : ""}`,
+      ),
+      pagina(
+        "Lo que no se ve desde afuera",
+        `<h2>La parte que no se ve</h2>${guiaDe(x.guia)}<p>${e(x.intro)}</p>${lista(x.preguntas, "q")}${platicamos}`,
+      ),
     );
   } else {
+    const { bueno: b, idea: i, pasos: p, siguienteNivel: sn } = k;
     paginas.push(
-      pagina("Lo que te mueve", `<h2>Lo que te mueve</h2>${lista(k.bueno)}`),
-      pagina(
-        "Tu idea",
-        `<h2>Tu idea</h2><p class="hand" style="font-size:18pt">${k.idea.viable ? "Sí tiene con qué." : "Todavía le falta."}</p><p>${e(k.idea.porque)}</p><h3 style="margin-top:6mm">Lo que le falta</h3>${lista(k.idea.leFalta)}`,
-      ),
-      pagina("Tus primeros pasos", `<h2>Tus primeros pasos</h2>${acciones(k.pasos)}`),
-      pagina("Lo que sigue", `<h2>El siguiente nivel</h2><p>${e(k.siguienteNivel)}</p><div class="yellow"><h2>¿Lo platicamos?</h2><p>${e(k.cierre)}</p></div>`),
+      pagina("Lo que te mueve", `<h2>Lo que te mueve</h2>${guiaDe(b.guia)}${kpis(b.felicitacion)}<p style="margin-top:7mm">${e(b.patron)}</p>`),
+      pagina("Tu idea", `<h2>Tu idea</h2>${guiaDe(i.guia)}<p>${e(i.porque)}</p><h3 style="margin-top:6mm">Lo que le falta</h3>${lista(i.leFalta)}`),
+      pagina("Tus primeros pasos", `<h2>Tus primeros pasos</h2>${guiaDe(p.guia)}${acciones(p.items)}`),
+      pagina("Lo que sigue", `<h2>El siguiente nivel</h2>${guiaDe(sn.guia)}<p>${e(sn.texto)}</p>${platicamos}`),
     );
   }
 
