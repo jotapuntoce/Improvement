@@ -27,7 +27,21 @@ describe("método", () => {
     expect(m).toContain("no tiene redes sociales");
   });
 
-  it("el método trae las reglas que no se rompen", () => {
-    for (const regla of ["dato", "estimacion", "Plática", "Kit Arranque", "ÚNICAMENTE un objeto JSON"]) expect(METODO).toContain(regla);
+  it("el método trae las reglas y el primer Chequeo como ejemplo de forma", () => {
+    for (const regla of ["dato", "estimacion", "Plática", "Kit Arranque", "ÚNICAMENTE un objeto JSON", "nunca sus datos", "Toti", '"trato"', '"vimos"']) {
+      expect(METODO).toContain(regla);
+    }
+  });
+
+  it("el mensaje lleva el expediente y dice qué no se pudo ver", () => {
+    const expediente = {
+      fecha: "2026-10-05T18:00:00.000Z",
+      sitio: { ok: true, data: { url: "https://ejemplo.com", enlacesRotos: [{ texto: "Blog", href: "https://ejemplo.com/blog", status: 404 }] } },
+      instagram: { ok: false, motivo: "Instagram sin configurar (faltan META_IG_USER_ID y META_ACCESS_TOKEN)." },
+    };
+    const m = mensajeDe(CHEQUEO_MUESTRA, { expediente });
+    expect(m).toContain("## Expediente");
+    expect(m).toContain("https://ejemplo.com/blog");
+    expect(m).toContain("No se pudo ver: instagram — Instagram sin configurar");
   });
 });
