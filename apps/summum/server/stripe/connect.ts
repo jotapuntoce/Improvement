@@ -1,7 +1,7 @@
 // Las acciones de Stripe del casco. Todas reciben Stripe por parámetro (StripeDeps) para poder
 // probarlas sin red; las rutas pasan getStripe(). El dinero de las ventas cae en la cuenta del
 // barco: Summum solo toma su application_fee (spec: Summum no retiene dinero).
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type Stripe from "stripe";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
@@ -38,13 +38,17 @@ export async function startOnboarding(userId: string, barcoId: string, deps: Str
       controller: { stripe_dashboard: { type: "express" }, fees: { payer: "application" }, losses: { payments: "application" } },
       capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
       metadata: { barco_org_id: barcoId },
-    });
-    row = await db
+    }, { idempotencyKey: `acct-${barcoId}` });
+    // Nunca reemplaza un id ya guardado: solo llena el hueco; luego se relee la fila ganadora.
+    await db
       .insert(stripeAccount)
       .values({ orgId: barcoId, stripeAccountId: account.id })
-      .onConflictDoUpdate({ target: stripeAccount.orgId, set: { stripeAccountId: account.id, updatedAt: new Date() } })
-      .returning()
-      .then((r) => r[0] ?? null);
+      .onConflictDoUpdate({
+        target: stripeAccount.orgId,
+        set: { stripeAccountId: account.id, updatedAt: new Date() },
+        setWhere: isNull(stripeAccount.stripeAccountId),
+      });
+    row = await accountRow(barcoId);
   }
   const link = await deps.stripe.accountLinks.create({
     account: row!.stripeAccountId!,
@@ -71,6 +75,7 @@ export async function createSaleLink(userId: string, barcoId: string, input: unk
   if (!rate) return { ok: false, error: "Summum aún no tiene comisión para este tipo de cobro." };
 
   const fee = feeCents(parsed.data.amountCents, rate);
+  if (fee >= parsed.data.amountCents) return { ok: false, error: "La comisión no puede ser igual o mayor que la venta." };
   const session = await deps.stripe.checkout.sessions.create(
     {
       mode: "payment",
@@ -103,11 +108,12 @@ export async function activateMembership(
 ): Promise<Result<{ subscriptionId: string }>> {
   await assertDockOwner(userId, muelleId);
   const [boat] = await db
-    .select({ id: organization.id })
+    .select({ id: organization.id, membershipPlanId: organization.membershipPlanId })
     .from(organization)
     .where(and(eq(organization.id, barcoId), eq(organization.parentOrgId, muelleId)))
     .limit(1);
   if (!boat) return { ok: false, error: "Ese barco no es de este muelle." };
+  if (boat.membershipPlanId) return { ok: false, error: "Este barco ya tiene membresía." };
   const [plan] = await db
     .select()
     .from(membershipPlan)
@@ -123,13 +129,19 @@ export async function activateMembership(
       .innerJoin(profile, eq(profile.id, membership.userId))
       .where(and(eq(membership.orgId, barcoId), eq(membership.role, "owner")))
       .limit(1);
-    const customer = await deps.stripe.customers.create({ email: owner?.email, metadata: { barco_org_id: barcoId } });
-    row = await db
+    const customer = await deps.stripe.customers.create(
+      { email: owner?.email, metadata: { barco_org_id: barcoId } },
+      { idempotencyKey: `cus-${barcoId}` },
+    );
+    await db
       .insert(stripeAccount)
       .values({ orgId: barcoId, stripeCustomerId: customer.id })
-      .onConflictDoUpdate({ target: stripeAccount.orgId, set: { stripeCustomerId: customer.id, updatedAt: new Date() } })
-      .returning()
-      .then((r) => r[0] ?? null);
+      .onConflictDoUpdate({
+        target: stripeAccount.orgId,
+        set: { stripeCustomerId: customer.id, updatedAt: new Date() },
+        setWhere: isNull(stripeAccount.stripeCustomerId),
+      });
+    row = await accountRow(barcoId);
   }
   const sub = await deps.stripe.subscriptions.create({
     customer: row!.stripeCustomerId!,
@@ -137,7 +149,7 @@ export async function activateMembership(
     collection_method: "send_invoice",
     days_until_due: 7,
     metadata: { barco_org_id: barcoId, muelle_org_id: muelleId },
-  });
+  }, { idempotencyKey: `sub-${barcoId}-${planId}` });
   await db.update(organization).set({ membershipPlanId: plan.id, updatedAt: new Date() }).where(eq(organization.id, barcoId));
   return { ok: true, data: { subscriptionId: sub.id } };
 }

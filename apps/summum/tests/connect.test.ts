@@ -46,7 +46,7 @@ describe("startOnboarding", () => {
     expect(s.accounts.create).toHaveBeenCalledWith(expect.objectContaining({
       country: "MX",
       controller: { stripe_dashboard: { type: "express" }, fees: { payer: "application" }, losses: { payments: "application" } },
-    }));
+    }), expect.objectContaining({ idempotencyKey: expect.any(String) }));
     const [row] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, boat.id));
     expect(row?.stripeAccountId).toMatch(/^acct_/);
   });
@@ -103,7 +103,7 @@ describe("activateMembership", () => {
     expect(r.ok).toBe(true);
     expect(s.subscriptions.create).toHaveBeenCalledWith(expect.objectContaining({
       items: [{ price: "price_test" }], collection_method: "send_invoice", days_until_due: 7,
-    }));
+    }), expect.objectContaining({ idempotencyKey: expect.any(String) }));
     const [org] = await db.select().from(organization).where(eq(organization.id, boat.id));
     expect(org?.membershipPlanId).toBe(plan!.id);
   });
@@ -113,5 +113,59 @@ describe("activateMembership", () => {
     const [plan] = await db.insert(membershipPlan).values({ muelleOrgId: a.dock.id, name: "Base", monthlyAmountCents: 50_000, stripePriceId: "price_test" }).returning();
     const r = await activateMembership(a.dockOwner, a.dock.id, b.boat.id, plan!.id, deps(fakeStripe()));
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("fix round 1", () => {
+  it("startOnboarding manda idempotencyKey y un segundo intento conserva el id original", async () => {
+    const { boat, boatOwner } = await setup();
+    const s = fakeStripe();
+    await startOnboarding(boatOwner, boat.id, deps(s));
+    const [, opts] = s.accounts.create.mock.calls[0] as unknown as [unknown, unknown];
+    expect(opts).toEqual({ idempotencyKey: `acct-${boat.id}` });
+    const [first] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, boat.id));
+    await startOnboarding(boatOwner, boat.id, deps(s));
+    expect(s.accounts.create).toHaveBeenCalledTimes(1);
+    const [second] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, boat.id));
+    expect(second?.stripeAccountId).toBe(first?.stripeAccountId);
+  });
+  it("startOnboarding no sobrescribe un id ya guardado por otra carrera", async () => {
+    const { boat, boatOwner } = await setup();
+    const s = fakeStripe();
+    s.accounts.create.mockImplementationOnce(async () => {
+      await db.insert(stripeAccount).values({ orgId: boat.id, stripeAccountId: "acct_original" });
+      return { id: "acct_nuevo" };
+    });
+    await startOnboarding(boatOwner, boat.id, deps(s));
+    const [row] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, boat.id));
+    expect(row?.stripeAccountId).toBe("acct_original");
+    expect(s.accountLinks.create).toHaveBeenCalledWith(expect.objectContaining({ account: "acct_original" }));
+  });
+  it("startOnboarding rechaza a quien no es dueño del barco", async () => {
+    const a = await setup();
+    const b = await setup();
+    await expect(startOnboarding(b.boatOwner, a.boat.id, deps(fakeStripe()))).rejects.toThrow();
+  });
+  it("activateMembership manda idempotencyKey y rechaza un barco que ya tiene membresía sin llamar a Stripe", async () => {
+    const { dock, boat, dockOwner } = await setup();
+    const [plan] = await db.insert(membershipPlan).values({ muelleOrgId: dock.id, name: "Base", monthlyAmountCents: 50_000, stripePriceId: "price_test" }).returning();
+    const s = fakeStripe();
+    await activateMembership(dockOwner, dock.id, boat.id, plan!.id, deps(s));
+    expect((s.customers.create.mock.calls[0] as unknown as unknown[])[1]).toEqual({ idempotencyKey: `cus-${boat.id}` });
+    expect((s.subscriptions.create.mock.calls[0] as unknown as unknown[])[1]).toEqual({ idempotencyKey: `sub-${boat.id}-${plan!.id}` });
+    const s2 = fakeStripe();
+    const r = await activateMembership(dockOwner, dock.id, boat.id, plan!.id, deps(s2));
+    expect(r).toEqual({ ok: false, error: "Este barco ya tiene membresía." });
+    expect(s2.customers.create).not.toHaveBeenCalled();
+    expect(s2.subscriptions.create).not.toHaveBeenCalled();
+  });
+  it("createSaleLink rechaza si la comisión iguala o supera la venta", async () => {
+    const { dock, boat, boatOwner } = await setup();
+    await db.insert(stripeAccount).values({ orgId: boat.id, stripeAccountId: `acct_${crypto.randomUUID()}`, chargesEnabled: true });
+    await db.insert(feeRate).values({ muelleOrgId: dock.id, chargeKind: "venta_propia", percentBps: 10_000, fixedCents: 0 });
+    const s = fakeStripe();
+    const r = await createSaleLink(boatOwner, boat.id, { amountCents: 10_000, description: "x" }, deps(s));
+    expect(r).toEqual({ ok: false, error: "La comisión no puede ser igual o mayor que la venta." });
+    expect(s.checkout.sessions.create).not.toHaveBeenCalled();
   });
 });
