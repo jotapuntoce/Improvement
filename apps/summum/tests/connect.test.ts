@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { feeRate, membership, membershipPlan, organization, profile, stripeAccount } from "@jotapuntoce/db/schema";
-import { activateMembership, createSaleLink, startOnboarding, type StripeDeps } from "../server/stripe/connect.ts";
+import { activateMembership, createMembershipPlan, createSaleLink, startOnboarding, type StripeDeps } from "../server/stripe/connect.ts";
 
 const orgIds: string[] = [];
 const profileIds: string[] = [];
@@ -18,6 +18,7 @@ function fakeStripe() {
     accountLinks: { create: vi.fn(async () => ({ url: "https://connect.stripe.test/onboard" })) },
     checkout: { sessions: { create: vi.fn(async () => ({ url: "https://checkout.stripe.test/s" })) } },
     customers: { create: vi.fn(async () => ({ id: `cus_${crypto.randomUUID()}` })) },
+    prices: { create: vi.fn(async () => ({ id: `price_${crypto.randomUUID()}` })) },
     subscriptions: { create: vi.fn(async () => ({ id: `sub_${crypto.randomUUID()}` })) },
   };
 }
@@ -94,6 +95,32 @@ describe("createSaleLink", () => {
   });
 });
 
+describe("createMembershipPlan", () => {
+  it("WHEN el dueño del muelle crea un nivel THE SYSTEM SHALL crear su precio mensual en MXN y guardar la fila", async () => {
+    const { dock, dockOwner } = await setup();
+    const s = fakeStripe();
+    const r = await createMembershipPlan(dockOwner, dock.id, { name: "Base", monthlyAmountCents: 150_000 }, deps(s));
+    expect(r.ok).toBe(true);
+    expect(s.prices.create).toHaveBeenCalledWith(expect.objectContaining({ currency: "mxn", unit_amount: 150_000, recurring: { interval: "month" } }));
+    const [plan] = await db.select().from(membershipPlan).where(eq(membershipPlan.muelleOrgId, dock.id));
+    expect(plan).toMatchObject({ name: "Base", monthlyAmountCents: 150_000, stripePriceId: expect.stringMatching(/^price_/) });
+  });
+  it("WHEN el precio no es un entero positivo THE SYSTEM SHALL rechazarlo sin tocar Stripe", async () => {
+    const { dock, dockOwner } = await setup();
+    const s = fakeStripe();
+    for (const monthlyAmountCents of [0, -100, 10.5]) {
+      const r = await createMembershipPlan(dockOwner, dock.id, { name: "Base", monthlyAmountCents }, deps(s));
+      expect(r).toEqual({ ok: false, error: "Nombre del nivel y precio mensual mayor que cero." });
+    }
+    expect(s.prices.create).not.toHaveBeenCalled();
+  });
+  it("WHEN quien crea no es dueño del muelle THE SYSTEM SHALL dar 404", async () => {
+    const { dock, boatOwner } = await setup();
+    await expect(createMembershipPlan(boatOwner, dock.id, { name: "Base", monthlyAmountCents: 100 }, deps(fakeStripe())))
+      .rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+  });
+});
+
 describe("activateMembership", () => {
   it("WHEN el dueño del muelle activa un nivel THE SYSTEM SHALL suscribir al barco y guardar su nivel", async () => {
     const { dock, boat, dockOwner } = await setup();
@@ -113,6 +140,15 @@ describe("activateMembership", () => {
     const [plan] = await db.insert(membershipPlan).values({ muelleOrgId: a.dock.id, name: "Base", monthlyAmountCents: 50_000, stripePriceId: "price_test" }).returning();
     const r = await activateMembership(a.dockOwner, a.dock.id, b.boat.id, plan!.id, deps(fakeStripe()));
     expect(r.ok).toBe(false);
+  });
+  it("WHEN el barco ya tiene nivel THE SYSTEM SHALL rechazar una segunda activación sin suscribir de nuevo", async () => {
+    const { dock, boat, dockOwner } = await setup();
+    const [plan] = await db.insert(membershipPlan).values({ muelleOrgId: dock.id, name: "Base", monthlyAmountCents: 50_000, stripePriceId: "price_test" }).returning();
+    const s = fakeStripe();
+    await activateMembership(dockOwner, dock.id, boat.id, plan!.id, deps(s));
+    const r = await activateMembership(dockOwner, dock.id, boat.id, plan!.id, deps(s));
+    expect(r).toEqual({ ok: false, error: "Este barco ya tiene membresía." });
+    expect(s.subscriptions.create).toHaveBeenCalledTimes(1);
   });
 });
 

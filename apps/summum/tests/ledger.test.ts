@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { ledgerEntry, membership, organization, profile } from "@jotapuntoce/db/schema";
+import { ledgerEntry, membership, membershipPlan, organization, profile } from "@jotapuntoce/db/schema";
 import { listBarcoLedgerForOwner, listDockLedger, summarize } from "../server/money/ledger.ts";
-import { listDockBarcos } from "../server/barcos/list.ts";
+import { alCorriente, listDockBarcos } from "../server/barcos/list.ts";
 
 describe("summarize", () => {
   it("WHEN no hay movimientos THE SYSTEM SHALL dar margen 0, no NaN", () => {
@@ -63,5 +63,45 @@ describe("listBarcoLedgerForOwner", () => {
 
     expect((await listBarcoLedgerForOwner(owner, b1!.id)).map((r) => r.barcoOrgId)).toEqual([b1!.id]);
     await expect(listBarcoLedgerForOwner(dockOwner, b1!.id)).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+  });
+});
+
+describe("alCorriente", () => {
+  const paid = new Date("2026-09-10T12:00:00Z");
+  it("WHEN no hay pago de membresía THE SYSTEM SHALL marcarlo pendiente", () => {
+    expect(alCorriente(null, paid)).toBe(false);
+  });
+  it("WHEN el último pago cubre el mes más los días de gracia THE SYSTEM SHALL darlo al corriente", () => {
+    expect(alCorriente(paid, new Date("2026-10-17T12:00:00Z"))).toBe(true);
+  });
+  it("WHEN ya pasó el mes más la gracia sin pago nuevo THE SYSTEM SHALL marcarlo pendiente", () => {
+    expect(alCorriente(paid, new Date("2026-10-17T12:00:01Z"))).toBe(false);
+  });
+});
+
+describe("listDockBarcos · al corriente", () => {
+  it("WHEN el barco con nivel pagó su membresía este periodo THE SYSTEM SHALL darlo al corriente; sin pago o sin nivel, no", async () => {
+    const [dock] = await db.insert(organization).values({ name: "m", slug: `m-${crypto.randomUUID()}`, kind: "muelle" }).returning();
+    orgIds.push(dock!.id);
+    const [plan] = await db.insert(membershipPlan).values({ muelleOrgId: dock!.id, name: "Base", monthlyAmountCents: 50_000, stripePriceId: "price_test" }).returning();
+    const boat = async (name: string, membershipPlanId: string | null) => {
+      const [b] = await db.insert(organization).values({ name, slug: `${name}-${crypto.randomUUID()}`, parentOrgId: dock!.id, membershipPlanId }).returning();
+      orgIds.push(b!.id);
+      return b!.id;
+    };
+    const pagado = await boat("pagado", plan!.id);
+    const vencido = await boat("vencido", plan!.id);
+    await boat("nuevo", plan!.id);
+    await boat("sin-nivel", null);
+    const u = crypto.randomUUID();
+    await db.insert(profile).values({ id: u, email: `${u}@example.com` });
+    profileIds.push(u);
+    await db.insert(membership).values({ userId: u, orgId: dock!.id, role: "owner", acceptedAt: new Date() });
+    const fee = (barco: string, createdAt: Date) => ({ muelleOrgId: dock!.id, barcoOrgId: barco, chargeKind: "membresia" as const, grossCents: 50_000, summumFeeCents: 50_000, currency: "mxn", stripeObjectId: `in_${crypto.randomUUID()}`, createdAt });
+    const old = new Date(Date.now() - 90 * 86_400_000);
+    await db.insert(ledgerEntry).values([fee(pagado, old), fee(pagado, new Date()), fee(vencido, old)]);
+
+    const status = Object.fromEntries((await listDockBarcos(u, dock!.id)).map((b) => [b.name, b.alCorriente]));
+    expect(status).toEqual({ pagado: true, vencido: false, nuevo: false, "sin-nivel": false });
   });
 });

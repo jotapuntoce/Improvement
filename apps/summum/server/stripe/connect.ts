@@ -12,7 +12,7 @@ import { feeCents, pickRate } from "../fees/rates.ts";
 import type { Result } from "../result.ts";
 
 export type StripeDeps = {
-  stripe: Pick<Stripe, "accounts" | "accountLinks" | "checkout" | "customers" | "subscriptions">;
+  stripe: Pick<Stripe, "accounts" | "accountLinks" | "checkout" | "customers" | "prices" | "subscriptions">;
   baseUrl: string;
 };
 
@@ -111,6 +111,31 @@ export async function createSaleLink(userId: string, barcoId: string, input: unk
   );
   if (!session.url) return { ok: false, error: "Stripe no devolvió la liga de cobro." };
   return { ok: true, data: { url: session.url } };
+  });
+}
+
+const planSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  monthlyAmountCents: z.number().int().positive(),
+});
+
+/** Crea un nivel de membresía: su precio mensual en Stripe (cuenta de la plataforma) y su fila. */
+export async function createMembershipPlan(userId: string, muelleId: string, input: unknown, deps: StripeDeps): Promise<Result<{ planId: string }>> {
+  await assertDockOwner(userId, muelleId);
+  const parsed = planSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Nombre del nivel y precio mensual mayor que cero." };
+  return withStripe(async () => {
+  const price = await deps.stripe.prices.create({
+    currency: "mxn",
+    unit_amount: parsed.data.monthlyAmountCents,
+    recurring: { interval: "month" },
+    product_data: { name: `Membresía Summum · ${parsed.data.name}`, metadata: { muelle_org_id: muelleId } },
+  });
+  const [plan] = await db
+    .insert(membershipPlan)
+    .values({ muelleOrgId: muelleId, name: parsed.data.name, monthlyAmountCents: parsed.data.monthlyAmountCents, stripePriceId: price.id })
+    .returning({ id: membershipPlan.id });
+  return { ok: true, data: { planId: plan!.id } };
   });
 }
 
