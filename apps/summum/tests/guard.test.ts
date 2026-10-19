@@ -93,6 +93,11 @@ describe("listMyBarcos", () => {
     await db.insert(membership).values({ userId: u, orgId: boat.id, role: "owner", acceptedAt: new Date() });
     expect((await listMyBarcos(u)).map((b) => b.id)).toEqual([boat.id]);
   });
+  it("WHEN su barco aún no cuelga de un muelle THE SYSTEM SHALL no listarlo (su panel daría 404)", async () => {
+    const orphan = await org("barco");
+    const u = await person(orphan.id);
+    expect(await listMyBarcos(u)).toEqual([]);
+  });
 });
 
 describe("sin sesión", () => {

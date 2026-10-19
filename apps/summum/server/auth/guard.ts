@@ -4,7 +4,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, organization } from "@jotapuntoce/db/schema";
 import { env } from "@/lib/env.ts";
@@ -70,10 +70,11 @@ export async function listMyDocks(userId: string) {
     .where(eq(organization.kind, "muelle"));
 }
 
+// Solo barcos ya colgados de un muelle: un barco huérfano no tiene panel (assertBarcoOwner da 404).
 export async function listMyBarcos(userId: string) {
   return db
     .select({ id: organization.id, name: organization.name })
     .from(organization)
     .innerJoin(membership, and(eq(membership.orgId, organization.id), eq(membership.userId, userId), eq(membership.role, "owner")))
-    .where(eq(organization.kind, "barco"));
+    .where(and(eq(organization.kind, "barco"), isNotNull(organization.parentOrgId)));
 }

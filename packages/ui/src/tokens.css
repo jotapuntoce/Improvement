@@ -177,6 +177,11 @@
   --summum-hueso: #f2eee2;
   --summum-navy: #0b1322;
   --summum-guia: #8b8679;
+  /* Neutros del kit de la web-app (Summum System/marca/20-webapp-kit.html): campos y notas sobre hueso. */
+  --summum-campo: #ffffff;
+  --summum-campo-borde: #d6d0c1;
+  --summum-nota: #5d5a52;
+  --summum-hueso-suave: #cfcabd;
 }
 
 [data-brand="summum"] {

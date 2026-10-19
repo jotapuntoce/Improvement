@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import s from "./login.module.css";
 
 // Next.js solo inlinea NEXT_PUBLIC_* en el bundle del navegador cuando detecta un acceso literal
 // `process.env.NEXT_PUBLIC_X` en el código fuente — lib/env.ts hace `schema.parse(process.env)`
@@ -52,7 +53,7 @@ export function LoginForm() {
     });
 
     if (signInError || !data.session) {
-      setError("Email o contraseña incorrectos.");
+      setError("Correo o contraseña incorrectos.");
       setLoading(false);
       return;
     }
@@ -72,91 +73,37 @@ export function LoginForm() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bg)",
-        color: "var(--text-primary)",
-        fontFamily: "var(--font-geist-sans), sans-serif",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          width: "100%",
-          maxWidth: "360px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "12px",
-          padding: "24px",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "24px",
-            fontWeight: 700,
-            marginBottom: "8px",
-            background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-          }}
-        >
-          Summum
-        </h1>
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px" }}>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              padding: "10px 12px",
-              borderRadius: "10px",
-              border: "1px solid var(--border)",
-              background: "var(--bg-card)",
-              color: "var(--text-primary)",
-            }}
-          />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px" }}>
-          Contraseña
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              padding: "10px 12px",
-              borderRadius: "10px",
-              border: "1px solid var(--border)",
-              background: "var(--bg-card)",
-              color: "var(--text-primary)",
-            }}
-          />
-        </label>
-        {error && <p style={{ color: "var(--danger)", fontSize: "13px" }}>{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "10px 12px",
-            borderRadius: "10px",
-            border: "none",
-            fontWeight: 600,
-            cursor: loading ? "default" : "pointer",
-            background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))",
-            color: "var(--bg)",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-      </form>
+    <main className={s.login}>
+      <div className={s.marca}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
+        <img src="/brand/logo-completo-hueso.svg" alt="Summum System" />
+        <p>Donde vive tu ruta a la cúspide: tu diagnóstico, tus especialistas, tu equipo y tu sello.</p>
+      </div>
+      <div className={s.lado}>
+        <form onSubmit={handleSubmit} className={s.form}>
+          <span className={s.etiqueta}>Bienvenido de vuelta</span>
+          <h1 className={s.titulo}>Entra a Summum</h1>
+          <label className={s.campo}>
+            Correo
+            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className={s.campo}>
+            Contraseña
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && <p className={s.error}>{error}</p>}
+          <button type="submit" disabled={loading} className={s.entrar}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+          <p className={s.nota}>¿Aún no eres miembro? Al equipo se entra con el diagnóstico, no con la tarjeta.</p>
+        </form>
+      </div>
     </main>
   );
 }
