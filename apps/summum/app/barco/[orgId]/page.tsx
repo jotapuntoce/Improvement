@@ -10,7 +10,7 @@ import { connect, sale } from "./actions.ts";
 export default async function BarcoPage({ params, searchParams }: { params: Promise<{ orgId: string }>; searchParams: Promise<{ error?: string }> }) {
   const { orgId } = await params;
   const { error } = await searchParams;
-  const { userId } = await requireBarcoOwnership(orgId);
+  const { userId } = await requireBarcoOwnership(orgId, `/barco/${orgId}`);
   const account = await getAccountStatus(userId, orgId);
   const rows = await listBarcoLedgerForOwner(userId, orgId);
 

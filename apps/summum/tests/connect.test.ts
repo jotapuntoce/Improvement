@@ -169,3 +169,16 @@ describe("fix round 1", () => {
     expect(s.checkout.sessions.create).not.toHaveBeenCalled();
   });
 });
+
+describe("errores del SDK de Stripe", () => {
+  it("WHEN Stripe lanza THE SYSTEM SHALL devolver Result fallido, no relanzar", async () => {
+    const { boat, boatOwner } = await setup();
+    const s = fakeStripe();
+    s.accounts.create.mockRejectedValue(new Error("boom"));
+    expect(await startOnboarding(boatOwner, boat.id, deps(s))).toEqual({ ok: false, error: "Stripe rechazó la operación." });
+  });
+  it("WHEN el guard responde 404 THE SYSTEM SHALL dejarlo pasar", async () => {
+    const { boat, dockOwner } = await setup();
+    await expect(startOnboarding(dockOwner, boat.id, deps(fakeStripe()))).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+  });
+});

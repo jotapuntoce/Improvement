@@ -13,6 +13,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   "sin-liga": "Stripe no devolvió la liga de cobro.",
   "ya-membresia": "Este barco ya tiene membresía.",
   "nivel-inexistente": "Ese nivel no existe en este muelle.",
+  stripe: "Stripe rechazó la operación.",
   "no-se-pudo": "No se pudo completar. Inténtalo de nuevo.",
 };
 

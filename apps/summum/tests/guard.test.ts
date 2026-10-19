@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, organization, profile } from "@jotapuntoce/db/schema";
-import { assertBarcoOwner, assertDockOwner, listMyDocks } from "../server/auth/guard.ts";
+import { assertBarcoOwner, assertDockOwner, listMyBarcos, listMyDocks, requireBarcoOwnership, requireDockOwnership } from "../server/auth/guard.ts";
+
+// Sin cookie de sesión: getSessionUserId() devuelve null.
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 const NOT_FOUND = { digest: "NEXT_HTTP_ERROR_FALLBACK;404" };
 const orgIds: string[] = [];
@@ -79,5 +82,30 @@ describe("listMyDocks", () => {
     const u = await person(dock.id);
     await db.insert(membership).values({ userId: u, orgId: boat.id, role: "owner", acceptedAt: new Date() });
     expect((await listMyDocks(u)).map((d) => d.id)).toEqual([dock.id]);
+  });
+});
+
+describe("listMyBarcos", () => {
+  it("WHEN es dueño de un muelle y de un barco THE SYSTEM SHALL listar solo el barco", async () => {
+    const dock = await org("muelle");
+    const boat = await org("barco", dock.id);
+    const u = await person(dock.id);
+    await db.insert(membership).values({ userId: u, orgId: boat.id, role: "owner", acceptedAt: new Date() });
+    expect((await listMyBarcos(u)).map((b) => b.id)).toEqual([boat.id]);
+  });
+});
+
+describe("sin sesión", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  it("WHEN no hay sesión THE SYSTEM SHALL redirigir al login con returnTo", async () => {
+    await expect(requireBarcoOwnership(id, `/barco/${id}`)).rejects.toMatchObject({
+      digest: expect.stringContaining(`/login?returnTo=${encodeURIComponent(`/barco/${id}`)}`),
+    });
+    await expect(requireDockOwnership(id, "/muelle/x/dinero")).rejects.toMatchObject({
+      digest: expect.stringContaining("/login?returnTo=%2Fmuelle%2Fx%2Fdinero"),
+    });
+  });
+  it("WHEN no hay sesión y no hay ruta THE SYSTEM SHALL redirigir a /login a secas", async () => {
+    await expect(requireDockOwnership(id)).rejects.toMatchObject({ digest: expect.stringMatching(/NEXT_REDIRECT.*\/login;/) });
   });
 });

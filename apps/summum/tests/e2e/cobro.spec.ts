@@ -85,7 +85,7 @@ test("WHEN el barco cobra 100 MXN con tarjeta de prueba THE SYSTEM SHALL mostrar
   await page.getByPlaceholder("CVC").fill("123");
   await page.getByLabel(/nombre|name/i).first().fill("Prueba E2E");
   await page.getByRole("button", { name: /pagar|pay/i }).click();
-  await page.waitForURL(new RegExp(`/barco/${boatId}\?cobro=ok`));
+  await page.waitForURL((u) => u.pathname === `/barco/${boatId}` && u.searchParams.get("cobro") === "ok");
 
   await expect
     .poll(async () => (await db.select().from(ledgerEntry).where(eq(ledgerEntry.barcoOrgId, boatId))).length, { timeout: 30_000 })

@@ -1,6 +1,6 @@
 // La única instancia de Stripe. Sin apiVersion explícita: usa la que fija el SDK 23.0.0.
 import Stripe from "stripe";
-import { requireEnv } from "../../lib/env.ts";
+import { requireEnv } from "@/lib/env.ts";
 
 let instance: Stripe | null = null;
 

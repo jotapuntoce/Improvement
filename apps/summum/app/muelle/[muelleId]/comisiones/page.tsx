@@ -11,7 +11,7 @@ const fixed = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 export default async function ComisionesPage({ params, searchParams }: { params: Promise<{ muelleId: string }>; searchParams: Promise<{ error?: string }> }) {
   const { muelleId } = await params;
   const { error } = await searchParams;
-  const { userId } = await requireDockOwnership(muelleId);
+  const { userId } = await requireDockOwnership(muelleId, `/muelle/${muelleId}/comisiones`);
   const [rates, pending, barcos] = await Promise.all([listRates(muelleId), listPendingChanges(muelleId), listDockBarcos(userId, muelleId)]);
   const boatName = (id: string | null) => (id ? barcos.find((b) => b.id === id)?.name ?? "—" : "Todos (de fábrica)");
 

@@ -2,12 +2,12 @@
 // BARCO colgado de un muelle (sus acciones de Stripe). Ser dueño del muelle no abre el barco. 404,
 // nunca 403. Sesión: misma idea que apps/improvement (cookie con el access token de Supabase).
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, organization } from "@jotapuntoce/db/schema";
-import { env } from "../../lib/env.ts";
+import { env } from "@/lib/env.ts";
 
 export const SESSION_COOKIE = "sum-access-token";
 
@@ -39,9 +39,14 @@ export async function assertDockOwner(userId: string, muelleId: string) {
   return { userId, muelleId };
 }
 
-export async function requireDockOwnership(muelleId: string) {
+// Sin sesión: al login con returnTo (si la página pasa su ruta); con sesión ajena: 404.
+function toLogin(path?: string): never {
+  redirect(path ? `/login?returnTo=${encodeURIComponent(path)}` : "/login");
+}
+
+export async function requireDockOwnership(muelleId: string, path?: string) {
   const userId = await getSessionUserId();
-  if (!userId) notFound();
+  if (!userId) toLogin(path);
   return assertDockOwner(userId, muelleId);
 }
 
@@ -51,9 +56,9 @@ export async function assertBarcoOwner(userId: string, barcoId: string) {
   return { userId, barcoId, muelleId: row.parentOrgId };
 }
 
-export async function requireBarcoOwnership(barcoId: string) {
+export async function requireBarcoOwnership(barcoId: string, path?: string) {
   const userId = await getSessionUserId();
-  if (!userId) notFound();
+  if (!userId) toLogin(path);
   return assertBarcoOwner(userId, barcoId);
 }
 
@@ -63,4 +68,12 @@ export async function listMyDocks(userId: string) {
     .from(organization)
     .innerJoin(membership, and(eq(membership.orgId, organization.id), eq(membership.userId, userId), eq(membership.role, "owner")))
     .where(eq(organization.kind, "muelle"));
+}
+
+export async function listMyBarcos(userId: string) {
+  return db
+    .select({ id: organization.id, name: organization.name })
+    .from(organization)
+    .innerJoin(membership, and(eq(membership.orgId, organization.id), eq(membership.userId, userId), eq(membership.role, "owner")))
+    .where(eq(organization.kind, "barco"));
 }

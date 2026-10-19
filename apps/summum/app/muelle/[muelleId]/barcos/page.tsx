@@ -6,7 +6,7 @@ const estado = (b: { chargesEnabled: boolean; payoutsEnabled: boolean }) =>
 
 export default async function BarcosPage({ params }: { params: Promise<{ muelleId: string }> }) {
   const { muelleId } = await params;
-  const { userId } = await requireDockOwnership(muelleId);
+  const { userId } = await requireDockOwnership(muelleId, `/muelle/${muelleId}/barcos`);
   const barcos = await listDockBarcos(userId, muelleId);
   return (
     <main>

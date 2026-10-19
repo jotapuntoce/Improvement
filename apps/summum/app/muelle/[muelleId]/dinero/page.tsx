@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function DineroPage({ params, searchParams }: { params: Promise<{ muelleId: string }>; searchParams: Promise<{ barco?: string; tipo?: string }> }) {
   const { muelleId } = await params;
   const { barco, tipo } = await searchParams;
-  const { userId } = await requireDockOwnership(muelleId);
+  const { userId } = await requireDockOwnership(muelleId, `/muelle/${muelleId}/dinero`);
   const chargeKind = KINDS.find((k) => k === tipo);
   const barcoOrgId = barco && UUID.test(barco) ? barco : undefined; // un valor mal formado haría fallar el query de uuid
   const [rows, barcos] = await Promise.all([listDockLedger(userId, muelleId, { barcoOrgId, chargeKind }), listDockBarcos(userId, muelleId)]);

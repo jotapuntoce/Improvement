@@ -24,6 +24,17 @@ export const SALE_METADATA = z.object({
   fixed_cents: z.coerce.number().int(),
 });
 
+// Los errores del SDK de Stripe (red, tarjeta, permisos) vuelven como Result; los de Next
+// (notFound/redirect, con digest NEXT_*) y los demás se relanzan.
+async function withStripe<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof Error && !("digest" in err)) return { ok: false, error: "Stripe rechazó la operación." };
+    throw err;
+  }
+}
+
 async function accountRow(orgId: string) {
   const [row] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, orgId)).limit(1);
   return row ?? null;
@@ -31,6 +42,7 @@ async function accountRow(orgId: string) {
 
 export async function startOnboarding(userId: string, barcoId: string, deps: StripeDeps): Promise<Result<{ url: string }>> {
   await assertBarcoOwner(userId, barcoId);
+  return withStripe(async () => {
   let row = await accountRow(barcoId);
   if (!row?.stripeAccountId) {
     const account = await deps.stripe.accounts.create({
@@ -57,6 +69,7 @@ export async function startOnboarding(userId: string, barcoId: string, deps: Str
     return_url: `${deps.baseUrl}/barco/${barcoId}`,
   });
   return { ok: true, data: { url: link.url } };
+  });
 }
 
 const saleSchema = z.object({
@@ -66,6 +79,7 @@ const saleSchema = z.object({
 
 export async function createSaleLink(userId: string, barcoId: string, input: unknown, deps: StripeDeps): Promise<Result<{ url: string }>> {
   const { muelleId } = await assertBarcoOwner(userId, barcoId);
+  return withStripe(async () => {
   const parsed = saleSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Monto en centavos enteros positivos y una descripción." };
   const row = await accountRow(barcoId);
@@ -97,6 +111,7 @@ export async function createSaleLink(userId: string, barcoId: string, input: unk
   );
   if (!session.url) return { ok: false, error: "Stripe no devolvió la liga de cobro." };
   return { ok: true, data: { url: session.url } };
+  });
 }
 
 export async function activateMembership(
@@ -107,6 +122,7 @@ export async function activateMembership(
   deps: StripeDeps,
 ): Promise<Result<{ subscriptionId: string }>> {
   await assertDockOwner(userId, muelleId);
+  return withStripe(async () => {
   const [boat] = await db
     .select({ id: organization.id, membershipPlanId: organization.membershipPlanId })
     .from(organization)
@@ -152,6 +168,7 @@ export async function activateMembership(
   }, { idempotencyKey: `sub-${barcoId}-${planId}` });
   await db.update(organization).set({ membershipPlanId: plan.id, updatedAt: new Date() }).where(eq(organization.id, barcoId));
   return { ok: true, data: { subscriptionId: sub.id } };
+  });
 }
 
 /** Estado de la cuenta de cobro del barco, para su pagina. null = aun no la conecta. */
