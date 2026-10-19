@@ -78,6 +78,15 @@ describe("decideFeeChange", () => {
     await decideFeeChange(owners[1]!, p.data.id, "aprobado");
     expect((await decideFeeChange(owners[2]!, p.data.id, "rechazado")).ok).toBe(false);
   });
+  it("WHEN se decide dos veces el mismo cambio THE SYSTEM SHALL dar el error y dejar fee_rate como estaba", async () => {
+    const { dock, owners } = await dockWithOwners(3);
+    const p = await proposeFeeChange(owners[0]!, dock.id, { chargeKind: "venta_propia", percentBps: 500, fixedCents: 0, barcoOrgId: null });
+    if (!p.ok) throw new Error("setup");
+    await decideFeeChange(owners[1]!, p.data.id, "aprobado");
+    const before = await listRates(dock.id);
+    expect(await decideFeeChange(owners[2]!, p.data.id, "aprobado")).toEqual({ ok: false, error: "Este cambio ya se decidió." });
+    expect(await listRates(dock.id)).toEqual(before);
+  });
   it("WHEN decide alguien que no es dueño del muelle THE SYSTEM SHALL responder 404", async () => {
     const { dock, owners } = await dockWithOwners(1);
     const p = await proposeFeeChange(owners[0]!, dock.id, { chargeKind: "venta_propia", percentBps: 500, fixedCents: 0, barcoOrgId: null });

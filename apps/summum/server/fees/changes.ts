@@ -45,14 +45,16 @@ export async function decideFeeChange(
   if (!change) notFound();
   await assertDockOwner(userId, change.muelleOrgId);
   if (change.proposedBy === userId) return { ok: false, error: "Necesita la firma del otro dueño." };
-  if (change.decision) return { ok: false, error: "Ese cambio ya se decidió." };
+  if (change.decision) return { ok: false, error: "Este cambio ya se decidió." };
 
-  await db.transaction(async (tx) => {
-    await tx
+  const decided = await db.transaction(async (tx) => {
+    const claimed = await tx
       .update(feeRateChange)
       .set({ decidedBy: userId, decidedAt: new Date(), decision })
-      .where(and(eq(feeRateChange.id, changeId), isNull(feeRateChange.decision)));
-    if (decision !== "aprobado") return;
+      .where(and(eq(feeRateChange.id, changeId), isNull(feeRateChange.decision)))
+      .returning({ id: feeRateChange.id });
+    if (claimed.length === 0) return false; // otro decidió entre la lectura y el update
+    if (decision !== "aprobado") return true;
 
     const scope = and(
       eq(feeRate.muelleOrgId, change.muelleOrgId),
@@ -74,7 +76,9 @@ export async function decideFeeChange(
         fixedCents: change.fixedCents,
       });
     }
+    return true;
   });
+  if (!decided) return { ok: false, error: "Este cambio ya se decidió." };
   return { ok: true, data: { id: changeId } };
 }
 
