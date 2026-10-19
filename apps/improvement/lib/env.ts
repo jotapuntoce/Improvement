@@ -24,6 +24,7 @@ const schema = z.object({
   RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — recordatorios por email
   CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — bearer del cron de Vercel
   NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  NEXT_PUBLIC_SUMMUM_URL: z.preprocess(emptyToUndefined, z.string().url().optional()), // enlace "Cobros" a apps/summum
 });
 
 export const env = schema.parse(process.env);

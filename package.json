@@ -9,6 +9,7 @@
     "dev": "turbo run dev",
     "dev:admin": "turbo run dev --filter=@jotapuntoce/admin",
     "dev:improvement": "turbo run dev --filter=@jotapuntoce/improvement",
+    "dev:summum": "turbo run dev --filter=@jotapuntoce/summum",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

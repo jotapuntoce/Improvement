@@ -1,0 +1,75 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
+import { db } from "@jotapuntoce/db";
+import { membership, organization, profile } from "@jotapuntoce/db/schema";
+import { assertBarcoOwner, assertDockOwner, listMyDocks } from "../server/auth/guard.ts";
+
+const NOT_FOUND = { digest: "NEXT_HTTP_ERROR_FALLBACK;404" };
+const orgIds: string[] = [];
+const profileIds: string[] = [];
+afterEach(async () => {
+  for (const id of orgIds.splice(0).reverse()) await db.delete(organization).where(sql`${organization.id} = ${id}`);
+  for (const id of profileIds.splice(0)) await db.delete(profile).where(sql`${profile.id} = ${id}`);
+});
+
+async function org(kind: "muelle" | "barco", parentOrgId: string | null = null) {
+  const [row] = await db.insert(organization).values({ name: `t-${kind}`, slug: `t-${crypto.randomUUID()}`, kind, parentOrgId }).returning();
+  if (!row) throw new Error("sin fila");
+  orgIds.push(row.id);
+  return row;
+}
+async function person(orgId?: string, role: "owner" | "employee" = "owner") {
+  const id = crypto.randomUUID();
+  await db.insert(profile).values({ id, email: `${id}@example.com` });
+  profileIds.push(id);
+  if (orgId) await db.insert(membership).values({ userId: id, orgId, role, acceptedAt: new Date() });
+  return id;
+}
+
+describe("assertDockOwner", () => {
+  it("WHEN es dueño del muelle THE SYSTEM SHALL devolverlo", async () => {
+    const dock = await org("muelle");
+    const u = await person(dock.id);
+    await expect(assertDockOwner(u, dock.id)).resolves.toEqual({ userId: u, muelleId: dock.id });
+  });
+  it("WHEN es dueño de un barco y pide el muelle THE SYSTEM SHALL responder 404", async () => {
+    const dock = await org("muelle");
+    const boat = await org("barco", dock.id);
+    const u = await person(boat.id);
+    await expect(assertDockOwner(u, dock.id)).rejects.toMatchObject(NOT_FOUND);
+  });
+  it("WHEN es dueño pero la empresa no es muelle THE SYSTEM SHALL responder 404", async () => {
+    const boat = await org("barco");
+    const u = await person(boat.id);
+    await expect(assertDockOwner(u, boat.id)).rejects.toMatchObject(NOT_FOUND);
+  });
+  it("WHEN es empleado del muelle THE SYSTEM SHALL responder 404", async () => {
+    const dock = await org("muelle");
+    const u = await person(dock.id, "employee");
+    await expect(assertDockOwner(u, dock.id)).rejects.toMatchObject(NOT_FOUND);
+  });
+});
+
+describe("assertBarcoOwner", () => {
+  it("WHEN es dueño de un barco colgado THE SYSTEM SHALL devolver su muelle", async () => {
+    const dock = await org("muelle");
+    const boat = await org("barco", dock.id);
+    const u = await person(boat.id);
+    await expect(assertBarcoOwner(u, boat.id)).resolves.toEqual({ userId: u, barcoId: boat.id, muelleId: dock.id });
+  });
+  it("WHEN el barco no tiene muelle THE SYSTEM SHALL responder 404", async () => {
+    const boat = await org("barco");
+    const u = await person(boat.id);
+    await expect(assertBarcoOwner(u, boat.id)).rejects.toMatchObject(NOT_FOUND);
+  });
+});
+
+describe("listMyDocks", () => {
+  it("WHEN es dueño de un muelle y de un barco THE SYSTEM SHALL listar solo el muelle", async () => {
+    const dock = await org("muelle");
+    const boat = await org("barco", dock.id);
+    const u = await person(dock.id);
+    await db.insert(membership).values({ userId: u, orgId: boat.id, role: "owner", acceptedAt: new Date() });
+    expect((await listMyDocks(u)).map((d) => d.id)).toEqual([dock.id]);
+  });
+});
