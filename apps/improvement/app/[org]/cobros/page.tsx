@@ -4,6 +4,8 @@ import { requireSection } from "@/server/auth/guard.ts";
 import { listOrgLedger } from "@/server/cobros/ledger.ts";
 import { env } from "@/lib/env.ts";
 
+const KIND_LABEL: Record<string, string> = { venta_propia: "Venta", membresia: "Membresía", proyecto_summum: "Proyecto" };
+
 const money = (cents: number, currency: string) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
 
@@ -22,11 +24,11 @@ export default async function CobrosPage({ params }: { params: Promise<{ org: st
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
         {rows.map((r) => (
           <li key={r.id} style={{ padding: "16px", borderRadius: "var(--radius-md, 16px)", border: "1px solid var(--border)", background: "var(--bg-card)" }}>
-            {r.createdAt.toLocaleDateString("es-MX")} · {money(r.grossCents, r.currency)} · Summum: {money(r.summumFeeCents, r.currency)}
+            {r.createdAt.toLocaleDateString("es-MX")} · {KIND_LABEL[r.chargeKind] ?? r.chargeKind} · {money(r.grossCents, r.currency)} · Summum: {money(r.summumFeeCents, r.currency)}
           </li>
         ))}
-        {rows.length === 0 && <p style={{ color: "var(--text-muted)" }}>Sin cobros todavía.</p>}
       </ul>
+      {rows.length === 0 && <p style={{ color: "var(--text-secondary)" }}>Sin cobros todavía.</p>}
     </main>
   );
 }
