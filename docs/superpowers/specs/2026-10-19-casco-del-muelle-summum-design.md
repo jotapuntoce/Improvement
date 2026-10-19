@@ -4,6 +4,17 @@
 **Estado:** Diseño aprobado por Jose Carlos sección por sección. Falta su revisión de este documento antes del plan de implementación.
 **Relacionado:** `Improvement/absorber-apps/07-whop-rea.md` (análisis REA de Whop del que sale este diseño), `organization` / `membership` / `permission_type` / `payment` / `company_request` (`packages/db/src/schema.ts`), `requireOrgMembership()` y `requireSection()` (`apps/improvement/server/auth/guard.ts`), `server/permissions/sections.ts`.
 
+## Ajustes al bajar al plan (2026-10-19)
+
+Al revisar el código para el plan de implementación salieron cinco ajustes; mandan sobre el texto de abajo:
+
+1. **Barco sin muelle permitido.** El `check` queda solo como `kind <> 'muelle' or parent_org_id is null`. Un barco con `parent_org_id` nulo existe pero no está colgado de ningún muelle y no puede cobrar. La fila del muelle la crea un script de línea de comandos (`pnpm db:muelle`) que recibe el nombre por parámetro y adopta los barcos huérfanos. Así ninguna migración escribe el id ni el nombre de Summum (`.claude/rules/motor-generico.md`).
+2. **Dinero en centavos enteros.** `ledger_entry.gross_cents` / `summum_fee_cents` (bigint) y `membership_plan.monthly_amount_cents` (integer), por `.claude/rules/base-de-datos.md`.
+3. **Dos webhooks.** Los eventos de cuentas conectadas (`account.updated`, `payment_intent.succeeded` de cobros directos) llegan por el endpoint de Connect y los de la plataforma (`invoice.paid`) por el normal: `/api/stripe/connect` con `STRIPE_CONNECT_WEBHOOK_SECRET` y `/api/stripe/webhook` con `STRIPE_WEBHOOK_SECRET`. Mismo manejador.
+4. **El dueño del barco hace sus acciones de Stripe en `apps/summum`** (`/barco/[orgId]`, protegido por ser dueño de ese barco): conectar su cuenta y crear ligas de cobro. La sección "Cobros" de `apps/improvement` muestra sus movimientos y enlaza ahí (`NEXT_PUBLIC_SUMMUM_URL`). Las llaves de Stripe nunca entran a `apps/improvement`.
+5. **`stripe_account.stripe_customer_id`**: el cliente de Stripe del barco en la cuenta de la plataforma, para cobrarle la membresía.
+6. **Cuentas con `controller`, no `type: 'express'`.** La documentación de Stripe marca el tipo Express como obsoleto para integraciones nuevas. Se crea la cuenta con `controller: { stripe_dashboard: { type: 'express' }, fees: { payer: 'application' }, losses: { payments: 'application' } }`, que da la misma experiencia. Plataforma y cuentas conectadas en México son la misma región, que es lo que exigen los cobros directos ([cuentas conectadas](https://docs.stripe.com/connect/accounts), [Express](https://docs.stripe.com/connect/express-accounts), [capacidades](https://docs.stripe.com/connect/account-capabilities)). Antes de producción se confirma con Stripe que la cuenta de plataforma de Summum tiene Connect activo en México.
+
 ## Problema
 
 Summum es el muelle y cada Improvement es un barco. Hoy no existe el muelle en el sistema: cada empresa es una `organization` suelta, el único "padre" es la bandera `is_platform_admin` de Jose Carlos y lo que el cliente paga se captura a mano en `payment`. Ricardo, co-dueño de Summum, no tiene dónde ver nada sin entrar al panel interno de Jotapuntoce.
