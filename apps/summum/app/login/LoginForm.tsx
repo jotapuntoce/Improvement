@@ -9,7 +9,7 @@
 // localStorage por default (client-only). Para que server/auth/guard.ts (Server Components) pueda
 // leerla, este formulario copia el access token a una cookie propia (`sum-access-token`) al iniciar
 // sesión. El manejo "oficial" de sesión SSR de Supabase usa el paquete @supabase/ssr, que no está en
-// las dependencias fijadas de este blueprint (§11) — este es un atajo documentado, no un descuido:
+// las dependencias fijadas del proyecto — este es un atajo documentado, no un descuido:
 // sin refresh automático de token todavía, aceptable para el piloto de un solo cliente. Si el
 // refresco automático se vuelve necesario, ese es el momento de agregar @supabase/ssr (con su propio
 // pin verificado vía stack-researcher), no de inventar más cookies a mano.
@@ -59,13 +59,14 @@ export function LoginForm() {
 
     // Cookie que server/auth/guard.ts lee del lado del servidor — ver nota arriba. El nombre lleva
     // prefijo propio a propósito: apps/admin escribe `sb-access-token` httpOnly desde el servidor, y
-    // las cookies ignoran el puerto, así que en localhost (admin :3100, improvement :3200 — mismo
+    // las cookies ignoran el puerto, así que en localhost (admin :3100, summum :3300 — mismo
     // host) ambas apps se pisaban bajo un solo nombre. Peor: document.cookie no puede sobrescribir
     // ni borrar una httpOnly, así que la sesión de admin ganaba siempre y el cliente terminaba
     // viendo el panel de Jose Carlos. Bug real encontrado probando el flujo de cliente end-to-end.
-    document.cookie = `sum-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+    document.cookie = `sum-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 
-    const returnTo = searchParams.get("returnTo") ?? "/";
+    const requested = searchParams.get("returnTo");
+    const returnTo = requested && requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
     router.push(returnTo);
     router.refresh();
   }

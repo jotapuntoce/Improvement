@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: "node",
     // El default de Vitest (5s) no alcanza: cada prueba habla con un proyecto Supabase remoto real,
-    // y las más pesadas (tests/powerups.test.ts) tardan hasta ~7s de ida y vuelta.
+    // y las más pesadas tardan hasta ~7s de ida y vuelta.
     testTimeout: 20000,
     setupFiles: ["./tests/setup.ts"],
     include: ["**/*.test.ts", "**/*.test.tsx"],
@@ -13,7 +13,6 @@ export default defineConfig({
       "node_modules",
       ".next",
       "tests/e2e/**",
-      "../../blueprints/**", // el bundle del blueprint vive dentro del proyecto — nunca se recolecta como test
     ],
   },
   resolve: {

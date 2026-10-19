@@ -8,8 +8,7 @@
     "start": "next start --port 3300",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test": "vitest run"
   },
   "dependencies": {
     "@jotapuntoce/db": "workspace:*",
