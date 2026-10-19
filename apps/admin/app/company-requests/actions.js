@@ -12,6 +12,7 @@ import { defaultOrgKpis } from "@jotapuntoce/ui/building/kpis.ts";
 import { db } from "../../lib/db.js";
 import { requirePlatformAdmin } from "../../lib/auth.js";
 import { slugify } from "../../lib/slugify.js";
+import { findDockOfOwner } from "../../lib/muelle.js";
 
 /**
  * Lógica pura — sin guard adentro, para poder probarla sin mockear cookies() de next/headers (mismo
@@ -33,9 +34,10 @@ export async function approveCompanyRequest(requestId, adminId) {
   const slug = `${slugify(request.companyName)}-${randomUUID().slice(0, 8)}`;
 
   return db.transaction(async (tx) => {
+    const parentOrgId = await findDockOfOwner(tx, adminId);
     const [newOrg] = await tx
       .insert(organization)
-      .values({ name: request.companyName, slug, industry: request.industry })
+      .values({ name: request.companyName, slug, industry: request.industry, kind: "barco", parentOrgId })
       .returning();
     if (!newOrg) throw new Error("insert de organization no devolvió fila");
 

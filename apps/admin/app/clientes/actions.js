@@ -23,6 +23,7 @@ import { db, supabaseAdmin } from "../../lib/db.js";
 import { requirePlatformAdmin } from "../../lib/auth.js";
 import { sendWhatsAppMessage } from "../../lib/whatsapp.js";
 import { slugify } from "../../lib/slugify.js";
+import { findDockOfOwner } from "../../lib/muelle.js";
 
 // 12 caracteres url-safe — nunca se guarda en la base de datos, solo vive en memoria durante esta
 // llamada y viaja al cliente por WhatsApp. No hay pantalla de "cambiar contraseña" en
@@ -137,8 +138,9 @@ export async function addProspectCompanyAction(formData) {
  * apps/improvement/server/objectives/mutations.ts.
  *
  * @param {string} prospectId
+ * @param {string | null} [adminId] quien provisiona; si es dueño de un único muelle, el barco cuelga de él
  */
-export async function provisionOrganization(prospectId) {
+export async function provisionOrganization(prospectId, adminId = null) {
   const [prospect] = await db
     .select()
     .from(prospectCompany)
@@ -198,7 +200,8 @@ export async function provisionOrganization(prospectId) {
   const slug = `${slugify(prospect.name)}-${randomUUID().slice(0, 8)}`;
 
   const org = await db.transaction(async (tx) => {
-    const [newOrg] = await tx.insert(organization).values({ name: prospect.name, slug }).returning();
+    const parentOrgId = await findDockOfOwner(tx, adminId);
+    const [newOrg] = await tx.insert(organization).values({ name: prospect.name, slug, kind: "barco", parentOrgId }).returning();
     if (!newOrg) throw new Error("insert de organization no devolvió fila");
 
     if (isNewUser) {
@@ -268,8 +271,8 @@ export async function provisionOrganization(prospectId) {
  * Punto de entrada real como Server Action: guard en el borde + delega en provisionOrganization.
  */
 export async function provisionOrganizationAction(prospectId) {
-  await requirePlatformAdmin();
-  return provisionOrganization(prospectId);
+  const admin = await requirePlatformAdmin();
+  return provisionOrganization(prospectId, admin.id);
 }
 
 /**
