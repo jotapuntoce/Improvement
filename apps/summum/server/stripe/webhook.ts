@@ -49,6 +49,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ wrote: b
   if (event.type === "payment_intent.succeeded") {
     const pi = intentSchema.safeParse(object);
     if (!pi.success) return skip("sin metadatos de Summum", event);
+    if (pi.data.application_fee_amount === null) return skip("sin application_fee_amount", event);
     const m = pi.data.metadata;
     // El aviso llega por Connect con event.account = la cuenta donde se cobró: tiene que ser la del
     // barco que dicen los metadatos y ese barco tiene que colgar de ese muelle.
@@ -66,7 +67,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ wrote: b
         barcoOrgId: m.barco_org_id,
         chargeKind: m.charge_kind,
         grossCents: pi.data.amount_received,
-        summumFeeCents: pi.data.application_fee_amount ?? 0,
+        summumFeeCents: pi.data.application_fee_amount,
         appliedPercentBps: m.percent_bps,
         appliedFixedCents: m.fixed_cents,
         currency: pi.data.currency,
@@ -78,6 +79,8 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<{ wrote: b
   }
 
   if (event.type === "invoice.paid") {
+    // Las facturas de membresía son de la plataforma: una con event.account viene de una cuenta conectada.
+    if (event.account) return skip("factura de cuenta conectada", event);
     const inv = invoiceSchema.safeParse(object);
     if (!inv.success) return skip("forma inesperada", event);
     const [boat] = await db

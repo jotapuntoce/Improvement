@@ -73,9 +73,28 @@ describe("payment_intent.succeeded", () => {
     expect(await handleStripeEvent(ev("payment_intent.succeeded", pi(id, boat.id, dock.id), "acct_desconocida"))).toEqual({ wrote: false });
     expect(await db.select().from(ledgerEntry).where(eq(ledgerEntry.stripeObjectId, id))).toHaveLength(0);
   });
+  it("WHEN el cobro no trae application_fee_amount THE SYSTEM SHALL no escribir nada", async () => {
+    const { dock, boat, acct } = await boatWithAccount();
+    const id = `pi_${crypto.randomUUID()}`;
+    const e = ev("payment_intent.succeeded", { ...pi(id, boat.id, dock.id), application_fee_amount: null }, acct);
+    expect(await handleStripeEvent(e)).toEqual({ wrote: false });
+    expect(await db.select().from(ledgerEntry).where(eq(ledgerEntry.stripeObjectId, id))).toHaveLength(0);
+  });
+  it("WHEN el muelle de los metadatos no es el del barco THE SYSTEM SHALL no escribir nada", async () => {
+    const { boat, acct } = await boatWithAccount();
+    const id = `pi_${crypto.randomUUID()}`;
+    expect(await handleStripeEvent(ev("payment_intent.succeeded", pi(id, boat.id, crypto.randomUUID()), acct))).toEqual({ wrote: false });
+    expect(await db.select().from(ledgerEntry).where(eq(ledgerEntry.stripeObjectId, id))).toHaveLength(0);
+  });
 });
 
 describe("invoice.paid", () => {
+  it("WHEN la factura trae event.account THE SYSTEM SHALL no escribir nada", async () => {
+    const { cus, acct } = await boatWithAccount();
+    const id = `in_${crypto.randomUUID()}`;
+    expect(await handleStripeEvent(ev("invoice.paid", { id, customer: cus, amount_paid: 50_000, currency: "mxn" }, acct))).toEqual({ wrote: false });
+    expect(await db.select().from(ledgerEntry).where(eq(ledgerEntry.stripeObjectId, id))).toHaveLength(0);
+  });
   it("WHEN se paga la membresía THE SYSTEM SHALL escribir el libro y el pago, una sola vez", async () => {
     const { dock, cus } = await boatWithAccount();
     const id = `in_${crypto.randomUUID()}`;
