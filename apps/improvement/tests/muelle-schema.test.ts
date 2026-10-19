@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { feeRate, feeRateChange, ledgerEntry, membership, organization, profile } from "@jotapuntoce/db/schema";
+import { feeRate, feeRateChange, ledgerEntry, membership, membershipPlan, organization, profile, stripeAccount } from "@jotapuntoce/db/schema";
 
 const orgIds: string[] = [];
 const profileIds: string[] = [];
@@ -108,10 +108,56 @@ describe("RLS — ledger_entry", () => {
     expect(await asUser(dockOwner, "select id from ledger_entry")).toHaveLength(1);
   });
 
-  it("WHEN cualquier authenticated consulta fee_rate de un muelle ajeno THE SYSTEM SHALL devolver vacío", async () => {
+  it("WHEN el dueño de un barco hermano consulta fee_rate del muelle THE SYSTEM SHALL devolver vacío", async () => {
     const dock = await org("muelle");
-    const stranger = await person((await org("barco", dock.id)).id, "owner");
+    const siblingOwner = await person((await org("barco", dock.id)).id, "owner");
     await db.insert(feeRate).values({ muelleOrgId: dock.id, chargeKind: "venta_propia", percentBps: 500 });
-    expect(await asUser(stranger, "select id from fee_rate")).toEqual([]);
+    expect(await asUser(siblingOwner, "select id from fee_rate")).toEqual([]);
+  });
+});
+
+describe("RLS — stripe_account, fee_rate, membership_plan, fee_rate_change", () => {
+  async function setup() {
+    const dock = await org("muelle");
+    const b1 = await org("barco", dock.id);
+    const dockOwner = await person(dock.id, "owner");
+    const boatOwner = await person(b1.id, "owner");
+    const other = await org("barco", null);
+    const unrelated = await person(other.id, "owner");
+    return { dock, b1, dockOwner, boatOwner, unrelated };
+  }
+
+  it("WHEN el dueño del muelle consulta stripe_account del barco THE SYSTEM SHALL verla", async () => {
+    const { b1, dockOwner } = await setup();
+    await db.insert(stripeAccount).values({ orgId: b1.id });
+    expect(await asUser(dockOwner, "select id from stripe_account")).toHaveLength(1);
+  });
+
+  it("WHEN el dueño del barco consulta su stripe_account THE SYSTEM SHALL verla", async () => {
+    const { b1, boatOwner } = await setup();
+    await db.insert(stripeAccount).values({ orgId: b1.id });
+    expect(await asUser(boatOwner, "select id from stripe_account")).toHaveLength(1);
+  });
+
+  it("WHEN alguien sin relación consulta stripe_account THE SYSTEM SHALL devolver vacío", async () => {
+    const { b1, unrelated } = await setup();
+    await db.insert(stripeAccount).values({ orgId: b1.id });
+    expect(await asUser(unrelated, "select id from stripe_account")).toEqual([]);
+  });
+
+  it("WHEN el dueño del muelle consulta fee_rate, membership_plan y fee_rate_change THE SYSTEM SHALL verlos", async () => {
+    const { dock, dockOwner } = await setup();
+    await db.insert(feeRate).values({ muelleOrgId: dock.id, chargeKind: "venta_propia", percentBps: 500 });
+    await db.insert(membershipPlan).values({ muelleOrgId: dock.id, name: "p", monthlyAmountCents: 1000, stripePriceId: "price_x" });
+    await db.insert(feeRateChange).values({ muelleOrgId: dock.id, chargeKind: "venta_propia", percentBps: 500, proposedBy: dockOwner });
+    expect(await asUser(dockOwner, "select id from fee_rate")).toHaveLength(1);
+    expect(await asUser(dockOwner, "select id from membership_plan")).toHaveLength(1);
+    expect(await asUser(dockOwner, "select id from fee_rate_change")).toHaveLength(1);
+  });
+
+  it("WHEN el dueño de un barco consulta fee_rate_change THE SYSTEM SHALL devolver vacío", async () => {
+    const { dock, dockOwner, boatOwner } = await setup();
+    await db.insert(feeRateChange).values({ muelleOrgId: dock.id, chargeKind: "venta_propia", percentBps: 500, proposedBy: dockOwner });
+    expect(await asUser(boatOwner, "select id from fee_rate_change")).toEqual([]);
   });
 });
