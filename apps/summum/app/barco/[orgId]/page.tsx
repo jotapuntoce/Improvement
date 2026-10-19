@@ -3,12 +3,9 @@ import { requireBarcoOwnership } from "@/server/auth/guard.ts";
 import { listBarcoLedgerForOwner } from "@/server/money/ledger.ts";
 import { getAccountStatus } from "@/server/stripe/connect.ts";
 import { Money } from "@/components/Money.tsx";
+import { errorMessage } from "@/server/error-codes.ts";
 import { connect, sale } from "./actions.ts";
 
-const ERRORS: Record<string, string> = {
-  invalido: "Escribe un concepto y un monto mayor a cero.",
-  "no-se-pudo": "No se pudo completar. Revisa tu cuenta de cobro e inténtalo de nuevo.",
-};
 
 export default async function BarcoPage({ params, searchParams }: { params: Promise<{ orgId: string }>; searchParams: Promise<{ error?: string }> }) {
   const { orgId } = await params;
@@ -20,7 +17,7 @@ export default async function BarcoPage({ params, searchParams }: { params: Prom
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text-primary)", padding: "24px" }}>
       <h1>Cobros</h1>
-      {error && Object.hasOwn(ERRORS, error) && <p className="error">{ERRORS[error]}</p>}
+      {errorMessage(error) && <p className="error">{errorMessage(error)}</p>}
       {!account?.chargesEnabled ? (
         <form action={connect}><input type="hidden" name="orgId" value={orgId} /><button type="submit">Conectar mi cuenta de cobro</button></form>
       ) : (

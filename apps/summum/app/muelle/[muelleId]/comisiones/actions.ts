@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { requireDockOwnership } from "@/server/auth/guard.ts";
 import { decideFeeChange, proposeFeeChange } from "@/server/fees/changes.ts";
+import { errorCode } from "@/server/error-codes.ts";
 import type { Result } from "@/server/result.ts";
 
 const proposeSchema = z.object({
@@ -33,7 +34,7 @@ function done(muelleId: string, r: Result<unknown>): never {
     revalidatePath(base);
     redirect(base);
   }
-  redirect(`${base}?error=no-se-pudo`);
+  redirect(`${base}?error=${errorCode(r.error)}`);
 }
 
 export async function propose(formData: FormData) {

@@ -2,6 +2,7 @@
 
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { errorCode } from "@/server/error-codes.ts";
 import { requireEnv } from "@/lib/env.ts";
 import { requireBarcoOwnership } from "@/server/auth/guard.ts";
 import { createSaleLink, startOnboarding } from "@/server/stripe/connect.ts";
@@ -14,14 +15,14 @@ const saleSchema = orgSchema.extend({
 });
 
 const deps = () => ({ stripe: getStripe(), baseUrl: requireEnv("NEXT_PUBLIC_SUMMUM_URL") });
-const fail = (orgId: string, code: "invalido" | "no-se-pudo"): never => redirect(`/barco/${orgId}?error=${code}`);
+const fail = (orgId: string, code: string): never => redirect(`/barco/${orgId}?error=${code}`);
 
 export async function connect(formData: FormData) {
   const p = orgSchema.safeParse({ orgId: formData.get("orgId") });
   if (!p.success) notFound();
   const { userId } = await requireBarcoOwnership(p.data.orgId);
   const r = await startOnboarding(userId, p.data.orgId, deps());
-  if (!r.ok) return fail(p.data.orgId, "no-se-pudo");
+  if (!r.ok) return fail(p.data.orgId, errorCode(r.error));
   redirect(r.data.url);
 }
 
@@ -36,6 +37,6 @@ export async function sale(formData: FormData) {
   if (!p.success) return fail(org.data.orgId, "invalido");
   const { userId } = await requireBarcoOwnership(p.data.orgId);
   const r = await createSaleLink(userId, p.data.orgId, { amountCents: p.data.amountCents, description: p.data.description }, deps());
-  if (!r.ok) return fail(p.data.orgId, "no-se-pudo");
+  if (!r.ok) return fail(p.data.orgId, errorCode(r.error));
   redirect(r.data.url);
 }
