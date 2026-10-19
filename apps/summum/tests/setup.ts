@@ -1,7 +1,7 @@
 // Carga .env.test para las pruebas de integración que hablan con el proyecto Supabase real de
 // desarrollo (ver CLAUDE.md, sin base de datos local). Usa la
-// API nativa de Node 24 en vez de una dependencia como `dotenv` (CLAUDE.md regla 8; sin
-// used). El try/catch es intencional: en CI las variables ya vienen exportadas por la plataforma,
+// API nativa de Node 24 en vez de una dependencia como `dotenv` (CLAUDE.md regla 8).
+// El try/catch es intencional: en CI las variables ya vienen exportadas por la plataforma,
 // no desde un archivo, así que la ausencia de .env.test ahí no debe fallar la suite.
 try {
   process.loadEnvFile(".env.test");
