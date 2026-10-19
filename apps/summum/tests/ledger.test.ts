@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { ledgerEntry, membership, organization, profile } from "@jotapuntoce/db/schema";
-import { listDockLedger, summarize } from "../server/money/ledger.ts";
+import { listBarcoLedgerForOwner, listDockLedger, summarize } from "../server/money/ledger.ts";
 import { listDockBarcos } from "../server/barcos/list.ts";
 
 describe("summarize", () => {
@@ -41,5 +41,27 @@ describe("listDockLedger / listDockBarcos", () => {
     expect((await listDockLedger(u, dock!.id)).map((r) => r.barcoOrgId).sort()).toEqual([b1!.id, b2!.id].sort());
     expect((await listDockLedger(u, dock!.id, { barcoOrgId: b1!.id })).map((r) => r.barcoOrgId)).toEqual([b1!.id]);
     expect((await listDockBarcos(u, dock!.id)).map((b) => b.name).sort()).toEqual(["b1", "b2"]);
+  });
+});
+
+describe("listBarcoLedgerForOwner", () => {
+  it("WHEN el dueño del barco lee THE SYSTEM SHALL ver solo su barco; el dueño del muelle recibe 404", async () => {
+    const [dock] = await db.insert(organization).values({ name: "m", slug: `m-${crypto.randomUUID()}`, kind: "muelle" }).returning();
+    const [b1] = await db.insert(organization).values({ name: "b1", slug: `b1-${crypto.randomUUID()}`, parentOrgId: dock!.id }).returning();
+    const [b2] = await db.insert(organization).values({ name: "b2", slug: `b2-${crypto.randomUUID()}`, parentOrgId: dock!.id }).returning();
+    orgIds.push(dock!.id, b1!.id, b2!.id);
+    const owner = crypto.randomUUID();
+    const dockOwner = crypto.randomUUID();
+    for (const id of [owner, dockOwner]) await db.insert(profile).values({ id, email: `${id}@example.com` });
+    profileIds.push(owner, dockOwner);
+    await db.insert(membership).values([
+      { userId: owner, orgId: b1!.id, role: "owner", acceptedAt: new Date() },
+      { userId: dockOwner, orgId: dock!.id, role: "owner", acceptedAt: new Date() },
+    ]);
+    const row = (barco: string) => ({ muelleOrgId: dock!.id, barcoOrgId: barco, chargeKind: "venta_propia" as const, grossCents: 100, summumFeeCents: 10, currency: "mxn", stripeObjectId: `pi_${crypto.randomUUID()}` });
+    await db.insert(ledgerEntry).values([row(b1!.id), row(b2!.id)]);
+
+    expect((await listBarcoLedgerForOwner(owner, b1!.id)).map((r) => r.barcoOrgId)).toEqual([b1!.id]);
+    await expect(listBarcoLedgerForOwner(dockOwner, b1!.id)).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
   });
 });
