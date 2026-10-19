@@ -153,3 +153,10 @@ export async function activateMembership(
   await db.update(organization).set({ membershipPlanId: plan.id, updatedAt: new Date() }).where(eq(organization.id, barcoId));
   return { ok: true, data: { subscriptionId: sub.id } };
 }
+
+/** Estado de la cuenta de cobro del barco, para su pagina. null = aun no la conecta. */
+export async function getAccountStatus(userId: string, barcoId: string) {
+  await assertBarcoOwner(userId, barcoId);
+  const row = await accountRow(barcoId);
+  return row ? { chargesEnabled: row.chargesEnabled, payoutsEnabled: row.payoutsEnabled } : null;
+}

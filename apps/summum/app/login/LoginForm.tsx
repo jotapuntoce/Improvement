@@ -150,7 +150,7 @@ export function LoginForm() {
             fontWeight: 600,
             cursor: loading ? "default" : "pointer",
             background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))",
-            color: "#05060b",
+            color: "var(--bg)",
             opacity: loading ? 0.7 : 1,
           }}
         >

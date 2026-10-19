@@ -1,2 +1,15 @@
 @import "tailwindcss";
 @import "@jotapuntoce/ui/tokens.css";
+
+body { background: var(--bg); color: var(--text-primary); }
+main { max-width: 960px; }
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+h2 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-muted); font-weight: 500; }
+form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); }
+button { padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font-weight: 600; cursor: pointer; }
+button:hover { background: var(--bg-card-hover); }
+.error { color: var(--danger); }

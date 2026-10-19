@@ -168,3 +168,31 @@
   --brain-green: #3ddc84;
   --brain-white: #ffffff;
 }
+
+/* Summum System — manual v1.1 (Summum System/marca/assets/summum-tokens.css). Tres tintas, ~50/42/8:
+   navy noche dominante, hueso para texto, guia para etiquetas. Oro cenit NO entra: es solo del vertice
+   del sello. <body data-brand="summum"> (apps/summum/app/layout.tsx) remapea los tokens genericos, asi
+   los componentes siguen refiriendo --bg, --text-primary, etc. Acento plano hueso, sin degradado. */
+:root {
+  --summum-hueso: #f2eee2;
+  --summum-navy: #0b1322;
+  --summum-guia: #8b8679;
+}
+
+[data-brand="summum"] {
+  --bg: var(--summum-navy);
+  --bg-elevated: color-mix(in srgb, var(--summum-navy) 94%, var(--summum-hueso));
+  --bg-card: color-mix(in srgb, var(--summum-hueso) 5%, transparent);
+  --bg-card-hover: color-mix(in srgb, var(--summum-hueso) 8%, transparent);
+  --border: color-mix(in srgb, var(--summum-hueso) 14%, transparent);
+  --border-strong: color-mix(in srgb, var(--summum-hueso) 28%, transparent);
+  --text-primary: var(--summum-hueso);
+  --text-secondary: color-mix(in srgb, var(--summum-hueso) 75%, var(--summum-navy));
+  --text-muted: var(--summum-guia);
+  --accent-1: var(--summum-hueso);
+  --accent-2: var(--summum-hueso);
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-glow: 0 0 0 1px var(--border);
+}
