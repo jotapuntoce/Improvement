@@ -50,6 +50,14 @@ describe("assertDockOwner", () => {
   });
 });
 
+describe("ids mal formados", () => {
+  it("WHEN el id no es uuid THE SYSTEM SHALL responder 404, no 500", async () => {
+    const u = await person();
+    await expect(assertDockOwner(u, "no-es-uuid")).rejects.toMatchObject(NOT_FOUND);
+    await expect(assertBarcoOwner(u, "no-es-uuid")).rejects.toMatchObject(NOT_FOUND);
+  });
+});
+
 describe("assertBarcoOwner", () => {
   it("WHEN es dueño de un barco colgado THE SYSTEM SHALL devolver su muelle", async () => {
     const dock = await org("muelle");

@@ -4,6 +4,10 @@ import { listDockBarcos } from "@/server/barcos/list.ts";
 import { decide, propose } from "./actions.ts";
 
 const KIND_LABEL = { venta_propia: "Venta del barco", proyecto_summum: "Proyecto Summum" } as const;
+const ERRORS: Record<string, string> = {
+  invalido: "Revisa los datos: porcentaje entre 0 y 100, cuota fija 0 o más.",
+  "no-se-pudo": "No se pudo completar: revisa los datos o la firma del otro dueño.",
+};
 const pct = (bps: number) => `${(bps / 100).toFixed(2)} %`;
 const fixed = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -17,7 +21,7 @@ export default async function ComisionesPage({ params, searchParams }: { params:
   return (
     <main>
       <h1>Comisiones</h1>
-      {error && <p className="error">{error}</p>}
+      {error && Object.hasOwn(ERRORS, error) && <p className="error">{ERRORS[error]}</p>}
       <ul>
         {rates.map((r) => (
           <li key={`${r.barcoOrgId}-${r.chargeKind}`}>{KIND_LABEL[r.chargeKind]} · {boatName(r.barcoOrgId)} · {pct(r.percentBps)} + {fixed(r.fixedCents)}</li>

@@ -20,7 +20,10 @@ export async function getSessionUserId(): Promise<string | null> {
   return error || !data.user ? null : data.user.id;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function ownedOrg(userId: string, orgId: string) {
+  if (!UUID.test(orgId)) return null; // un id mal formado haría fallar el query de uuid con 500
   const [row] = await db
     .select({ id: organization.id, kind: organization.kind, parentOrgId: organization.parentOrgId })
     .from(organization)

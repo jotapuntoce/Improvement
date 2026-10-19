@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { requireDockOwnership } from "@/server/auth/guard.ts";
 import { decideFeeChange, proposeFeeChange } from "@/server/fees/changes.ts";
@@ -11,14 +11,21 @@ const proposeSchema = z.object({
   muelleId: z.string().uuid(),
   barcoOrgId: z.string().uuid().nullable(),
   chargeKind: z.enum(["venta_propia", "proyecto_summum"]),
-  percent: z.coerce.number().min(0).max(100),
-  fixed: z.coerce.number().min(0),
+  percent: z.string().trim().min(1).transform(Number).pipe(z.number().min(0).max(100)),
+  fixed: z.string().trim().min(1).transform(Number).pipe(z.number().min(0)),
 });
+const idSchema = z.string().uuid();
 const decideSchema = z.object({
   muelleId: z.string().uuid(),
   changeId: z.string().uuid(),
   decision: z.enum(["aprobado", "rechazado"]),
 });
+
+function bad(muelleId: unknown): never {
+  const id = idSchema.safeParse(muelleId);
+  if (!id.success) notFound();
+  return redirect(`/muelle/${id.data}/comisiones?error=invalido`);
+}
 
 function done(muelleId: string, r: Result<unknown>): never {
   const base = `/muelle/${muelleId}/comisiones`;
@@ -26,7 +33,7 @@ function done(muelleId: string, r: Result<unknown>): never {
     revalidatePath(base);
     redirect(base);
   }
-  redirect(`${base}?error=${encodeURIComponent(r.error)}`);
+  redirect(`${base}?error=no-se-pudo`);
 }
 
 export async function propose(formData: FormData) {
@@ -34,10 +41,10 @@ export async function propose(formData: FormData) {
     muelleId: formData.get("muelleId"),
     barcoOrgId: formData.get("barcoOrgId")?.toString() || null,
     chargeKind: formData.get("chargeKind"),
-    percent: formData.get("percent"),
-    fixed: formData.get("fixed") || 0,
+    percent: formData.get("percent") ?? undefined,
+    fixed: formData.get("fixed") ?? undefined,
   });
-  if (!p.success) return redirect("/");
+  if (!p.success) return bad(formData.get("muelleId"));
   const { userId } = await requireDockOwnership(p.data.muelleId);
   const r = await proposeFeeChange(userId, p.data.muelleId, {
     barcoOrgId: p.data.barcoOrgId,
@@ -54,7 +61,7 @@ export async function decide(formData: FormData) {
     changeId: formData.get("changeId"),
     decision: formData.get("decision"),
   });
-  if (!p.success) return redirect("/");
+  if (!p.success) return bad(formData.get("muelleId"));
   const { userId } = await requireDockOwnership(p.data.muelleId);
   done(p.data.muelleId, await decideFeeChange(userId, p.data.changeId, p.data.decision));
 }
