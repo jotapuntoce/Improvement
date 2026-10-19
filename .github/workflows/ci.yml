@@ -66,6 +66,16 @@ jobs:
           EOF
           cp apps/admin/.env.local apps/admin/.env.test
 
+          # apps/summum: sin service-role ni llaves de Stripe (sus pruebas usan un Stripe falso).
+          cat > apps/summum/.env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DATABASE_URL_DIRECT=${{ secrets.DATABASE_URL_DIRECT }}
+          NEXT_PUBLIC_SUMMUM_URL=http://localhost:3300
+          EOF
+          cp apps/summum/.env.local apps/summum/.env.test
+
       - name: Lint
         run: pnpm lint
 
