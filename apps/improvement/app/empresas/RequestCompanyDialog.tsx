@@ -8,17 +8,23 @@
 //
 // La Server Action llega como prop y no importada: un archivo "use client" nunca importa de
 // server/** (tabla de boundaries, CLAUDE.md) — mismo patrón que components/LogoutButton.tsx.
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { INDUSTRIES } from "@jotapuntoce/ui/building/industries.ts";
 
 export function RequestCompanyDialog({
   action,
   priceLabel,
+  abrirAlCargar = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   priceLabel: string;
+  /** Llega abierto cuando el cliente viene de "Crear mi empresa" en Summum (/empresas?solicitar=1). */
+  abrirAlCargar?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (abrirAlCargar && !dialogRef.current?.open) dialogRef.current?.showModal();
+  }, [abrirAlCargar]);
 
   return (
     <>

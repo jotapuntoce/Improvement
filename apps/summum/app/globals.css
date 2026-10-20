@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@import "@jotapuntoce/ui/tokens.css";
+
+body { background: var(--bg); color: var(--text-primary); }
+main { max-width: 960px; }
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+h2 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-muted); font-weight: 500; }
+form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); }
+button { padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font-weight: 600; cursor: pointer; }
+button:hover { background: var(--bg-card-hover); }
+.error { color: var(--danger); }
+
+/* Movimiento del sitio (elegido por el dueño 2026-10-20): títulos palabra por palabra, textos que
+   aparecen y suben, etiquetas que se teclean; 0.8 s, una sola vez. components/Revelador.tsx marca
+   data-visto; sin JS o con movimiento reducido no se anima nada. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-anima="on"] [data-anima="titulo"]:not([data-visto]) .palabra,
+  html[data-anima="on"] [data-anima="texto"]:not([data-visto]),
+  html[data-anima="on"] [data-anima="bloque"]:not([data-visto]) { opacity: 0; }
+  [data-anima="titulo"] .palabra { display: inline-block; }
+  [data-anima="titulo"][data-visto] .palabra { animation: palabra 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i) * 90ms); }
+  [data-anima="texto"][data-visto],
+  [data-anima="bloque"][data-visto] { animation: sube 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  html[data-anima="on"] [data-anima="etiqueta"] { width: fit-content; }
+  html[data-anima="on"] [data-anima="etiqueta"]:not([data-visto]) { clip-path: inset(0 100% 0 0); }
+  [data-anima="etiqueta"][data-visto] { animation: teclea 0.8s steps(var(--c, 20)) both; }
+  [data-anima][data-visto] [data-icono] :is(path, circle, rect) { stroke-dasharray: 1; animation: dibuja 0.8s ease both 0.2s; }
+}
+@keyframes palabra { from { opacity: 0; filter: blur(6px); transform: translateY(0.25em); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes sube { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes teclea { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes dibuja { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }

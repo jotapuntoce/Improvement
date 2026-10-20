@@ -1,0 +1,204 @@
+// Las acciones de Stripe del casco. Todas reciben Stripe por parámetro (StripeDeps) para poder
+// probarlas sin red; las rutas pasan getStripe(). El dinero de las ventas cae en la cuenta del
+// barco: Summum solo toma su application_fee (spec: Summum no retiene dinero).
+import { and, eq, isNull } from "drizzle-orm";
+import type Stripe from "stripe";
+import { z } from "zod";
+import { db } from "@jotapuntoce/db";
+import { membership, membershipPlan, organization, profile, stripeAccount } from "@jotapuntoce/db/schema";
+import { assertBarcoOwner, assertDockOwner } from "../auth/guard.ts";
+import { listRates } from "../fees/changes.ts";
+import { feeCents, pickRate } from "../fees/rates.ts";
+import type { Result } from "../result.ts";
+
+export type StripeDeps = {
+  stripe: Pick<Stripe, "accounts" | "accountLinks" | "checkout" | "customers" | "prices" | "subscriptions">;
+  baseUrl: string;
+};
+
+export const SALE_METADATA = z.object({
+  barco_org_id: z.string().uuid(),
+  muelle_org_id: z.string().uuid(),
+  charge_kind: z.enum(["venta_propia", "proyecto_summum"]),
+  percent_bps: z.coerce.number().int(),
+  fixed_cents: z.coerce.number().int(),
+});
+
+// Los errores del SDK de Stripe (red, tarjeta, permisos) vuelven como Result; los de Next
+// (notFound/redirect, con digest NEXT_*) y los demás se relanzan.
+async function withStripe<T>(fn: () => Promise<Result<T>>): Promise<Result<T>> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof Error && !("digest" in err)) return { ok: false, error: "Stripe rechazó la operación." };
+    throw err;
+  }
+}
+
+async function accountRow(orgId: string) {
+  const [row] = await db.select().from(stripeAccount).where(eq(stripeAccount.orgId, orgId)).limit(1);
+  return row ?? null;
+}
+
+export async function startOnboarding(userId: string, barcoId: string, deps: StripeDeps): Promise<Result<{ url: string }>> {
+  await assertBarcoOwner(userId, barcoId);
+  return withStripe(async () => {
+  let row = await accountRow(barcoId);
+  if (!row?.stripeAccountId) {
+    const account = await deps.stripe.accounts.create({
+      country: "MX",
+      controller: { stripe_dashboard: { type: "express" }, fees: { payer: "application" }, losses: { payments: "application" } },
+      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+      metadata: { barco_org_id: barcoId },
+    }, { idempotencyKey: `acct-${barcoId}` });
+    // Nunca reemplaza un id ya guardado: solo llena el hueco; luego se relee la fila ganadora.
+    await db
+      .insert(stripeAccount)
+      .values({ orgId: barcoId, stripeAccountId: account.id })
+      .onConflictDoUpdate({
+        target: stripeAccount.orgId,
+        set: { stripeAccountId: account.id, updatedAt: new Date() },
+        setWhere: isNull(stripeAccount.stripeAccountId),
+      });
+    row = await accountRow(barcoId);
+  }
+  const link = await deps.stripe.accountLinks.create({
+    account: row!.stripeAccountId!,
+    type: "account_onboarding",
+    refresh_url: `${deps.baseUrl}/barco/${barcoId}`,
+    return_url: `${deps.baseUrl}/barco/${barcoId}`,
+  });
+  return { ok: true, data: { url: link.url } };
+  });
+}
+
+const saleSchema = z.object({
+  amountCents: z.number().int().positive(),
+  description: z.string().trim().min(1).max(200),
+});
+
+export async function createSaleLink(userId: string, barcoId: string, input: unknown, deps: StripeDeps): Promise<Result<{ url: string }>> {
+  const { muelleId } = await assertBarcoOwner(userId, barcoId);
+  return withStripe(async () => {
+  const parsed = saleSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Monto en centavos enteros positivos y una descripción." };
+  const row = await accountRow(barcoId);
+  if (!row?.stripeAccountId || !row.chargesEnabled) return { ok: false, error: "Tu cuenta de cobro aún no está verificada." };
+
+  const rate = pickRate(await listRates(muelleId), barcoId, "venta_propia");
+  if (!rate) return { ok: false, error: "Summum aún no tiene comisión para este tipo de cobro." };
+
+  const fee = feeCents(parsed.data.amountCents, rate);
+  if (fee >= parsed.data.amountCents) return { ok: false, error: "La comisión no puede ser igual o mayor que la venta." };
+  const session = await deps.stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      line_items: [{ quantity: 1, price_data: { currency: "mxn", unit_amount: parsed.data.amountCents, product_data: { name: parsed.data.description } } }],
+      payment_intent_data: {
+        application_fee_amount: fee,
+        metadata: {
+          barco_org_id: barcoId,
+          muelle_org_id: muelleId,
+          charge_kind: "venta_propia",
+          percent_bps: String(rate.percentBps),
+          fixed_cents: String(rate.fixedCents),
+        },
+      },
+      success_url: `${deps.baseUrl}/barco/${barcoId}?cobro=ok`,
+      cancel_url: `${deps.baseUrl}/barco/${barcoId}`,
+    },
+    { stripeAccount: row.stripeAccountId },
+  );
+  if (!session.url) return { ok: false, error: "Stripe no devolvió la liga de cobro." };
+  return { ok: true, data: { url: session.url } };
+  });
+}
+
+const planSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  monthlyAmountCents: z.number().int().positive(),
+});
+
+/** Crea un nivel de membresía: su precio mensual en Stripe (cuenta de la plataforma) y su fila. */
+export async function createMembershipPlan(userId: string, muelleId: string, input: unknown, deps: StripeDeps): Promise<Result<{ planId: string }>> {
+  await assertDockOwner(userId, muelleId);
+  const parsed = planSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Nombre del nivel y precio mensual mayor que cero." };
+  return withStripe(async () => {
+  const price = await deps.stripe.prices.create({
+    currency: "mxn",
+    unit_amount: parsed.data.monthlyAmountCents,
+    recurring: { interval: "month" },
+    product_data: { name: `Membresía Summum · ${parsed.data.name}`, metadata: { muelle_org_id: muelleId } },
+  });
+  const [plan] = await db
+    .insert(membershipPlan)
+    .values({ muelleOrgId: muelleId, name: parsed.data.name, monthlyAmountCents: parsed.data.monthlyAmountCents, stripePriceId: price.id })
+    .returning({ id: membershipPlan.id });
+  return { ok: true, data: { planId: plan!.id } };
+  });
+}
+
+export async function activateMembership(
+  userId: string,
+  muelleId: string,
+  barcoId: string,
+  planId: string,
+  deps: StripeDeps,
+): Promise<Result<{ subscriptionId: string }>> {
+  await assertDockOwner(userId, muelleId);
+  return withStripe(async () => {
+  const [boat] = await db
+    .select({ id: organization.id, membershipPlanId: organization.membershipPlanId })
+    .from(organization)
+    .where(and(eq(organization.id, barcoId), eq(organization.parentOrgId, muelleId)))
+    .limit(1);
+  if (!boat) return { ok: false, error: "Ese barco no es de este muelle." };
+  if (boat.membershipPlanId) return { ok: false, error: "Este barco ya tiene membresía." };
+  const [plan] = await db
+    .select()
+    .from(membershipPlan)
+    .where(and(eq(membershipPlan.id, planId), eq(membershipPlan.muelleOrgId, muelleId)))
+    .limit(1);
+  if (!plan) return { ok: false, error: "Ese nivel no existe en este muelle." };
+
+  let row = await accountRow(barcoId);
+  if (!row?.stripeCustomerId) {
+    const [owner] = await db
+      .select({ email: profile.email })
+      .from(membership)
+      .innerJoin(profile, eq(profile.id, membership.userId))
+      .where(and(eq(membership.orgId, barcoId), eq(membership.role, "owner")))
+      .limit(1);
+    const customer = await deps.stripe.customers.create(
+      { email: owner?.email, metadata: { barco_org_id: barcoId } },
+      { idempotencyKey: `cus-${barcoId}` },
+    );
+    await db
+      .insert(stripeAccount)
+      .values({ orgId: barcoId, stripeCustomerId: customer.id })
+      .onConflictDoUpdate({
+        target: stripeAccount.orgId,
+        set: { stripeCustomerId: customer.id, updatedAt: new Date() },
+        setWhere: isNull(stripeAccount.stripeCustomerId),
+      });
+    row = await accountRow(barcoId);
+  }
+  const sub = await deps.stripe.subscriptions.create({
+    customer: row!.stripeCustomerId!,
+    items: [{ price: plan.stripePriceId }],
+    collection_method: "send_invoice",
+    days_until_due: 7,
+    metadata: { barco_org_id: barcoId, muelle_org_id: muelleId },
+  }, { idempotencyKey: `sub-${barcoId}-${planId}` });
+  await db.update(organization).set({ membershipPlanId: plan.id, updatedAt: new Date() }).where(eq(organization.id, barcoId));
+  return { ok: true, data: { subscriptionId: sub.id } };
+  });
+}
+
+/** Estado de la cuenta de cobro del barco, para su pagina. null = aun no la conecta. */
+export async function getAccountStatus(userId: string, barcoId: string) {
+  await assertBarcoOwner(userId, barcoId);
+  const row = await accountRow(barcoId);
+  return row ? { chargesEnabled: row.chargesEnabled, payoutsEnabled: row.payoutsEnabled } : null;
+}

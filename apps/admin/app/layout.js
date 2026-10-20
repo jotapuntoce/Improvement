@@ -1,20 +1,10 @@
-import { Geist, Geist_Mono, Caveat, Inter } from "next/font/google";
+import { Caveat, Inter_Tight } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { getOrgStats } from "@/lib/orgStats.js";
 import { signOut } from "./logout/actions.js";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 // Solo para el tagline manuscrito de la recepción del edificio (components/building/*) — ver
 // .claude/rules/tokens-de-diseno.md, ninguna fuente/hex nuevo se referencia inline, así que se
@@ -24,12 +14,15 @@ const caveat = Caveat({
   subsets: ["latin"],
 });
 
-// Solo para /login (estilo Dala: Inter sustituye a PP Neue Montreal; el cuerpo usa peso 200).
-const inter = Inter({
-  variable: "--font-inter",
+// Inter Tight 300–600 es la tipografía de la marca JotaPuntoCe (manual de marca v1): todo el panel.
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
   subsets: ["latin"],
-  weight: ["200", "400", "600"],
+  weight: ["300", "400", "500", "600"],
 });
+
+// data-brand activa el remapeo de tokens a la marca madre (packages/ui/src/tokens.css).
+const fontVars = `${caveat.variable} ${interTight.variable}`;
 
 export const metadata = {
   title: "JotaPuntoCe · Panel Administrativo",
@@ -45,11 +38,10 @@ export default async function RootLayout({ children }) {
   const isLoginRoute = headerList.get("x-pathname") === "/login";
 
   if (isLoginRoute) {
-    // Ni .app-shell (display:flex en fila, pensado para Sidebar+Topbar) ni .app-bg (los brillos
-    // morado/cian del dashboard) aplican aquí: .jl-root (app/login/login.css) ocupa la pantalla
-    // completa con su propio fondo, sin scroll.
+    // .app-shell (display:flex en fila, pensado para Sidebar+Topbar) no aplica aquí: .jl-root
+    // (app/login/login.css) ocupa la pantalla completa con su propio fondo, sin scroll.
     return (
-      <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} ${inter.variable}`}>
+      <html lang="es" data-brand="jotapuntoce" className={fontVars}>
         <body>{children}</body>
       </html>
     );
@@ -61,9 +53,8 @@ export default async function RootLayout({ children }) {
   const { totalOrgs } = await getOrgStats();
 
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable}`}>
+    <html lang="es" data-brand="jotapuntoce" className={fontVars}>
       <body className="app-shell">
-        <div className="app-bg" aria-hidden="true" />
         <Sidebar orgCount={totalOrgs} />
         <div className="app-main">
           <Topbar orgCount={totalOrgs} signOut={signOut} />

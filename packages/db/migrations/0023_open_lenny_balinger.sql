@@ -1,0 +1,2 @@
+ALTER TABLE "chequeo" DROP CONSTRAINT "chequeo_canal_check";--> statement-breakpoint
+ALTER TABLE "chequeo" ADD CONSTRAINT "chequeo_canal_check" CHECK ("chequeo"."canal" in ('anuncio_meta','referido','summum','tiktok','youtube','anuncio_google','conferencia','webinar','live','reel','otro','directo'));

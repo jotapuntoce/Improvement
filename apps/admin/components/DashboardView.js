@@ -26,7 +26,7 @@ export default function DashboardView({
           <div>
             <p className="r-eyebrow">Bienvenido de vuelta</p>
             <h2 className="r-title">
-              Recepción <em>JotaPuntoCe</em>
+              <em>Genio</em> Incomprendido
             </h2>
           </div>
           <span className="r-status">

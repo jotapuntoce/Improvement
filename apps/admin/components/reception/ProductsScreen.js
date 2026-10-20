@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Monogram from "@/components/brand/Monogram.js";
 
 // "Productos digitales" del dashboard, dentro de una TV de calidad montada en la pared (pedido
 // explícito de Jose Carlos, iterado varias veces en el Artifact antes de portarlo aquí). Los 2
@@ -48,16 +49,15 @@ export default function ProductsScreen({ totalOrgs, totalMembers, improvementUrl
   return (
     <div className="screen-mount">
       <p className="wall-label">
-        <span className="wall-label-dot wall-label-dot-products" />
+        <span className="wall-label-dot" />
         Productos digitales
       </p>
 
       <div className="tv-wrap">
-        <div className="tv-glow" aria-hidden="true" />
         <div className="tv-frame">
           <div className="screen">
             <div className="screen-chrome">
-              <span className="screen-brand">JOTAPUNTOCE // ORGANIZACIONES</span>
+              <span className="screen-brand">ORGANIZACIONES</span>
               <span className="screen-live">
                 <span className="screen-live-dot" />
                 LIVE
@@ -87,7 +87,6 @@ export default function ProductsScreen({ totalOrgs, totalMembers, improvementUrl
                 className="app-tile app-tile-active"
               >
                 <span className="tile-icon tile-icon-live">
-                  <span className="tile-shine" />
                   <svg
                     width="21"
                     height="21"
@@ -145,8 +144,7 @@ export default function ProductsScreen({ totalOrgs, totalMembers, improvementUrl
             </div>
           </div>
           <div className="tv-chin">
-            <span className="tv-led" aria-hidden="true" />
-            <span className="tv-brand">JOTAPUNTOCE</span>
+            <Monogram className="tv-sign" />
           </div>
         </div>
       </div>

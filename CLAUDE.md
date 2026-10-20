@@ -91,7 +91,7 @@ código. Detalle completo: `.claude/rules/motor-generico.md`.
 | Acceso a env | `apps/improvement/lib/env.ts` (zod, degradado por paso — ver blueprint §10) |
 | Sesión/auth | `apps/improvement/server/auth/guard.ts` — un `requireOrgMembership()`, usado en todas partes |
 | Motor de puntos | `apps/improvement/server/objectives/points.ts` — constante `POINTS_PER_WEIGHT_POINT`, nunca repetida |
-| Gateway de IA | `apps/improvement/server/ai/gateway.ts` — único import de `@anthropic-ai/sdk` en todo el repo |
+| Gateway de IA | `apps/improvement/server/ai/gateway.ts` y `apps/admin/lib/ia.js` — un único import de `@anthropic-ai/sdk` por app |
 
 ## Code rules
 
