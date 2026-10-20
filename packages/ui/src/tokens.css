@@ -182,6 +182,8 @@
   --summum-campo-borde: #d6d0c1;
   --summum-nota: #5d5a52;
   --summum-hueso-suave: #cfcabd;
+  --summum-linea: #e1dccf;
+  --summum-tarjeta: #faf8f2;
 }
 
 [data-brand="summum"] {

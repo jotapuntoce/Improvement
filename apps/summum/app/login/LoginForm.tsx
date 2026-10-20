@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import s from "./login.module.css";
+import Link from "next/link";
 
 // Next.js solo inlinea NEXT_PUBLIC_* en el bundle del navegador cuando detecta un acceso literal
 // `process.env.NEXT_PUBLIC_X` en el código fuente — lib/env.ts hace `schema.parse(process.env)`
@@ -74,40 +75,38 @@ export function LoginForm() {
 
   return (
     <main className={s.login}>
+      <Link href="/" className={s.inicio} aria-label="Inicio de Summum System">
+        {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
+        <img src="/brand/wordmark-navy.svg" alt="Summum System" />
+      </Link>
       {/* ponytail: destino provisional; la landing con el formulario "Solicitar el Súmmum 360" aún no está publicada. */}
       <a href="/diagnostico" className={s.diagnostico}>
         Crear diagnóstico <span aria-hidden="true">→</span>
       </a>
-      <div className={s.marca}>
+      <form onSubmit={handleSubmit} className={s.tarjeta}>
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
-        <img src="/brand/logo-completo-navy.svg" alt="Summum System" />
-        <p>Donde vive tu ruta a la cúspide: tu diagnóstico, tus especialistas, tu equipo y tu sello.</p>
-      </div>
-      <div className={s.lado}>
-        <form onSubmit={handleSubmit} className={s.form}>
-          <span className={s.etiqueta}>Bienvenido de vuelta</span>
-          <h1 className={s.titulo}>Entra a Summum</h1>
-          <label className={s.campo}>
-            Correo
-            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <label className={s.campo}>
-            Contraseña
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          {error && <p className={s.error}>{error}</p>}
-          <button type="submit" disabled={loading} className={s.entrar}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-          <p className={s.nota}>¿Aún no eres miembro? Al equipo se entra con el diagnóstico, no con la tarjeta.</p>
-        </form>
-      </div>
+        <img src="/brand/isotipo-navy.svg" alt="" className={s.isotipo} />
+        <h1 className={s.titulo}>Entra a Summum</h1>
+        <label className={s.campo}>
+          Correo
+          <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label className={s.campo}>
+          Contraseña
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        {error && <p className={s.error}>{error}</p>}
+        <button type="submit" disabled={loading} className={s.entrar}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+        <p className={s.nota}>¿Aún no eres miembro? Al equipo se entra con el diagnóstico, no con la tarjeta.</p>
+      </form>
     </main>
   );
 }
