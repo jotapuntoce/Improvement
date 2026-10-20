@@ -74,9 +74,13 @@ export function LoginForm() {
 
   return (
     <main className={s.login}>
+      {/* ponytail: destino provisional; la landing con el formulario "Solicitar el Súmmum 360" aún no está publicada. */}
+      <a href="/diagnostico" className={s.diagnostico}>
+        Crear diagnóstico <span aria-hidden="true">→</span>
+      </a>
       <div className={s.marca}>
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
-        <img src="/brand/logo-completo-hueso.svg" alt="Summum System" />
+        <img src="/brand/logo-completo-navy.svg" alt="Summum System" />
         <p>Donde vive tu ruta a la cúspide: tu diagnóstico, tus especialistas, tu equipo y tu sello.</p>
       </div>
       <div className={s.lado}>

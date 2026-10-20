@@ -15,7 +15,7 @@ export default async function Home() {
     <main className={s.login}>
       <div className={s.marca}>
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
-        <img src="/brand/logo-completo-hueso.svg" alt="Summum System" />
+        <img src="/brand/logo-completo-navy.svg" alt="Summum System" />
       </div>
       <div className={s.lado}>
         <div className={s.form}>
