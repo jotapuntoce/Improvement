@@ -22,7 +22,7 @@ const evento = (chequeoId, autor, detalle) => db.insert(chequeoEvento).values({ 
 
 // Cuenta los armados automáticos de las últimas 24 h (terminados o fallidos) más los que están armando ahora.
 // ponytail: leer y tomar no son atómicos; una ráfaga simultánea puede pasarse del tope por unos cuantos.
-async function automaticosUltimoDia() {
+export async function automaticosUltimoDia() {
   const desde = new Date(Date.now() - 86_400_000);
   const [[ev], [en]] = await Promise.all([
     db

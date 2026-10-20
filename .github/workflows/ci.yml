@@ -82,6 +82,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # El motor del Chequeo (apps/admin) imprime PDFs y recolecta sitios con playwright-core: necesita Chromium.
+      - name: Install Chromium for playwright-core
+        run: pnpm --filter @jotapuntoce/admin exec playwright-core install --with-deps --only-shell chromium
+
       - name: Test
         run: pnpm test
 

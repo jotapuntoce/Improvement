@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db, supabaseAdmin } from "../lib/db.js";
 import { chequeo, chequeoEvento } from "@jotapuntoce/db/schema";
 import { crearChequeoPropio } from "../lib/chequeos.js";
-import { aprobarChequeo, armarChequeo, gastoDelMes } from "../lib/motor/armar.js";
+import { aprobarChequeo, armarChequeo, automaticosUltimoDia, gastoDelMes } from "../lib/motor/armar.js";
 import { contenidoMuestra } from "../lib/motor/muestra.js";
 
 const ids = [];
@@ -106,7 +106,8 @@ describe("armarChequeo", () => {
   }, 20_000);
 
   it("un automático fallido cuenta para el tope", async () => {
-    process.env.CHEQUEOS_MOTOR_TOPE_DIA = "1";
+    // La base es compartida (local, CI, otras pruebas): el tope se fija a lo ya gastado + 1, no a 1 fijo.
+    process.env.CHEQUEOS_MOTOR_TOPE_DIA = String((await automaticosUltimoDia()) + 1);
     try {
       const a = await propio();
       expect((await armarChequeo(a, {}, { investigar: responde("{}", "nada"), aPdf: pdfFalso })).error.code).toBe("MOTOR");
