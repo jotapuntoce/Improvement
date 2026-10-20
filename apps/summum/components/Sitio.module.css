@@ -126,30 +126,7 @@
 .cierre { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between; }
 .micro { font-size: 13px; color: var(--summum-guia); margin: 12px 0 0; }
 
-/* Movimiento: cada bloque entra al aparecer y sale al irse (animación ligada al scroll, sin JS).
-   Sin soporte o con movimiento reducido, todo queda visible y quieto. */
 .icono { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .revelar {
-      animation: entraSale linear both;
-      animation-timeline: view();
-      animation-range: entry 0% exit 100%;
-    }
-    .revelar .icono :is(path, circle, rect) {
-      stroke-dasharray: 1;
-      animation: dibuja linear both;
-      animation-timeline: view();
-      animation-range: entry 10% cover 35%;
-    }
-  }
-}
-@keyframes entraSale {
-  0% { opacity: 0; transform: translateY(40px); }
-  22%, 78% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(-40px); }
-}
-@keyframes dibuja { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 .cajaIcono {
   width: 48px;
   height: 48px;

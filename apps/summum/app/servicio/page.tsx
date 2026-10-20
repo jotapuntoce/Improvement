@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pagina } from "@/components/SiteHeader.tsx";
 import { Icono } from "@/components/Icono.tsx";
 import s from "@/components/Sitio.module.css";
+import { Palabras } from "@/components/Palabras.tsx";
 
 export const metadata = { title: "Servicio · Summum System" };
 
@@ -32,19 +33,19 @@ export default function Servicio() {
       intro="Entramos a tu negocio con mentes maestras, empezamos por un diagnóstico que llega a la raíz y te acompañamos hasta que tu negocio llegue al Summum, junto con toda la red."
     >
       <section className={s.seccion}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>Lo que hacemos</span>
-            <h2 className={s.h2}>Seis pasos, una sola ruta</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">Lo que hacemos</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Seis pasos, una sola ruta" /></h2>
           </div>
-          <p className={s.texto}>
+          <p data-anima="texto" className={s.texto}>
             Llegar a la raíz, no al síntoma. Cada paso alimenta al siguiente y todo se mide contra el punto de partida que
             fija el diagnóstico.
           </p>
         </div>
         <div className={s.rejilla}>
           {RUTA.map((r, i) => (
-            <div key={r.t} className={`${s.tarjeta} ${s.revelar}`}>
+            <div key={r.t} className={s.tarjeta} data-anima="bloque">
               <span className={s.cajaIcono}>
                 <Icono nombre={r.icono} />
               </span>
@@ -57,19 +58,19 @@ export default function Servicio() {
       </section>
 
       <section id="sistema" className={`${s.seccion} ${s.plano} ${s.oscura}`}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>El sistema Summum · Súmmum 360</span>
-            <h2 className={s.h2}>Los seis sistemas de tu negocio</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">El sistema Summum · Súmmum 360</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Los seis sistemas de tu negocio" /></h2>
           </div>
-          <p className={s.texto}>
+          <p data-anima="texto" className={s.texto}>
             Cada sistema queda sano, inflamado o infectado. Esa radiografía es la línea base contra la que se mide todo lo
             que hacemos después.
           </p>
         </div>
         <div className={s.rejilla}>
           {SISTEMAS.map((x, i) => (
-            <div key={x.t} className={`${s.tarjeta} ${s.revelar}`}>
+            <div key={x.t} className={s.tarjeta} data-anima="bloque">
               <span className={s.cajaIcono}>
                 <Icono nombre={x.icono} />
               </span>
@@ -82,9 +83,9 @@ export default function Servicio() {
       </section>
 
       <section className={s.seccion}>
-        <div className={`${s.cierre} ${s.revelar}`}>
+        <div className={s.cierre}>
           <div>
-            <h2 className={s.h2}>Empieza por la radiografía</h2>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Empieza por la radiografía" /></h2>
             <p className={s.micro}>Si el diagnóstico dice que no aplicas, te lo decimos.</p>
           </div>
           <Link href="/diagnostico" className={s.boton}>

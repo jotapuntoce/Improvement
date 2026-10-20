@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { LoginModal } from "./LoginModal.tsx";
 import s from "./Sitio.module.css";
+import { Palabras } from "./Palabras.tsx";
 
 export const NAV = [
   { label: "Empresas Afiliadas", href: "/afiliadas" },
@@ -91,9 +92,9 @@ export function Pagina({
     <main className={s.pagina}>
       <section className={`${s.portada} ${s.plano}`}>
         <SiteHeader activo={activo} />
-        <span className={s.etiqueta}>{etiqueta}</span>
-        <h1 className={s.titulo}>{titulo}</h1>
-        <p className={s.intro}>{intro}</p>
+        <span className={s.etiqueta} data-anima="etiqueta">{etiqueta}</span>
+        <h1 className={s.titulo} data-anima="titulo"><Palabras texto={titulo} /></h1>
+        <p className={s.intro} data-anima="texto">{intro}</p>
       </section>
       {children}
       <SiteFooter />

@@ -21,11 +21,11 @@ export default async function Diagnostico({ searchParams }: { searchParams: Prom
       intro="Revisamos cada esquina de tu negocio para encontrar la raíz de lo que lo frena y trazar tu ruta hasta la cúspide."
     >
       <section id="solicitar" className={s.seccion}>
-        <div className={`${s.cabeza} ${s.revelar}`} style={{ alignItems: "start" }}>
+        <div className={s.cabeza} style={{ alignItems: "start" }}>
           <div>
-            <span className={s.etiqueta}>Inversión</span>
+            <span className={s.etiqueta} data-anima="etiqueta">Inversión</span>
             <p className={s.precio}>$7,500 MXN</p>
-            <p className={s.texto} style={{ marginTop: 16 }}>
+            <p data-anima="texto" className={s.texto} style={{ marginTop: 16 }}>
               Si después del diagnóstico avanzas con tu mejora interna y externa, los $7,500 se abonan a tu primer
               servicio.
             </p>
@@ -37,7 +37,7 @@ export default async function Diagnostico({ searchParams }: { searchParams: Prom
             <p className={s.micro}>Si el diagnóstico dice que no aplicas, te lo decimos.</p>
           </div>
           <form action={solicitarDiagnostico} className={`${s.tarjeta} ${s.formulario}`}>
-            <span className={s.etiqueta}>Cuéntanos de tu negocio</span>
+            <span className={s.etiqueta} data-anima="etiqueta">Cuéntanos de tu negocio</span>
             <label className={s.campo}>
               Tu nombre
               <input name="nombre" autoComplete="name" required maxLength={120} />

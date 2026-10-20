@@ -13,7 +13,7 @@ export default function Gracias() {
     >
       <section className={s.seccion}>
         <div className={s.cierre}>
-          <p className={s.texto}>
+          <p data-anima="texto" className={s.texto}>
             Si después del diagnóstico avanzas con tu mejora interna y externa, los $7,500 se abonan a tu primer servicio.
           </p>
           <Link href="/servicio" className={s.boton}>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pagina } from "@/components/SiteHeader.tsx";
 import { Icono } from "@/components/Icono.tsx";
 import s from "@/components/Sitio.module.css";
+import { Palabras } from "@/components/Palabras.tsx";
 
 export const metadata = { title: "Empresas Afiliadas · Summum System" };
 
@@ -30,12 +31,12 @@ export default function Afiliadas() {
       intro="Una empresa afiliada es un especialista de la red Summum. Da el servicio en las áreas donde nosotros no somos expertos y entra a tu negocio en el momento en que el diagnóstico dice que hace falta."
     >
       <section className={s.seccion}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>Qué es</span>
-            <h2 className={s.h2}>Como en un quirófano</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">Qué es</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Como en un quirófano" /></h2>
           </div>
-          <p className={s.texto}>
+          <p data-anima="texto" className={s.texto}>
             Primero ordenamos el negocio por dentro. Después entra cada especialista a su área, con su método, y se queda
             hasta que el negocio aprende a sostenerlo. Nadie entra antes de tiempo y nadie entra sin el diagnóstico.
           </p>
@@ -43,16 +44,16 @@ export default function Afiliadas() {
       </section>
 
       <section className={`${s.seccion} ${s.plano} ${s.oscura}`}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>Cómo funciona</span>
-            <h2 className={s.h2}>Una red que vale más con cada afiliada</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">Cómo funciona</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Una red que vale más con cada afiliada" /></h2>
           </div>
-          <p className={s.texto}>Un sello solo vale si se puede perder. Por eso no cualquier empresa pertenece a Summum.</p>
+          <p data-anima="texto" className={s.texto}>Un sello solo vale si se puede perder. Por eso no cualquier empresa pertenece a Summum.</p>
         </div>
         <div className={s.rejilla}>
           {PASOS.map((p, i) => (
-            <div key={p.t} className={`${s.tarjeta} ${s.revelar}`}>
+            <div key={p.t} className={s.tarjeta} data-anima="bloque">
               <span className={s.cajaIcono}>
                 <Icono nombre={p.icono} />
               </span>
@@ -65,20 +66,20 @@ export default function Afiliadas() {
       </section>
 
       <section className={s.seccion}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>Quiénes están dentro</span>
-            <h2 className={s.h2}>La primera generación</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">Quiénes están dentro</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="La primera generación" /></h2>
           </div>
-          <p className={s.texto}>Las afiliadas que hoy forman la red. Cada una recorre el mismo camino que le pedimos a tus clientes.</p>
+          <p data-anima="texto" className={s.texto}>Las afiliadas que hoy forman la red. Cada una recorre el mismo camino que le pedimos a tus clientes.</p>
         </div>
         <div className={s.rejilla}>
           {AFILIADAS.map((a) => (
-            <div key={a.nombre} className={`${s.tarjeta} ${s.revelar}`}>
+            <div key={a.nombre} className={s.tarjeta} data-anima="bloque">
               <span className={s.cajaIcono}>
                 <Icono nombre={a.icono} />
               </span>
-              <span className={s.etiqueta}>{a.area}</span>
+              <span className={s.etiqueta} data-anima="etiqueta">{a.area}</span>
               <h3 className={s.h3}>{a.nombre}</h3>
               <p>{a.hace}</p>
             </div>
@@ -87,8 +88,8 @@ export default function Afiliadas() {
       </section>
 
       <section className={s.seccion}>
-        <div className={`${s.cierre} ${s.revelar}`}>
-          <h2 className={s.h2}>¿Tu empresa puede ser afiliada?</h2>
+        <div className={s.cierre}>
+          <h2 className={s.h2} data-anima="titulo"><Palabras texto="¿Tu empresa puede ser afiliada?" /></h2>
           <Link href="/diagnostico" className={s.boton}>
             Empieza con el Diagnóstico 360 <span aria-hidden="true">→</span>
           </Link>

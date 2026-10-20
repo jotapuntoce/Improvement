@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pagina } from "@/components/SiteHeader.tsx";
 import { Icono } from "@/components/Icono.tsx";
 import s from "@/components/Sitio.module.css";
+import { Palabras } from "@/components/Palabras.tsx";
 
 export const metadata = { title: "Para Dueños y Emprendedores · Summum System" };
 
@@ -39,11 +40,11 @@ export default function Duenos() {
       <section className={s.seccion}>
         <div className={s.rejilla2}>
           {PERFILES.map((p) => (
-            <div key={p.etiqueta} className={`${s.tarjeta} ${s.revelar}`}>
+            <div key={p.etiqueta} className={s.tarjeta} data-anima="bloque">
               <span className={s.cajaIcono}>
                 <Icono nombre={p.icono} />
               </span>
-              <span className={s.etiqueta}>{p.etiqueta}</span>
+              <span className={s.etiqueta} data-anima="etiqueta">{p.etiqueta}</span>
               <h2 className={s.h3}>{p.t}</h2>
               <ul className={s.lista}>
                 {p.puntos.map((x) => (
@@ -56,12 +57,12 @@ export default function Duenos() {
       </section>
 
       <section className={`${s.seccion} ${s.plano} ${s.oscura}`}>
-        <div className={`${s.cabeza} ${s.revelar}`}>
+        <div className={s.cabeza}>
           <div>
-            <span className={s.etiqueta}>Lo que pedimos</span>
-            <h2 className={s.h2}>Apertura, no perfección</h2>
+            <span className={s.etiqueta} data-anima="etiqueta">Lo que pedimos</span>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Apertura, no perfección" /></h2>
           </div>
-          <p className={s.texto}>
+          <p data-anima="texto" className={s.texto}>
             No necesitas tener todo resuelto para entrar: se entra con potencial y apertura, y se sale con el estándar.
             Lo único que no funciona es un dueño que no acepta el diagnóstico, porque el método llega a la raíz, y la raíz
             también eres tú. Esto ya no lo cargas solo.
@@ -70,9 +71,9 @@ export default function Duenos() {
       </section>
 
       <section className={s.seccion}>
-        <div className={`${s.cierre} ${s.revelar}`}>
+        <div className={s.cierre}>
           <div>
-            <h2 className={s.h2}>Que tu negocio ya no dependa solo de ti</h2>
+            <h2 className={s.h2} data-anima="titulo"><Palabras texto="Que tu negocio ya no dependa solo de ti" /></h2>
             <p className={s.micro}>Si el diagnóstico dice que no aplicas, te lo decimos.</p>
           </div>
           <Link href="/diagnostico" className={s.boton}>

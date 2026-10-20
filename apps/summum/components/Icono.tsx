@@ -1,5 +1,5 @@
 // Íconos de línea aprobados en la landing de Summum System (Summum System/landing/index.html, const ICO).
-// Una tinta (currentColor), trazo de 1.5; se dibujan al entrar en pantalla (ver .icono en Sitio.module.css).
+// Una tinta (currentColor), trazo de 1.5; se dibujan al entrar en pantalla (ver app/globals.css).
 import s from "./Sitio.module.css";
 
 const ICO = {
@@ -32,6 +32,7 @@ export function Icono({ nombre, size = 28 }: { nombre: NombreIcono; size?: numbe
   return (
     <svg
       className={s.icono}
+      data-icono=""
       width={size}
       height={size}
       viewBox="0 0 24 24"
