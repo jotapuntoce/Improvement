@@ -11,6 +11,7 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().startsWith("whsec_").optional()),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().startsWith("whsec_").optional()),
   NEXT_PUBLIC_SUMMUM_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  NEXT_PUBLIC_IMPROVEMENT_URL: z.preprocess(emptyToUndefined, z.string().url().optional()), // "Crear mi empresa" → Improvement
 });
 
 export const env = schema.parse(process.env);

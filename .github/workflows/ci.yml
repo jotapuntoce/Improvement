@@ -73,6 +73,7 @@ jobs:
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           DATABASE_URL_DIRECT=${{ secrets.DATABASE_URL_DIRECT }}
           NEXT_PUBLIC_SUMMUM_URL=http://localhost:3300
+          NEXT_PUBLIC_IMPROVEMENT_URL=http://localhost:3200
           EOF
           cp apps/summum/.env.local apps/summum/.env.test
 

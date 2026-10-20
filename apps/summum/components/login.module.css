@@ -95,6 +95,9 @@
   color: var(--summum-hueso);
   cursor: pointer;
 }
+.entrar { text-decoration: none; gap: 8px; }
+.secundario { justify-self: center; font-size: 14px; color: var(--summum-nota); text-underline-offset: 3px; }
+.secundario:hover { color: var(--summum-navy); }
 .entrar:hover { background: var(--summum-navy); opacity: 0.92; }
 .entrar:disabled { opacity: 0.7; cursor: default; }
 .error { color: var(--danger); font-size: 13px; margin: 0; }
