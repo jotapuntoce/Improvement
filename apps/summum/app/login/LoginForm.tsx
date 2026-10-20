@@ -79,9 +79,8 @@ export function LoginForm() {
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
         <img src="/brand/wordmark-navy.svg" alt="Summum System" />
       </Link>
-      {/* ponytail: destino provisional; la landing con el formulario "Solicitar el Súmmum 360" aún no está publicada. */}
       <a href="/diagnostico" className={s.diagnostico}>
-        Crear diagnóstico <span aria-hidden="true">→</span>
+        Diagnóstico 360 <span aria-hidden="true">→</span>
       </a>
       <form onSubmit={handleSubmit} className={s.tarjeta}>
         {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}

@@ -15,6 +15,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   "nivel-inexistente": "Ese nivel no existe en este muelle.",
   "nivel-invalido": "Nombre del nivel y precio mensual mayor que cero.",
   stripe: "Stripe rechazó la operación.",
+  "cobro-inactivo": "El cobro en línea aún no está activo. Escríbenos y te contactamos.",
   "no-se-pudo": "No se pudo completar. Inténtalo de nuevo.",
 };
 

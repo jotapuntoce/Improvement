@@ -1,0 +1,169 @@
+/* Sitio público de Summum: barra de whop.com (96px, 14px/500) y páginas con la marca Summum System. */
+.header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: 96px;
+  padding: 0 55px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  color: var(--summum-hueso);
+}
+.logo img { height: 40px; width: auto; display: block; }
+.nav { display: flex; gap: 32px; }
+.nav a,
+.entrar {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--summum-hueso);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nav a:hover,
+.entrar:hover,
+.nav a[aria-current="page"] { text-decoration: underline; text-underline-offset: 4px; }
+.acciones { justify-self: end; display: flex; align-items: center; gap: 25px; }
+.diagnostico {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--summum-radio, 8px);
+  background: var(--summum-hueso);
+  color: var(--summum-navy);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Fondo navy con la cuadrícula de plano de la landing de Summum. */
+.plano {
+  background-color: var(--summum-navy);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--summum-hueso) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--summum-hueso) 10%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  color: var(--summum-hueso);
+}
+
+.pagina {
+  max-width: none;
+  background: var(--summum-hueso);
+  color: var(--summum-navy);
+  font: 16px/1.6 var(--summum-texto), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.portada { position: relative; padding: 176px 55px 88px; }
+.etiqueta {
+  display: block;
+  font: 500 11px/1.2 var(--summum-datos), ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--summum-guia);
+}
+.titulo,
+.h2,
+.h3 {
+  font-family: var(--summum-titulo), system-ui, sans-serif;
+  font-stretch: 75%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  margin: 0;
+}
+.titulo { font-size: clamp(48px, 6.4vw, 96px); max-width: 18ch; margin: 18px 0 24px; }
+.intro { max-width: 640px; font-size: 22px; line-height: 1.5; margin: 0; color: var(--summum-hueso-suave); }
+
+.seccion { padding: 88px 55px; border-top: 1px solid var(--summum-linea); }
+.seccion:first-of-type { border-top: 0; }
+.cabeza { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: end; margin-bottom: 40px; }
+.h2 { font-size: clamp(36px, 4vw, 56px); margin-top: 12px; }
+.texto { margin: 0; max-width: 560px; color: var(--summum-nota); font-size: 17px; }
+.rejilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.rejilla2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.tarjeta {
+  background: var(--summum-tarjeta);
+  border: 1px solid var(--summum-linea);
+  border-radius: var(--summum-radio-max, 12px);
+  padding: 24px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.tarjeta p { margin: 0; color: var(--summum-nota); font-size: 15px; }
+.h3 { font-size: 24px; }
+.numero { font: 500 12px/1 var(--summum-datos), ui-monospace, monospace; letter-spacing: 0.14em; color: var(--summum-guia); }
+.lista { margin: 0; padding-left: 18px; color: var(--summum-nota); font-size: 15px; display: grid; gap: 6px; }
+.oscura .texto,
+.oscura .tarjeta p,
+.oscura .lista { color: var(--summum-hueso-suave); }
+.oscura .tarjeta { background: color-mix(in srgb, var(--summum-hueso) 5%, var(--summum-navy)); border-color: color-mix(in srgb, var(--summum-hueso) 14%, transparent); }
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 28px;
+  border-radius: var(--summum-radio-max, 12px);
+  background: var(--summum-navy);
+  color: var(--summum-hueso);
+  font-size: 18px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+}
+.oscura .boton,
+.portada .boton { background: var(--summum-hueso); color: var(--summum-navy); }
+.cierre { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between; }
+.micro { font-size: 13px; color: var(--summum-guia); margin: 12px 0 0; }
+
+/* Formulario del Diagnóstico 360 (campos de 48px como el login). */
+.formulario { display: grid; gap: 16px; }
+.campo { display: grid; gap: 6px; font-size: 14px; color: var(--summum-nota); }
+.campo input,
+.campo select,
+.campo textarea {
+  font: inherit;
+  font-size: 16px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: var(--summum-radio, 8px);
+  border: 1.5px solid var(--summum-campo-borde);
+  background: var(--summum-campo);
+  color: var(--summum-navy);
+}
+.campo textarea { min-height: 112px; resize: vertical; }
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus { outline: 2px solid var(--summum-navy); outline-offset: 1px; }
+.precio {
+  font-family: var(--summum-titulo), system-ui, sans-serif;
+  font-stretch: 75%;
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 1;
+  margin: 8px 0 0;
+}
+.error { color: var(--danger); font-size: 14px; margin: 0; }
+
+@media (max-width: 900px) {
+  .header { padding: 0 16px; grid-template-columns: auto 1fr; }
+  .nav { display: none; }
+  .logo img { height: 32px; }
+  .acciones { gap: 16px; }
+  .portada { padding: 128px 16px 56px; }
+  .intro { font-size: 18px; }
+  .seccion { padding: 56px 16px; }
+  .cabeza,
+  .rejilla,
+  .rejilla2 { grid-template-columns: 1fr; gap: 16px; }
+}
