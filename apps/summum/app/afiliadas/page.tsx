@@ -1,23 +1,24 @@
 import Link from "next/link";
 import { Pagina } from "@/components/SiteHeader.tsx";
+import { Icono } from "@/components/Icono.tsx";
 import s from "@/components/Sitio.module.css";
 
 export const metadata = { title: "Empresas Afiliadas · Summum System" };
 
 // Las afiliadas que ya están dentro. Al sumarse una nueva, se agrega aquí.
 const AFILIADAS = [
-  { nombre: "Jotapuntoce", area: "Dirección y tecnología", hace: "Dirección general externa, transformación interna del dueño y del negocio, e Improvement: el expediente de cada empresa." },
-  { nombre: "CR Consulting", area: "Comercial y conexiones", hace: "Estrategia comercial, eventos, comunidad y la red de networking que hace crecer las ventas." },
-  { nombre: "Área jurídica · Founding Partner", area: "Jurídico y cumplimiento", hace: "Contratos, derechos de cada dueño y empleado dentro del sistema, y la base de estándares de Summum." },
+  { nombre: "Jotapuntoce", icono: "adentro" as const, area: "Dirección y tecnología", hace: "Dirección general externa, transformación interna del dueño y del negocio, e Improvement: el expediente de cada empresa." },
+  { nombre: "CR Consulting", icono: "afuera" as const, area: "Comercial y conexiones", hace: "Estrategia comercial, eventos, comunidad y la red de networking que hace crecer las ventas." },
+  { nombre: "Área jurídica · Founding Partner", icono: "agenda" as const, area: "Jurídico y cumplimiento", hace: "Contratos, derechos de cada dueño y empleado dentro del sistema, y la base de estándares de Summum." },
 ];
 
 const PASOS = [
-  { t: "Entra por la misma puerta", p: "Una afiliada también es cliente: recorre su propia transformación interna antes de atender a nadie." },
-  { t: "Firma el Pacto Summum", p: "Cuerpo, descanso, claridad, orden, hábitos, mente y cumplir. Es requisito para entrar y para seguir dentro." },
-  { t: "Se capacita en el método", p: "Aprende cómo se hace Summum para dar un servicio de calidad real, no de catálogo." },
-  { t: "Recibe clientes del sistema", p: "Cuando el Súmmum 360 detecta que un negocio necesita su área, entra en el momento justo, uno por uno." },
-  { t: "Comparte lo que gana", p: "Por cada cliente que le llega por el sistema paga una comisión del 10 al 30 %. Si se satura, capacita a una sub-afiliada y cobra un porcentaje de lo que ella venda." },
-  { t: "Gana su Sello Cénit", p: "El mismo sello que obtiene un negocio. Se gana y se puede perder." },
+  { t: "Entra por la misma puerta", icono: "adentro" as const, p: "Una afiliada también es cliente: recorre su propia transformación interna antes de atender a nadie." },
+  { t: "Firma el Pacto Summum", icono: "ciclo" as const, p: "Cuerpo, descanso, claridad, orden, hábitos, mente y cumplir. Es requisito para entrar y para seguir dentro." },
+  { t: "Se capacita en el método", icono: "idea" as const, p: "Aprende cómo se hace Summum para dar un servicio de calidad real, no de catálogo." },
+  { t: "Recibe clientes del sistema", icono: "red" as const, p: "Cuando el Súmmum 360 detecta que un negocio necesita su área, entra en el momento justo, uno por uno." },
+  { t: "Comparte lo que gana", icono: "sube" as const, p: "Por cada cliente que le llega por el sistema paga una comisión del 10 al 30 %. Si se satura, capacita a una sub-afiliada y cobra un porcentaje de lo que ella venda." },
+  { t: "Gana su Sello Cénit", icono: "medalla" as const, p: "El mismo sello que obtiene un negocio. Se gana y se puede perder." },
 ];
 
 export default function Afiliadas() {
@@ -29,7 +30,7 @@ export default function Afiliadas() {
       intro="Una empresa afiliada es un especialista de la red Summum. Da el servicio en las áreas donde nosotros no somos expertos y entra a tu negocio en el momento en que el diagnóstico dice que hace falta."
     >
       <section className={s.seccion}>
-        <div className={s.cabeza}>
+        <div className={`${s.cabeza} ${s.revelar}`}>
           <div>
             <span className={s.etiqueta}>Qué es</span>
             <h2 className={s.h2}>Como en un quirófano</h2>
@@ -42,7 +43,7 @@ export default function Afiliadas() {
       </section>
 
       <section className={`${s.seccion} ${s.plano} ${s.oscura}`}>
-        <div className={s.cabeza}>
+        <div className={`${s.cabeza} ${s.revelar}`}>
           <div>
             <span className={s.etiqueta}>Cómo funciona</span>
             <h2 className={s.h2}>Una red que vale más con cada afiliada</h2>
@@ -51,7 +52,10 @@ export default function Afiliadas() {
         </div>
         <div className={s.rejilla}>
           {PASOS.map((p, i) => (
-            <div key={p.t} className={s.tarjeta}>
+            <div key={p.t} className={`${s.tarjeta} ${s.revelar}`}>
+              <span className={s.cajaIcono}>
+                <Icono nombre={p.icono} />
+              </span>
               <span className={s.numero}>{String(i + 1).padStart(2, "0")}</span>
               <h3 className={s.h3}>{p.t}</h3>
               <p>{p.p}</p>
@@ -61,7 +65,7 @@ export default function Afiliadas() {
       </section>
 
       <section className={s.seccion}>
-        <div className={s.cabeza}>
+        <div className={`${s.cabeza} ${s.revelar}`}>
           <div>
             <span className={s.etiqueta}>Quiénes están dentro</span>
             <h2 className={s.h2}>La primera generación</h2>
@@ -70,7 +74,10 @@ export default function Afiliadas() {
         </div>
         <div className={s.rejilla}>
           {AFILIADAS.map((a) => (
-            <div key={a.nombre} className={s.tarjeta}>
+            <div key={a.nombre} className={`${s.tarjeta} ${s.revelar}`}>
+              <span className={s.cajaIcono}>
+                <Icono nombre={a.icono} />
+              </span>
               <span className={s.etiqueta}>{a.area}</span>
               <h3 className={s.h3}>{a.nombre}</h3>
               <p>{a.hace}</p>
@@ -80,7 +87,7 @@ export default function Afiliadas() {
       </section>
 
       <section className={s.seccion}>
-        <div className={s.cierre}>
+        <div className={`${s.cierre} ${s.revelar}`}>
           <h2 className={s.h2}>¿Tu empresa puede ser afiliada?</h2>
           <Link href="/diagnostico" className={s.boton}>
             Empieza con el Diagnóstico 360 <span aria-hidden="true">→</span>

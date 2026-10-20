@@ -28,7 +28,7 @@ import Link from "next/link";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export function LoginForm() {
+export function LoginForm({ enModal = false }: { enModal?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -73,6 +73,34 @@ export function LoginForm() {
     router.refresh();
   }
 
+  const tarjeta = (
+    <form onSubmit={handleSubmit} className={s.tarjeta}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
+      <img src="/brand/isotipo-navy.svg" alt="" className={s.isotipo} />
+      <h1 className={s.titulo}>Entra a Summum</h1>
+      <label className={s.campo}>
+        Correo
+        <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <label className={s.campo}>
+        Contraseña
+        <input
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </label>
+      {error && <p className={s.error}>{error}</p>}
+      <button type="submit" disabled={loading} className={s.entrar}>
+        {loading ? "Entrando..." : "Entrar"}
+      </button>
+      <p className={s.nota}>¿Aún no eres miembro? Al equipo se entra con el diagnóstico, no con la tarjeta.</p>
+    </form>
+  );
+  if (enModal) return tarjeta;
+
   return (
     <main className={s.login}>
       <Link href="/" className={s.inicio} aria-label="Inicio de Summum System">
@@ -82,30 +110,7 @@ export function LoginForm() {
       <a href="/diagnostico" className={s.diagnostico}>
         Diagnóstico 360 <span aria-hidden="true">→</span>
       </a>
-      <form onSubmit={handleSubmit} className={s.tarjeta}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
-        <img src="/brand/isotipo-navy.svg" alt="" className={s.isotipo} />
-        <h1 className={s.titulo}>Entra a Summum</h1>
-        <label className={s.campo}>
-          Correo
-          <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label className={s.campo}>
-          Contraseña
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <p className={s.error}>{error}</p>}
-        <button type="submit" disabled={loading} className={s.entrar}>
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-        <p className={s.nota}>¿Aún no eres miembro? Al equipo se entra con el diagnóstico, no con la tarjeta.</p>
-      </form>
+      {tarjeta}
     </main>
   );
 }

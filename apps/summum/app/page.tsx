@@ -1,14 +1,16 @@
 // Entrada: dueño de un muelle -> su panel; dueño de un barco ya colgado de un muelle -> su barco;
 // sin sesión -> el inicio público (landing). Con sesión pero sin nada propio se dice aquí mismo: redirigir a /login haría un ciclo.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { redirect } from "next/navigation";
 import { getSessionUserId, listMyBarcos, listMyDocks } from "@/server/auth/guard.ts";
 import { Landing } from "@/components/Landing.tsx";
-import s from "./login/login.module.css";
+import s from "@/components/login.module.css";
 import Link from "next/link";
 
 export default async function Home() {
   const userId = await getSessionUserId();
-  if (!userId) return <Landing />;
+  if (!userId) return <Landing video={existsSync(join(process.cwd(), "public/brand/hero.mp4"))} />;
   const [dock] = await listMyDocks(userId);
   if (dock) redirect(`/muelle/${dock.id}/barcos`);
   const [barco] = await listMyBarcos(userId);

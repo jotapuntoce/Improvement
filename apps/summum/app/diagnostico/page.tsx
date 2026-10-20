@@ -21,7 +21,7 @@ export default async function Diagnostico({ searchParams }: { searchParams: Prom
       intro="Revisamos cada esquina de tu negocio para encontrar la raíz de lo que lo frena y trazar tu ruta hasta la cúspide."
     >
       <section id="solicitar" className={s.seccion}>
-        <div className={s.cabeza} style={{ alignItems: "start" }}>
+        <div className={`${s.cabeza} ${s.revelar}`} style={{ alignItems: "start" }}>
           <div>
             <span className={s.etiqueta}>Inversión</span>
             <p className={s.precio}>$7,500 MXN</p>

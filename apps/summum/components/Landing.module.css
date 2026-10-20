@@ -5,6 +5,7 @@
   min-height: 100vh;
   max-width: none;
   overflow: hidden;
+  isolation: isolate;
   background-color: var(--summum-navy);
   background-image:
     linear-gradient(color-mix(in srgb, var(--summum-hueso) 10%, transparent) 1px, transparent 1px),
@@ -17,13 +18,19 @@
 }
 /* Mismas dos capas de Whop: oscurece abajo (65% → 90%) y a la izquierda (0 → 38%). */
 .hero::before,
-.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-.hero::before { background: linear-gradient(transparent 65%, var(--summum-navy) 90%); }
+.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.hero::before {
+  /* Manual: toda foto o video lleva capa navy encima (25–70 %). */
+  background:
+    linear-gradient(transparent 65%, var(--summum-navy) 90%),
+    color-mix(in srgb, var(--summum-navy) 35%, transparent);
+}
+.video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .hero::after { background: linear-gradient(90deg, var(--summum-navy) 0%, transparent 38%); }
 
 .contenido {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   left: 55px;
   right: 55px;
   bottom: 96px;

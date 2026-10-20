@@ -1,5 +1,6 @@
-// Barra del sitio público (medidas de whop.com). `activo` marca la pestaña actual.
+// Barra y pie del sitio público (medidas de whop.com). `activo` marca la pestaña actual.
 import Link from "next/link";
+import { LoginModal } from "./LoginModal.tsx";
 import s from "./Sitio.module.css";
 
 export const NAV = [
@@ -24,9 +25,7 @@ export function SiteHeader({ activo }: { activo?: string }) {
         ))}
       </nav>
       <div className={s.acciones}>
-        <Link href="/login" className={s.entrar}>
-          Iniciar sesión
-        </Link>
+        <LoginModal className={s.entrar} />
         <Link href="/diagnostico" className={s.diagnostico}>
           Diagnóstico 360
         </Link>
@@ -35,7 +34,46 @@ export function SiteHeader({ activo }: { activo?: string }) {
   );
 }
 
-// Página interior: barra + portada navy (etiqueta, título, intro) + secciones.
+export function SiteFooter() {
+  return (
+    <footer className={`${s.pie} ${s.plano}`}>
+      <div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- SVG del kit de marca, sin optimizar */}
+        <img src="/brand/wordmark-hueso.svg" alt="Summum System" />
+        <p>Convertimos clientes en comunidad, y comunidad en rentabilidad.</p>
+      </div>
+      <div>
+        <h3>Summum</h3>
+        <ul>
+          {NAV.map((n) => (
+            <li key={n.href}>
+              <Link href={n.href}>{n.label}</Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h3>Empieza</h3>
+        <ul>
+          <li>
+            <Link href="/diagnostico">Diagnóstico 360</Link>
+          </li>
+          <li>
+            <Link href="/login">Iniciar sesión</Link>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <h3>La marca</h3>
+        <ul>
+          <li>Un sello solo vale si se puede perder.</li>
+        </ul>
+      </div>
+    </footer>
+  );
+}
+
+// Página interior: barra + portada navy (etiqueta, título, intro) + secciones + pie.
 export function Pagina({
   activo,
   etiqueta,
@@ -58,6 +96,7 @@ export function Pagina({
         <p className={s.intro}>{intro}</p>
       </section>
       {children}
+      <SiteFooter />
     </main>
   );
 }

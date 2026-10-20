@@ -2,7 +2,7 @@
 // hoja "use client" real) en <Suspense> porque useSearchParams() lo exige para poder prerenderizarse
 // — ver LoginForm.tsx para el resto del comportamiento y la nota de sesión.
 import { Suspense } from "react";
-import { LoginForm } from "./LoginForm.tsx";
+import { LoginForm } from "@/components/LoginForm.tsx";
 
 export default function LoginPage() {
   return (

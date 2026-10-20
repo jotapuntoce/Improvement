@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Pagina } from "@/components/SiteHeader.tsx";
+import { Icono } from "@/components/Icono.tsx";
 import s from "@/components/Sitio.module.css";
 
 export const metadata = { title: "Para Dueños y Emprendedores · Summum System" };
 
 const PERFILES = [
   {
-    etiqueta: "Dueños de negocio",
+    etiqueta: "Dueños de negocio", icono: "agenda" as const,
     t: "Tu negocio se estancó, pero sabes lo que puede llegar a ser",
     puntos: [
       "Ya funciona, pero dejó de crecer y no sabes exactamente por qué.",
@@ -16,7 +17,7 @@ const PERFILES = [
     ],
   },
   {
-    etiqueta: "Emprendedores",
+    etiqueta: "Emprendedores", icono: "idea" as const,
     t: "Tienes una idea brillante y necesitas quién te dirija",
     puntos: [
       "Sabes lo que quieres construir, pero no por dónde empezar.",
@@ -38,7 +39,10 @@ export default function Duenos() {
       <section className={s.seccion}>
         <div className={s.rejilla2}>
           {PERFILES.map((p) => (
-            <div key={p.etiqueta} className={s.tarjeta}>
+            <div key={p.etiqueta} className={`${s.tarjeta} ${s.revelar}`}>
+              <span className={s.cajaIcono}>
+                <Icono nombre={p.icono} />
+              </span>
               <span className={s.etiqueta}>{p.etiqueta}</span>
               <h2 className={s.h3}>{p.t}</h2>
               <ul className={s.lista}>
@@ -52,7 +56,7 @@ export default function Duenos() {
       </section>
 
       <section className={`${s.seccion} ${s.plano} ${s.oscura}`}>
-        <div className={s.cabeza}>
+        <div className={`${s.cabeza} ${s.revelar}`}>
           <div>
             <span className={s.etiqueta}>Lo que pedimos</span>
             <h2 className={s.h2}>Apertura, no perfección</h2>
@@ -66,7 +70,7 @@ export default function Duenos() {
       </section>
 
       <section className={s.seccion}>
-        <div className={s.cierre}>
+        <div className={`${s.cierre} ${s.revelar}`}>
           <div>
             <h2 className={s.h2}>Que tu negocio ya no dependa solo de ti</h2>
             <p className={s.micro}>Si el diagnóstico dice que no aplicas, te lo decimos.</p>
