@@ -92,6 +92,8 @@ código. Detalle completo: `.claude/rules/motor-generico.md`.
 | Sesión/auth | `apps/improvement/server/auth/guard.ts` — un `requireOrgMembership()`, usado en todas partes |
 | Motor de puntos | `apps/improvement/server/objectives/points.ts` — constante `POINTS_PER_WEIGHT_POINT`, nunca repetida |
 | Gateway de IA | `apps/improvement/server/ai/gateway.ts` y `apps/admin/lib/ia.js` — un único import de `@anthropic-ai/sdk` por app |
+| Semana del scorecard | `apps/improvement/server/direccion/scorecard/week.ts` — `weekStart()`: lunes en America/Mexico_City, nunca recalculada en otro lado |
+| Agenda de la junta L10 | `MEETING_BLOCKS` en `packages/db/src/schema.ts` (orden) + `AGENDA` en `apps/improvement/server/direccion/meetings/agenda.ts` (minutos) |
 
 ## Code rules
 
@@ -155,6 +157,24 @@ Convenciones diferidas — léelas antes de editar esa área:
 | `.claude/rules/base-de-datos.md` | `packages/db/**` |
 | `.claude/rules/ia-gateway.md` | `apps/improvement/server/ai/**` |
 | `.claude/rules/tokens-de-diseno.md` | `apps/*/app/**/*.css`, `packages/ui/**` |
+| `.claude/rules/direccion.md` | `apps/improvement/server/direccion/**`, `apps/improvement/app/[org]/direccion/**` |
+
+## Dirección (V/TO, Scorecard, Issues, Junta L10)
+
+Módulos tipo EOS dentro de `apps/improvement`: hub `/[org]/direccion` y sus cuatro rutas `vision`,
+`scorecard`, `issues`, `junta`. Blueprint: `blueprints/direccion-jaime/blueprint.md`.
+
+- Cada módulo es una sección de `SECTION_SLUGS` (`vision`, `scorecard`, `issues`, `junta`) y el dueño
+  la concede por tipo de permiso como cualquier otra. Página → `requireSection(orgId, slug)`;
+  `server/direccion/**` → `resolveSection(userId, orgId, slug)`, o `findOwnerMembership()` en las
+  escrituras solo-dueño (editar la V/TO, definir medibles, crear issues y pendientes).
+- Issues = filas de `org_need`, sin tabla nueva. `status` ES el flujo IDS: `abierta` → `en_progreso` →
+  `resuelta`; `derivada` queda fuera de Dirección. Un pendiente es un `objective` con `need_id`, creado
+  siempre por `createObjective()` — nunca un insert propio ni otra fórmula de puntos.
+- "Indicadores" (`org_kpi`, panel calculado) ≠ "Scorecard semanal" (`org_measurable`, captura manual).
+  No se mezclan, no se renombran y `org_kpi` no se toca.
+- La base es el Supabase compartido: `pnpm db:migrate` pide confirmación (`permissions.ask`). Muestra
+  el SQL a Jose Carlos y espera un "sí" explícito por cada migración.
 
 ## Non-negotiable
 

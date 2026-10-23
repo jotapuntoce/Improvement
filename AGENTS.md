@@ -27,4 +27,12 @@ JS), `apps/improvement` (producto del cliente, TS), `packages/db` (Drizzle/Postg
 6. Nunca editar a mano un archivo bajo `packages/db/migrations/`.
 7. Nunca marcar una tarea hecha con un comando de gate en rojo.
 
+## Dirección (V/TO, Scorecard, Issues, Junta L10)
+
+- Rutas bajo `/[org]/direccion`. Cada módulo es una sección (`vision`, `scorecard`, `issues`, `junta`)
+  que el dueño concede por tipo de permiso; toda página empieza con `requireSection(orgId, slug)`.
+- Issues son filas de `org_need`; un pendiente es un `objective` creado por `createObjective()`.
+- `org_kpi` (Indicadores) no se toca: el Scorecard semanal es `org_measurable` + `measurable_value`.
+- Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
+
 Arquitectura completa, boundaries y sistema de diseño: ver `CLAUDE.md` en este mismo directorio.

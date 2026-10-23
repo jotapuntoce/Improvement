@@ -45,7 +45,18 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git ls-files:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(git switch direccion-jaime)",
+      "Bash(git switch -c direccion-jaime chequeos)",
+      "Bash(git merge-base:*)",
+      "Bash(printf:*)",
+      "Bash(git branch --show-current)",
+      "Bash(git rev-list:*)",
+      "Bash(cp blueprints/direccion-jaime/workspace/:*)",
+      "Bash(pnpm --filter improvement exec playwright install:*)"
+    ],
+    "ask": [
+      "Bash(pnpm db:migrate:*)"
     ],
     "deny": [
       "Read(./.env)",

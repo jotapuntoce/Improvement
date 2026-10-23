@@ -1,0 +1,387 @@
+[
+  {
+    "id": "E1-T1",
+    "title": "Abrir la rama direccion-jaime con la línea base verde",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `git branch --show-current` corre en la raíz del repo THE SYSTEM SHALL imprimir `direccion-jaime`.",
+      "WHEN `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` corren en la rama THE SYSTEM SHALL salir con código 0 en los cuatro.",
+      "WHEN `pnpm db:generate` corre sobre `packages/db/src/schema.ts` sin cambios THE SYSTEM SHALL no agregar ningún archivo `.sql` a `packages/db/migrations/`.",
+      "WHEN se buscan las exclusiones del bundle THE SYSTEM SHALL encontrar `\"blueprints/**\"` en `eslint.config.mjs` y `\"../../blueprints/**\"` en `apps/improvement/tsconfig.json`, `apps/improvement/vitest.config.ts` y `packages/db/tsconfig.json`.",
+      "WHEN se lee el `CLAUDE.md` fusionado THE SYSTEM SHALL contener un encabezado que empieza con `## Direcci` y tener menos de 200 líneas."
+    ],
+    "verify": [
+      "test \"$(git branch --show-current)\" = direccion-jaime",
+      "grep -qF '\"blueprints/**\"' eslint.config.mjs",
+      "grep -qF '\"../../blueprints/**\"' apps/improvement/tsconfig.json",
+      "grep -qF '\"../../blueprints/**\"' apps/improvement/vitest.config.ts",
+      "grep -qF '\"../../blueprints/**\"' packages/db/tsconfig.json",
+      "grep -q '^## Direcci' CLAUDE.md",
+      "test \"$(wc -l < CLAUDE.md)\" -lt 200",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test",
+      "pnpm build"
+    ],
+    "checkpoint": "step-01-direccion-base",
+    "files": [
+      "CLAUDE.md",
+      "AGENTS.md",
+      ".claude/settings.json",
+      ".claude/rules/direccion.md",
+      "blueprints/direccion-jaime/**"
+    ],
+    "status": "done"
+  },
+  {
+    "id": "E1-T2",
+    "title": "Agregar el esquema de Dirección con su RLS",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `pnpm --filter improvement test tests/direccion-schema.test.ts` corre THE SYSTEM SHALL insertar y leer de vuelta una fila en `org_vision`, `org_measurable`, `measurable_value`, `meeting` y `meeting_rating`, y una fila de `org_need` con `owner_profile_id` y `priority_week` llenos.",
+      "WHEN se inserta una segunda `org_vision` del mismo org, un segundo `measurable_value` de la misma (medible, semana), un `meeting_rating` con `rating` 11, o un `measurable_value` cuyo `week_start` no es lunes THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN un empleado sin tipo de permiso consulta `org_vision`, `org_measurable`, `measurable_value`, `meeting` y `meeting_rating` como rol `authenticated` THE SYSTEM SHALL devolver 0 filas en cada una, y WHEN el dueño del org consulta THE SYSTEM SHALL devolver las filas de su org.",
+      "WHEN un empleado con grants `{\"scorecard\":\"propio\"}` consulta `org_measurable` y `measurable_value` como rol `authenticated` THE SYSTEM SHALL devolver solo las filas de los medibles cuyo `owner_profile_id` es él.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-02-direccion-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/direccion-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T3",
+    "title": "Registrar las cuatro secciones de Dirección",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [
+      "E1-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `scopeFor(\"owner\", null, slug)` corre para `vision`, `scorecard`, `issues` y `junta` THE SYSTEM SHALL devolver `empresa` en las cuatro, y WHEN `scopeFor(\"employee\", null, slug)` corre para las mismas THE SYSTEM SHALL devolver `ninguno`.",
+      "WHEN `grantsSchema` valida `{\"vision\":\"propio\"}` o `{\"junta\":\"area\"}` THE SYSTEM SHALL rechazarlo, y WHEN valida `{\"vision\":\"empresa\",\"scorecard\":\"propio\",\"issues\":\"propio\",\"junta\":\"empresa\"}` THE SYSTEM SHALL aceptarlo.",
+      "WHEN se lee `SECTION_SLUGS` THE SYSTEM SHALL ser exactamente `mapa`, `objetivos`, `equipo`, `clientes`, `powerups`, `cobros`, `vision`, `scorecard`, `issues`, `junta`, en ese orden, y `DIRECCION_SLUGS` SHALL ser `vision`, `scorecard`, `issues`, `junta`.",
+      "WHEN `loadDireccionNav` corre para el dueño THE SYSTEM SHALL devolver las cuatro secciones en el orden de `DIRECCION_SLUGS`, y WHEN corre para alguien sin membresía en el org o con un `orgId` que no es uuid THE SYSTEM SHALL devolver `[]` sin lanzar.",
+      "WHEN `loadLobby` corre para el dueño THE SYSTEM SHALL no incluir `vision`, `scorecard`, `issues` ni `junta` en `sueltas` ni en `puertas`.",
+      "WHEN `pnpm --filter improvement test tests/permissions.test.ts tests/lobby.test.ts` corre THE SYSTEM SHALL salir con código 0 — las pruebas existentes de permisos y recepción sin cambios."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-permissions.test.ts",
+      "pnpm --filter improvement test tests/permissions.test.ts tests/lobby.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-03-direccion-secciones",
+    "files": [
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/server/direccion/nav.ts",
+      "apps/improvement/server/lobby/loadLobby.ts",
+      "apps/improvement/tests/direccion-permissions.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T4",
+    "title": "Leer y editar la V/TO en el servidor",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [
+      "E1-T2",
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño llama `updateVisionSection` con la sección `core_values` y `[\"Servir\",\"Cumplir\"]` en un org sin visión THE SYSTEM SHALL crear exactamente una fila `org_vision` con esos valores y `updated_by` igual al dueño, y WHEN después la llama con `core_focus` THE SYSTEM SHALL actualizar esa misma fila sin crear otra.",
+      "WHEN un empleado, aun con grants `{\"vision\":\"empresa\"}`, llama `updateVisionSection` THE SYSTEM SHALL devolver `{ ok: false, error: { code: \"FORBIDDEN\" } }` y no escribir ninguna fila.",
+      "WHEN `updateVisionSection` recibe `core_values` con 8 elementos o una sección que no está en `VISION_SECTIONS` THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN un empleado con grants `{\"vision\":\"empresa\"}` llama `getVision` THE SYSTEM SHALL devolver la visión de su org, y WHEN la llama un empleado sin la sección `vision` THE SYSTEM SHALL devolver `null`.",
+      "WHEN alguien sin membresía en el org llama `getVision` THE SYSTEM SHALL lanzar el 404 de `assertMembership` (`notFound()`).",
+      "WHEN se busca un uuid literal en `apps/improvement/server/direccion/` THE SYSTEM SHALL no encontrar ninguno."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-vision.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/direccion || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-04-direccion-vision-server",
+    "files": [
+      "apps/improvement/server/direccion/vision/vision.ts",
+      "apps/improvement/tests/direccion-vision.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T5",
+    "title": "Pantalla de la V/TO y spec E2E de Dirección",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [
+      "E1-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/direccion/vision` THE SYSTEM SHALL responder 200 con un `h1` `Visión` y mostrar los valores centrales sembrados en `org_vision`.",
+      "WHEN axe-core audita `/[org]/direccion/vision` con la sesión del dueño THE SYSTEM SHALL reportar 0 violaciones de impacto serious o critical.",
+      "WHEN un empleado sin la sección `vision` abre `/[org]/direccion/vision` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño envía el formulario de valores centrales con dos líneas THE SYSTEM SHALL mostrar los dos valores después de la redirección."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e direccion.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-05-direccion-vision-pagina",
+    "files": [
+      "apps/improvement/app/[org]/direccion/vision/page.tsx",
+      "apps/improvement/tests/e2e/direccion.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T6",
+    "title": "Motor del Scorecard semanal",
+    "epic": "01-cimientos-y-motor",
+    "dependencies": [
+      "E1-T2",
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `weekStart` recibe `2026-10-26T05:59:00Z` (domingo 23:59 en Ciudad de México) THE SYSTEM SHALL devolver `2026-10-19`; con `2026-10-26T06:00:00Z` SHALL devolver `2026-10-26`; con `2026-04-06T05:59:00Z` (el antiguo horario de verano) SHALL devolver `2026-03-30`; con `2027-01-01T03:00:00Z` SHALL devolver `2026-12-28`.",
+      "WHEN `recentWeeks(\"2026-10-19\", 13)` se evalúa THE SYSTEM SHALL devolver 13 lunes de `2026-10-19` a `2026-07-27`, del más reciente al más viejo, y `isOnTrack` SHALL dar `true` para (10, 10, `gte`) y (10, 10, `lte`) y `false` para (9, 10, `gte`) y (11, 10, `lte`).",
+      "WHEN un empleado con grants `{\"scorecard\":\"propio\"}` llama `enterValue` sobre un medible de otra persona THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"` sin escribir, sobre el suyo SHALL guardar el valor, y WHEN un empleado con `{\"scorecard\":\"empresa\"}` captura en cualquier medible SHALL guardarlo.",
+      "WHEN se captura dos veces la misma (medible, semana) THE SYSTEM SHALL dejar una sola fila `measurable_value` con el último valor.",
+      "WHEN `enterValue` recibe un `weekStart` que no es lunes o que es posterior a la semana actual THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"`, y WHEN un empleado llama `createMeasurable` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`.",
+      "WHEN el dueño archiva un medible THE SYSTEM SHALL conservar sus filas `measurable_value` y `listScorecard` SHALL dejar de incluirlo, y WHEN un empleado con `{\"scorecard\":\"propio\"}` llama `listScorecard` THE SYSTEM SHALL devolver solo sus medibles, con 13 semanas en `weeks`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-week.test.ts tests/direccion-scorecard.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/direccion || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-06-direccion-scorecard-server",
+    "files": [
+      "apps/improvement/server/direccion/scorecard/week.ts",
+      "apps/improvement/server/direccion/scorecard/measurables.ts",
+      "apps/improvement/tests/direccion-week.test.ts",
+      "apps/improvement/tests/direccion-scorecard.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T1",
+    "title": "Pantalla del Scorecard semanal",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E1-T5",
+      "E1-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/direccion/scorecard` THE SYSTEM SHALL responder 200 con una tabla de 13 encabezados `th[data-week]`, el primero con `data-week` igual a `weekStart(new Date())`.",
+      "WHEN un medible `gte` con meta 10 tiene valor 12 en la semana actual THE SYSTEM SHALL mostrar el texto `En meta` en esa celda, y WHEN un medible `lte` con meta 2 tiene valor 5 THE SYSTEM SHALL mostrar `Fuera de meta`.",
+      "WHEN axe-core audita `/[org]/direccion/scorecard` con la sesión del dueño THE SYSTEM SHALL reportar 0 violaciones de impacto serious o critical.",
+      "WHEN un empleado sin la sección `scorecard` abre `/[org]/direccion/scorecard` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño captura 7 en el medible `Ventas cerradas` para la semana actual con el formulario THE SYSTEM SHALL mostrar `7` en la celda de esa semana después de la redirección.",
+      "WHEN se revisan las líneas agregadas a `apps/improvement/app/globals.css` THE SYSTEM SHALL no encontrar ningún valor hex nuevo — solo `var(--token)`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e direccion.spec.ts",
+      "d=\"$(git diff HEAD -- apps/improvement/app/globals.css)\" && { status=0; printf '%s\\n' \"$d\" | grep -E '^\\+.*#[0-9a-fA-F]{3,8}' || status=$?; test \"$status\" -eq 1; }",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-07-direccion-scorecard-pagina",
+    "files": [
+      "apps/improvement/app/[org]/direccion/scorecard/page.tsx",
+      "apps/improvement/app/globals.css",
+      "apps/improvement/tests/e2e/direccion.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T2",
+    "title": "Motor de Issues e IDS sobre org_need",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E1-T2",
+      "E1-T3",
+      "E1-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `moveIssue` lleva un issue de `abierta` a `en_progreso` y luego a `resuelta` THE SYSTEM SHALL guardar cada estado, y WHEN intenta `abierta` → `resuelta` o mover un issue `derivada` THE SYSTEM SHALL devolver `code: \"INVALID_TRANSITION\"` sin escribir.",
+      "WHEN un empleado con grants `{\"issues\":\"propio\"}` mueve un issue del que no es responsable THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, uno del que sí es responsable SHALL moverse, y WHEN un empleado sin la sección `issues` llama `listIssues` THE SYSTEM SHALL devolver `issues: []`.",
+      "WHEN `setIssuePriority` corre con `true` THE SYSTEM SHALL guardar `priority_week` igual a `weekStart(now)` y `listIssues` SHALL marcar ese issue con `onPriorityList: true`, y WHEN corre con `false` SHALL dejar `priority_week` en null.",
+      "WHEN el dueño llama `createTodoFromIssue` THE SYSTEM SHALL crear exactamente un `objective` con `need_id` igual al issue y `status` `pending`, y WHEN lo llama un empleado THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"` sin crear nada.",
+      "WHEN `referNeedToSummum` corre sobre un issue creado con `createIssue` THE SYSTEM SHALL dejarlo con `status` `derivada` y `referred_at` no nulo, y `listNeeds` SHALL seguir devolviéndolo con el mismo `title`, `detail` y `severity` y con `source` `dueno`.",
+      "WHEN se busca un uuid literal en `apps/improvement/server/direccion/` THE SYSTEM SHALL no encontrar ninguno."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-issues.test.ts",
+      "pnpm --filter improvement test tests/objectives.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/direccion || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-08-direccion-issues-server",
+    "files": [
+      "apps/improvement/server/direccion/issues/issues.ts",
+      "apps/improvement/tests/direccion-issues.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T3",
+    "title": "Pantalla de Issues",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E2-T1",
+      "E2-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/direccion/issues` THE SYSTEM SHALL responder 200 con las columnas `Identificar`, `Discutir` y `Resolver`, y el issue sembrado bajo `Identificar`.",
+      "WHEN axe-core audita `/[org]/direccion/issues` con la sesión del dueño THE SYSTEM SHALL reportar 0 violaciones de impacto serious o critical.",
+      "WHEN un empleado sin la sección `issues` abre `/[org]/direccion/issues` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño pulsa `Pasar a discutir` en el issue sembrado THE SYSTEM SHALL mostrarlo bajo `Discutir` después de la redirección.",
+      "WHEN el dueño crea un pendiente desde ese issue con el formulario THE SYSTEM SHALL dejar exactamente un `objective` con `need_id` igual al issue.",
+      "WHEN el dueño abre `/[org]/necesidades` THE SYSTEM SHALL responder 200 — la pantalla existente sigue en pie con las columnas nuevas de `org_need`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e direccion.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-09-direccion-issues-pagina",
+    "files": [
+      "apps/improvement/app/[org]/direccion/issues/page.tsx",
+      "apps/improvement/tests/e2e/direccion.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T4",
+    "title": "Motor de la Junta L10",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E1-T6",
+      "E2-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se lee `AGENDA` THE SYSTEM SHALL listar `segue`, `scorecard`, `rocks`, `headlines`, `todos`, `ids` y `conclude` en ese orden con 5, 5, 5, 5, 5, 60 y 5 minutos — `AGENDA_TOTAL_MINUTES` igual a 90 — y `nextBlock(\"conclude\")` SHALL ser `null`.",
+      "WHEN un empleado sin la sección `junta` llama `createMeeting` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN el dueño crea, inicia y avanza una junta seis veces THE SYSTEM SHALL dejar `current_block` en `conclude` y una séptima vez SHALL devolver `code: \"LAST_BLOCK\"`.",
+      "WHEN `closeMeeting` corre sin calificaciones o antes de `conclude` THE SYSTEM SHALL devolver `code: \"NOT_READY\"` y dejar `ended_at` en null, y WHEN corre con calificaciones 8 y 10 THE SYSTEM SHALL fijar `ended_at` y devolver `averageRating` 9.",
+      "WHEN `rateMeeting` recibe 0, 11 o un `profileId` de otro org THE SYSTEM SHALL rechazarlo sin escribir, y WHEN la misma persona califica dos veces THE SYSTEM SHALL dejar una sola fila con la última calificación.",
+      "WHEN `addMeetingTodo` corre con un `issueId` THE SYSTEM SHALL crear un `objective` con ese `need_id`, y WHEN `loadMeetingView` corre THE SYSTEM SHALL incluir el medible del org con su valor de la semana actual, los objetivos abiertos y los issues abiertos.",
+      "WHEN no hay junta terminada en la semana actual THE SYSTEM SHALL que `isMeetingPending` devuelva `true`, y WHEN hay una con `ended_at` en la semana actual THE SYSTEM SHALL devolver `false`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-meetings.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/direccion || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-10-direccion-junta-server",
+    "files": [
+      "apps/improvement/server/direccion/meetings/agenda.ts",
+      "apps/improvement/server/direccion/meetings/meetings.ts",
+      "apps/improvement/tests/direccion-meetings.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T5",
+    "title": "Pantalla de la Junta y tarjeta de junta pendiente",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E2-T3",
+      "E2-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/direccion/junta` THE SYSTEM SHALL responder 200 con el formulario `Nueva junta`, y WHEN abre `/[org]/direccion/junta?id=<id de la junta sembrada>` THE SYSTEM SHALL listar los siete bloques en el orden de `AGENDA` con el bloque actual marcado `aria-current=\"step\"`.",
+      "WHEN axe-core audita `/[org]/direccion/junta` y `/[org]/direccion/junta?id=<id de la junta sembrada>` con la sesión del dueño THE SYSTEM SHALL reportar 0 violaciones de impacto serious o critical en las dos.",
+      "WHEN un empleado sin la sección `junta` abre `/[org]/direccion/junta` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño abre `/empresas/[org]` sin junta terminada en la semana actual THE SYSTEM SHALL mostrar el texto `Junta pendiente` con un enlace a `/[org]/direccion/junta`.",
+      "WHEN el dueño avanza la junta sembrada hasta `conclude`, la califica con 9 y la cierra THE SYSTEM SHALL mostrar `Promedio 9.0`, y `/empresas/[org]` SHALL dejar de mostrar `Junta pendiente`.",
+      "WHEN `pnpm --filter improvement test:e2e a11y.spec.ts` corre THE SYSTEM SHALL salir con código 0 — el edificio y la recepción siguen sin violaciones serious o critical con la tarjeta nueva."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e direccion.spec.ts",
+      "pnpm --filter improvement test:e2e a11y.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-11-direccion-junta-pagina",
+    "files": [
+      "apps/improvement/app/[org]/direccion/junta/page.tsx",
+      "apps/improvement/app/empresas/[orgId]/page.tsx",
+      "apps/improvement/tests/e2e/direccion.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T6",
+    "title": "Hub, entrada de navegación y gate completo",
+    "epic": "02-pantallas-y-junta",
+    "dependencies": [
+      "E1-T3",
+      "E2-T5"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/direccion` THE SYSTEM SHALL responder 200 con enlaces a `/[org]/direccion/vision`, `/[org]/direccion/scorecard`, `/[org]/direccion/issues` y `/[org]/direccion/junta`, y axe-core SHALL reportar 0 violaciones de impacto serious o critical.",
+      "WHEN un empleado sin ninguna de las cuatro secciones abre `/[org]/direccion` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño abre `/[org]/objetivos` THE SYSTEM SHALL mostrar un enlace `Dirección` a `/[org]/direccion` dentro de un `nav` con nombre accesible `Dirección`.",
+      "WHEN `loadLobby` corre para el dueño THE SYSTEM SHALL incluir exactamente una entrada de `sueltas` con slug `direccion` y etiqueta `Dirección`, y WHEN corre para un empleado sin las cuatro secciones THE SYSTEM SHALL no incluirla.",
+      "WHEN `pnpm --filter improvement test:e2e` corre completo THE SYSTEM SHALL salir con código 0 con `a11y.spec.ts` y `direccion.spec.ts`.",
+      "WHEN `pnpm build` corre THE SYSTEM SHALL salir con código 0 para todas las apps del monorepo."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/direccion-lobby.test.ts tests/lobby.test.ts",
+      "pnpm --filter improvement test:e2e",
+      "pnpm build",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-12-direccion-navegacion",
+    "files": [
+      "apps/improvement/app/[org]/direccion/page.tsx",
+      "apps/improvement/app/[org]/layout.tsx",
+      "apps/improvement/server/lobby/loadLobby.ts",
+      "apps/improvement/tests/direccion-lobby.test.ts",
+      "apps/improvement/tests/e2e/direccion.spec.ts"
+    ],
+    "status": "pending"
+  }
+]
