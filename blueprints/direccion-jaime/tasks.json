@@ -155,7 +155,7 @@
       "apps/improvement/app/[org]/direccion/vision/page.tsx",
       "apps/improvement/tests/e2e/direccion.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T6",
