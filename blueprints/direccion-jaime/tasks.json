@@ -188,7 +188,7 @@
       "apps/improvement/tests/direccion-week.test.ts",
       "apps/improvement/tests/direccion-scorecard.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T1",
