@@ -283,7 +283,7 @@
       "apps/improvement/app/[org]/direccion/issues/page.tsx",
       "apps/improvement/tests/e2e/direccion.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T4",

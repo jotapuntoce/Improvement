@@ -5,7 +5,16 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { organization, profile, membership, orgVision, orgMeasurable, measurableValue } from "@jotapuntoce/db/schema";
+import {
+  organization,
+  profile,
+  membership,
+  orgVision,
+  orgMeasurable,
+  measurableValue,
+  orgNeed,
+  objective,
+} from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 import { weekStart } from "../../server/direccion/scorecard/week.ts";
 
@@ -21,6 +30,7 @@ const EMPLOYEE_PASSWORD = crypto.randomUUID();
 let orgId: string;
 let ownerId: string;
 let employeeId: string;
+let issueId: string;
 let ownerToken: string;
 let employeeToken: string;
 
@@ -60,6 +70,13 @@ test.beforeAll(async () => {
       enteredBy: ownerId,
     })),
   );
+
+  const [need] = await db
+    .insert(orgNeed)
+    .values({ orgId, title: "Se pierden clientes", status: "abierta", source: "dueno", ownerProfileId: ownerId })
+    .returning({ id: orgNeed.id });
+  if (!need) throw new Error("insert de org_need no devolvió fila");
+  issueId = need.id;
 
   ownerToken = await signInTestUser(OWNER_EMAIL, OWNER_PASSWORD);
   employeeToken = await signInTestUser(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
@@ -160,6 +177,61 @@ test.describe("Scorecard", () => {
   test("WHEN un empleado sin la sección abre /[org]/direccion/scorecard THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
     await as(context, employeeToken, baseURL);
     const response = await page.goto(`/${orgId}/direccion/scorecard`);
+    expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("Issues", () => {
+  const ISSUE = "Se pierden clientes";
+  const column = (page: Page, name: string) => page.getByRole("region", { name });
+
+  test("WHEN el dueño abre /[org]/direccion/issues THE SYSTEM SHALL mostrar las tres columnas y el issue bajo Identificar", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion/issues`);
+    expect(response?.status()).toBe(200);
+    for (const name of ["Identificar", "Discutir", "Resolver"]) {
+      await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+    }
+    await expect(column(page, "Identificar").getByText(ISSUE, { exact: true })).toBeVisible();
+  });
+
+  test("WHEN axe audita /[org]/direccion/issues con el dueño THE SYSTEM SHALL reportar 0 serious o critical", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/issues`);
+    await page.waitForLoadState("networkidle");
+    await expectNoSeriousA11y(page);
+  });
+
+  test("WHEN el dueño pulsa Pasar a discutir THE SYSTEM SHALL mostrar el issue bajo Discutir", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/issues`);
+    await column(page, "Identificar").getByRole("button", { name: "Pasar a discutir" }).click();
+    await page.waitForURL(`**/${orgId}/direccion/issues`);
+    await expect(column(page, "Discutir").getByText(ISSUE, { exact: true })).toBeVisible();
+  });
+
+  test("WHEN el dueño crea un pendiente desde el issue THE SYSTEM SHALL dejar un objective con ese need_id", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/issues`);
+    const form = page.getByRole("form", { name: `Pendiente nuevo para ${ISSUE}` });
+    await form.getByLabel("Título del pendiente").fill("Llamar a los clientes perdidos");
+    await form.getByLabel("Fecha").fill("2026-12-15");
+    await form.getByRole("button", { name: "Pendiente nuevo" }).click();
+    await page.waitForURL(`**/${orgId}/direccion/issues`);
+    await expect
+      .poll(async () => (await db.select().from(objective).where(eq(objective.needId, issueId))).length)
+      .toBe(1);
+  });
+
+  test("WHEN el dueño abre /[org]/necesidades THE SYSTEM SHALL responder 200", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/necesidades`);
+    expect(response?.status()).toBe(200);
+  });
+
+  test("WHEN un empleado sin la sección abre /[org]/direccion/issues THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion/issues`);
     expect(response?.status()).toBe(404);
   });
 });
