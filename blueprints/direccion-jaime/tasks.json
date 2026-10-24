@@ -65,7 +65,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/direccion-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T3",
