@@ -347,7 +347,7 @@
       "apps/improvement/app/empresas/[orgId]/page.tsx",
       "apps/improvement/tests/e2e/direccion.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T6",

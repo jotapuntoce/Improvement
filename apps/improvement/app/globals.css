@@ -550,10 +550,12 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 
 /* "Salir" es position:fixed en el resto del producto y aquí se encimaba sobre el botón de
    construcción. En el panel entra a la fila, que es lo que hace que el botón quede literalmente
-   entre la etiqueta del dueño y él. */
+   entre la etiqueta del dueño y él. Sin el blur, --text-muted a 11.5px queda en 4.03:1 sobre el
+   panel (axe pide 4.5:1): aquí va --text-secondary. */
 .owner-panel-actions .jpc-back-link--fixed {
   position: static;
   backdrop-filter: none;
+  color: var(--text-secondary);
 }
 
 /* --- Áreas del organigrama (/empresas/configuracion) — misma fila que .config-kpi-row. --- */

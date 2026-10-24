@@ -14,6 +14,7 @@ import {
   measurableValue,
   orgNeed,
   objective,
+  meeting,
 } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 import { weekStart } from "../../server/direccion/scorecard/week.ts";
@@ -31,6 +32,7 @@ let orgId: string;
 let ownerId: string;
 let employeeId: string;
 let issueId: string;
+let meetingId: string;
 let ownerToken: string;
 let employeeToken: string;
 
@@ -77,6 +79,20 @@ test.beforeAll(async () => {
     .returning({ id: orgNeed.id });
   if (!need) throw new Error("insert de org_need no devolvió fila");
   issueId = need.id;
+
+  const [junta] = await db
+    .insert(meeting)
+    .values({
+      orgId,
+      scheduledFor: new Date(),
+      startedAt: new Date(),
+      currentBlock: "segue",
+      facilitatorProfileId: ownerId,
+      createdBy: ownerId,
+    })
+    .returning({ id: meeting.id });
+  if (!junta) throw new Error("insert de meeting no devolvió fila");
+  meetingId = junta.id;
 
   ownerToken = await signInTestUser(OWNER_EMAIL, OWNER_PASSWORD);
   employeeToken = await signInTestUser(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
@@ -232,6 +248,71 @@ test.describe("Issues", () => {
   test("WHEN un empleado sin la sección abre /[org]/direccion/issues THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
     await as(context, employeeToken, baseURL);
     const response = await page.goto(`/${orgId}/direccion/issues`);
+    expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("Junta", () => {
+  const junta = () => `/${orgId}/direccion/junta`;
+  const sesion = () => `/${orgId}/direccion/junta?id=${meetingId}`;
+
+  test("WHEN el dueño abre /[org]/direccion/junta THE SYSTEM SHALL responder 200 con Nueva junta", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(junta());
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("form", { name: "Nueva junta" })).toBeVisible();
+  });
+
+  test("WHEN el dueño abre la junta sembrada THE SYSTEM SHALL listar los siete bloques con el actual marcado", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(sesion());
+    const items = page.getByRole("navigation", { name: "Agenda de la junta" }).getByRole("listitem");
+    await expect(items).toHaveCount(7);
+    await expect(page.locator('li[aria-current="step"]')).toContainText("Buenas noticias");
+  });
+
+  test("WHEN axe audita la lista y la junta sembrada THE SYSTEM SHALL reportar 0 serious o critical en las dos", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    for (const path of [junta(), sesion()]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle");
+      await expectNoSeriousA11y(page);
+    }
+  });
+
+  test("WHEN no hay junta cerrada esta semana THE SYSTEM SHALL mostrar Junta pendiente en el edificio", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/empresas/${orgId}`);
+    const aside = page.getByRole("complementary", { name: "Junta pendiente" });
+    await expect(aside).toContainText("Junta pendiente");
+    await expect(aside.getByRole("link")).toHaveAttribute("href", junta());
+  });
+
+  test("WHEN el dueño recorre, califica con 9 y cierra THE SYSTEM SHALL mostrar Promedio 9.0 y quitar la tarjeta", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(sesion());
+    for (let i = 0; i < 6; i++) {
+      await page.getByRole("button", { name: "Siguiente bloque" }).click();
+      await page.waitForURL(`**/direccion/junta?id=${meetingId}`);
+      await page.waitForLoadState("networkidle");
+    }
+    await expect(page.locator('li[aria-current="step"]')).toContainText("Cierre");
+
+    const rate = page.getByRole("form", { name: "Calificar la junta" });
+    await rate.getByLabel("Calificación (1-10)").fill("9");
+    await rate.getByRole("button", { name: "Calificar" }).click();
+    await page.waitForURL(`**/direccion/junta?id=${meetingId}`);
+    await page.getByRole("button", { name: "Cerrar junta" }).click();
+    await page.waitForURL(`**/direccion/junta?id=${meetingId}`);
+    await expect(page.getByText("Promedio 9.0")).toBeVisible();
+
+    await page.goto(`/empresas/${orgId}`);
+    await expect(page.getByRole("complementary", { name: "Junta pendiente" })).toHaveCount(0);
+  });
+
+  test("WHEN un empleado sin la sección abre /[org]/direccion/junta THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(junta());
     expect(response?.status()).toBe(404);
   });
 });
