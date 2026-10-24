@@ -316,3 +316,30 @@ test.describe("Junta", () => {
     expect(response?.status()).toBe(404);
   });
 });
+
+test.describe("Hub y navegación", () => {
+  test("WHEN el dueño abre /[org]/direccion THE SYSTEM SHALL responder 200 con los cuatro enlaces y sin violaciones serious o critical", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1, name: "Dirección" })).toBeVisible();
+    for (const slug of ["vision", "scorecard", "issues", "junta"]) {
+      await expect(page.locator(`main a[href="/${orgId}/direccion/${slug}"]`)).toHaveCount(1);
+    }
+    await page.waitForLoadState("networkidle");
+    await expectNoSeriousA11y(page);
+  });
+
+  test("WHEN un empleado sin las cuatro secciones abre /[org]/direccion THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion`);
+    expect(response?.status()).toBe(404);
+  });
+
+  test("WHEN el dueño abre /[org]/objetivos THE SYSTEM SHALL mostrar el nav Dirección con su enlace", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/objetivos`);
+    const nav = page.getByRole("navigation", { name: "Dirección" });
+    await expect(nav.getByRole("link", { name: "Dirección" })).toHaveAttribute("href", `/${orgId}/direccion`);
+  });
+});

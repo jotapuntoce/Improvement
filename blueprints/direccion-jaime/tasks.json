@@ -382,6 +382,6 @@
       "apps/improvement/tests/direccion-lobby.test.ts",
       "apps/improvement/tests/e2e/direccion.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   }
 ]

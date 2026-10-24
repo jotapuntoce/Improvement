@@ -125,6 +125,8 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
     if (zona) puertas.push({ zona, slug: s.slug, label: s.label });
     else sueltas.push({ slug: s.slug, label: s.label });
   }
+  // Las cuatro de Dirección entran juntas por una sola puerta: el hub /[org]/direccion.
+  if (secciones.some((s) => DIRECCION.has(s.slug))) sueltas.push({ slug: "direccion", label: "Dirección" });
 
   return {
     team: equipo.map((p) => ({
