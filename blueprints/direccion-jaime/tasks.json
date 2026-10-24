@@ -253,7 +253,7 @@
       "apps/improvement/server/direccion/issues/issues.ts",
       "apps/improvement/tests/direccion-issues.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",
