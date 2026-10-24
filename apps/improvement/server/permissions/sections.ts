@@ -9,8 +9,23 @@ import { z } from "zod";
 export const SCOPES = ["empresa", "area", "propio", "ninguno"] as const;
 export type Scope = (typeof SCOPES)[number];
 
-export const SECTION_SLUGS = ["mapa", "objetivos", "equipo", "clientes", "powerups", "cobros"] as const;
+export const SECTION_SLUGS = [
+  "mapa",
+  "objetivos",
+  "equipo",
+  "clientes",
+  "powerups",
+  "cobros",
+  "vision",
+  "scorecard",
+  "issues",
+  "junta",
+] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
+
+/** Las cuatro secciones de Dirección: viven bajo /[org]/direccion, no como rutas sueltas. */
+export const DIRECCION_SLUGS = ["vision", "scorecard", "issues", "junta"] as const;
+export type DireccionSlug = (typeof DIRECCION_SLUGS)[number];
 
 export interface Section {
   slug: SectionSlug;
@@ -30,6 +45,10 @@ export const SECTIONS: Section[] = [
   { slug: "clientes", label: "Clientes", hint: "Tu cartera y cómo va cada cuenta", scopes: ["empresa"] },
   { slug: "powerups", label: "PowerUps", hint: "Canjea los puntos que acumula tu equipo", scopes: ["empresa"] },
   { slug: "cobros", label: "Cobros", hint: "Lo que cobras y la comisión de Summum", scopes: ["empresa"] },
+  { slug: "vision", label: "Visión", hint: "Hacia dónde va la empresa y qué la guía", scopes: ["empresa"] },
+  { slug: "scorecard", label: "Scorecard semanal", hint: "Los números de cada semana contra su meta", scopes: ["empresa", "propio"] },
+  { slug: "issues", label: "Issues", hint: "Lo que estorba, discutido y resuelto", scopes: ["empresa", "propio"] },
+  { slug: "junta", label: "Junta semanal", hint: "La junta de 90 minutos, bloque por bloque", scopes: ["empresa"] },
 ];
 
 export function sectionBySlug(slug: string): Section | undefined {

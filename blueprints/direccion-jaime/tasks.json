@@ -97,7 +97,7 @@
       "apps/improvement/server/lobby/loadLobby.ts",
       "apps/improvement/tests/direccion-permissions.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T4",

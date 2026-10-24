@@ -23,6 +23,7 @@ import { saludo } from "@jotapuntoce/ui/building/greeting.ts";
 import type { LobbyZona } from "@jotapuntoce/ui/building/lobbyPlano.ts";
 import { assertMembership } from "../auth/guard.ts";
 import { loadVisibleSections } from "../permissions/loadSections.ts";
+import { DIRECCION_SLUGS } from "../permissions/sections.ts";
 import { listActivePowerups, pointsBalance } from "../powerups/mutations.ts";
 import { listProjects } from "../projects/mutations.ts";
 import { loadTeamStatus } from "../employees/loadTeamStatus.ts";
@@ -34,6 +35,8 @@ const ZONA_DE_SECCION: Record<string, LobbyZona> = {
   clientes: "clientes",
   powerups: "powerups",
 };
+
+const DIRECCION: ReadonlySet<string> = new Set(DIRECCION_SLUGS);
 
 /** El color del marco de un retrato: cómo va esa persona con sus objetivos. */
 const COLOR_DE_ESTADO: Record<string, string> = {
@@ -116,6 +119,8 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
   const puertas: LobbyPuertaInfo[] = [];
   const sueltas: { slug: string; label: string }[] = [];
   for (const s of secciones) {
+    // Dirección no tiene ruta suelta (/[org]/vision no existe): vive bajo /[org]/direccion.
+    if (DIRECCION.has(s.slug)) continue;
     const zona = ZONA_DE_SECCION[s.slug];
     if (zona) puertas.push({ zona, slug: s.slug, label: s.label });
     else sueltas.push({ slug: s.slug, label: s.label });
