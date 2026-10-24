@@ -5,8 +5,11 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { organization, profile, membership, orgVision } from "@jotapuntoce/db/schema";
+import { organization, profile, membership, orgVision, orgMeasurable, measurableValue } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
+import { weekStart } from "../../server/direccion/scorecard/week.ts";
+
+const THIS_WEEK = weekStart(new Date());
 
 test.describe.configure({ mode: "serial" });
 
@@ -41,6 +44,22 @@ test.beforeAll(async () => {
     { userId: employeeId, orgId, role: "employee", acceptedAt: new Date() },
   ]);
   await db.insert(orgVision).values({ orgId, coreValues: ["Servir", "Cumplir"], updatedBy: ownerId });
+
+  const measurables = await db
+    .insert(orgMeasurable)
+    .values([
+      { orgId, title: "Ventas cerradas", ownerProfileId: ownerId, goal: 10, goalDirection: "gte", position: 0 },
+      { orgId, title: "Quejas", ownerProfileId: ownerId, goal: 2, goalDirection: "lte", position: 1 },
+    ])
+    .returning({ id: orgMeasurable.id, title: orgMeasurable.title });
+  await db.insert(measurableValue).values(
+    measurables.map((m) => ({
+      measurableId: m.id,
+      weekStart: THIS_WEEK,
+      value: m.title === "Quejas" ? 5 : 12,
+      enteredBy: ownerId,
+    })),
+  );
 
   ownerToken = await signInTestUser(OWNER_EMAIL, OWNER_PASSWORD);
   employeeToken = await signInTestUser(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
@@ -95,6 +114,52 @@ test.describe("Visión", () => {
   test("WHEN un empleado sin la sección abre /[org]/direccion/vision THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
     await as(context, employeeToken, baseURL);
     const response = await page.goto(`/${orgId}/direccion/vision`);
+    expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("Scorecard", () => {
+  const cell = (page: Page, title: string) =>
+    page.locator(`tr:has(th[scope="row"]:text-is("${title}")) td[data-week="${THIS_WEEK}"]`);
+
+  test("WHEN el dueño abre /[org]/direccion/scorecard THE SYSTEM SHALL responder 200 con 13 semanas, la actual primero", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion/scorecard`);
+    expect(response?.status()).toBe(200);
+    const weeks = page.locator("th[data-week]");
+    await expect(weeks).toHaveCount(13);
+    await expect(weeks.first()).toHaveAttribute("data-week", THIS_WEEK);
+  });
+
+  test("WHEN un medible está en meta o fuera THE SYSTEM SHALL decirlo con texto en su celda", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/scorecard`);
+    await expect(cell(page, "Ventas cerradas")).toContainText("En meta");
+    await expect(cell(page, "Quejas")).toContainText("Fuera de meta");
+  });
+
+  test("WHEN axe audita /[org]/direccion/scorecard con el dueño THE SYSTEM SHALL reportar 0 serious o critical", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/scorecard`);
+    await page.waitForLoadState("networkidle");
+    await expectNoSeriousA11y(page);
+  });
+
+  test("WHEN el dueño captura 7 en Ventas cerradas THE SYSTEM SHALL mostrar 7 en la celda de la semana", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/direccion/scorecard`);
+    const form = page.getByRole("form", { name: "Capturar valor de Ventas cerradas" });
+    await form.getByLabel("Semana").selectOption(THIS_WEEK);
+    await form.getByLabel("Valor").fill("7");
+    await form.getByRole("button", { name: "Capturar" }).click();
+    await page.waitForURL(`**/${orgId}/direccion/scorecard`);
+    await expect(cell(page, "Ventas cerradas")).toContainText("7");
+    await expect(cell(page, "Ventas cerradas")).toContainText("Fuera de meta");
+  });
+
+  test("WHEN un empleado sin la sección abre /[org]/direccion/scorecard THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(`/${orgId}/direccion/scorecard`);
     expect(response?.status()).toBe(404);
   });
 });

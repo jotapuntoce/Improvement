@@ -646,3 +646,8 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .pendientes-resto { display: flex; flex-direction: column; gap: 8px; }
 .pendientes-resto > summary { cursor: pointer; }
 .pendientes-resto > summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* Dirección — scorecard (blueprint direccion-jaime §7). Solo tokens. */
+.scorecard-scroll { overflow-x: auto; }
+.scorecard-ok { color: var(--success); font-weight: 600; }
+.scorecard-off { color: var(--danger); font-weight: 600; }
