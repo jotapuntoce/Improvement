@@ -158,6 +158,7 @@ Convenciones diferidas — léelas antes de editar esa área:
 | `.claude/rules/ia-gateway.md` | `apps/improvement/server/ai/**` |
 | `.claude/rules/tokens-de-diseno.md` | `apps/*/app/**/*.css`, `packages/ui/**` |
 | `.claude/rules/direccion.md` | `apps/improvement/server/direccion/**`, `apps/improvement/app/[org]/direccion/**` |
+| `.claude/rules/summum-improvement.md` | `apps/improvement/server/{erp,crm,seal,sinapsis,people,powerups,ai}/**`, `apps/improvement/app/w/**`, `apps/summum/server/**`, `apps/summum/app/{red,muelle,directorio,r}/**` |
 
 ## Dirección (V/TO, Scorecard, Issues, Junta L10)
 
@@ -175,6 +176,13 @@ Módulos tipo EOS dentro de `apps/improvement`: hub `/[org]/direccion` y sus cua
   No se mezclan, no se renombran y `org_kpi` no se toca.
 - La base es el Supabase compartido: `pnpm db:migrate` pide confirmación (`permissions.ask`). Muestra
   el SQL a Jose Carlos y espera un "sí" explícito por cada migración.
+
+## Summum + Improvement (operación, red y Sello)
+
+Blueprint: `blueprints/summum-improvement/blueprint.md` · reglas: `.claude/rules/summum-improvement.md`.
+- `org_kpi` crece solo por su vía documentada: fuente nueva en `KPI_SOURCES` + valor en su check. Su semántica no cambia.
+- Pacto, check-ins y People Analyzer: cada quien lee solo lo suyo (RLS por `auth.uid()`); nunca un ranking en Improvement.
+- Rutas públicas (`/directorio`, `/r/[code]`, `/w/[token]`) leen columnas públicas explícitas — nunca `select *`.
 
 ## Non-negotiable
 

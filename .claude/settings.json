@@ -32,7 +32,6 @@
       "Bash(grep:*)",
       "Bash(wc:*)",
       "Bash(xargs:*)",
-      "Bash(pnpm add:*)",
       "Bash(pnpm exec playwright:*)",
       "Bash(curl -sf:*)",
       "Bash(curl -s -o:*)",
@@ -53,7 +52,12 @@
       "Bash(git branch --show-current)",
       "Bash(git rev-list:*)",
       "Bash(cp blueprints/direccion-jaime/workspace/:*)",
-      "Bash(pnpm --filter improvement exec playwright install:*)"
+      "Bash(pnpm --filter improvement exec playwright install:*)",
+      "Bash(git switch summum-improvement)",
+      "Bash(git switch -c summum-improvement direccion-jaime)",
+      "Bash(cp blueprints/summum-improvement/workspace/:*)",
+      "Bash(pnpm --filter @jotapuntoce/summum test:*)",
+      "Bash(pnpm --filter @jotapuntoce/summum test:e2e:*)"
     ],
     "ask": [
       "Bash(pnpm db:migrate:*)"

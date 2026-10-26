@@ -1,0 +1,1358 @@
+[
+  {
+    "id": "E1-T1",
+    "title": "Agregar el esquema de Proyectos/obra con su RLS",
+    "epic": "01-operacion",
+    "dependencies": [],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `git branch --show-current` corre THE SYSTEM SHALL imprimir `summum-improvement`, y WHEN se lee `CLAUDE.md` THE SYSTEM SHALL contener un encabezado que empieza con `## Summum + Improvement` y tener menos de 200 líneas.",
+      "WHEN `pnpm --filter improvement test tests/proyectos-schema.test.ts` corre THE SYSTEM SHALL insertar y leer de vuelta un `project` nuevo con `authorization_status` `pendiente` por defecto y una fila de `project_stage` ligada a él.",
+      "WHEN se inserta un `project` con `authorization_status` `aprobado`, o un `project_stage` con `progress` 101 o con `weight` 0 THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN se inserta un `org_kpi` con `source` `proyectos` o `pendientes` THE SYSTEM SHALL aceptarlo, y WHEN el `source` es `inventado` THE SYSTEM SHALL rechazarlo.",
+      "WHEN un miembro del org consulta `project_stage` como rol `authenticated` THE SYSTEM SHALL devolver las etapas de su org, y WHEN consulta un perfil sin membresía en ese org THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "test \"$(git branch --show-current)\" = summum-improvement",
+      "grep -q '^## Summum + Improvement' CLAUDE.md",
+      "test \"$(wc -l < CLAUDE.md)\" -lt 200",
+      "pnpm --filter improvement test tests/proyectos-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-01-si-proyectos-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/proyectos-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T2",
+    "title": "Motor de proyectos: autorización, responsable y etapas",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `stageWeightedProgress` recibe las etapas (peso 1, avance 100) y (peso 3, avance 0) THE SYSTEM SHALL devolver `25`; con (peso 2, avance 50) y (peso 1, avance 80) SHALL devolver `60`; con una lista vacía SHALL devolver `null`.",
+      "WHEN el dueño agrega dos etapas a un proyecto y actualiza sus avances THE SYSTEM SHALL dejar `project.progress` igual al promedio ponderado redondeado de esas etapas.",
+      "WHEN el dueño autoriza un proyecto `pendiente` THE SYSTEM SHALL guardar `authorization_status` `autorizado`, `authorized_by` igual al dueño y `authorized_at` no nulo, y WHEN lo intenta autorizar otra vez THE SYSTEM SHALL devolver `code: \"INVALID_TRANSITION\"`.",
+      "WHEN un empleado llama `authorizeProject` o `addStage` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"` sin escribir, y WHEN el empleado responsable del proyecto llama `updateStage` THE SYSTEM SHALL guardar el avance.",
+      "WHEN `setProjectOwner` recibe un perfil que no es miembro del org, o cualquier función recibe un id de proyecto de otro org THE SYSTEM SHALL devolver `code: \"NOT_FOUND\"`.",
+      "WHEN alguien sin membresía en el org llama `loadProjectBoard` THE SYSTEM SHALL lanzar el 404 de `assertMembership` (`notFound()`)."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/erp-projects.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/erp || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-02-si-proyectos-motor",
+    "files": [
+      "apps/improvement/server/erp/projects.ts",
+      "apps/improvement/tests/erp-projects.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T3",
+    "title": "Fuentes de KPI proyectos y pendientes",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `computeKpiValues` corre para un org con tres proyectos activos — uno `pendiente`, uno `autorizado` con avance 25 y otro `autorizado` con avance 60 — THE SYSTEM SHALL devolver `1` para `proyectos` con `{\"estado\":\"por_autorizar\"}`, `2` con `{\"estado\":\"en_obra\"}` y `43` con `{\"estado\":\"avance_promedio\"}`.",
+      "WHEN el org tiene tres objetivos abiertos con `need_id` — dos con responsable y uno sin — y uno completado con `need_id` THE SYSTEM SHALL devolver `3` para `pendientes` con `{}`, `2` con `{\"responsable\":\"con\"}` y `1` con `{\"responsable\":\"sin\"}`.",
+      "WHEN la config de una fila `proyectos` trae `{\"estado\":\"otro\"}` THE SYSTEM SHALL calcular como `en_obra` sin lanzar.",
+      "WHEN un org no tiene proyectos THE SYSTEM SHALL devolver `0` para `proyectos` con `{\"estado\":\"avance_promedio\"}`.",
+      "WHEN `pnpm --filter improvement test tests/owner-panel.test.ts` corre THE SYSTEM SHALL salir con código 0 — el panel existente de Indicadores sin cambios."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/kpi-erp.test.ts",
+      "pnpm --filter improvement test tests/owner-panel.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-03-si-kpi-proyectos",
+    "files": [
+      "apps/improvement/server/kpis/sources.ts",
+      "apps/improvement/tests/kpi-erp.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T4",
+    "title": "Pantalla de Proyectos con autorización y etapas",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/proyectos` THE SYSTEM SHALL responder 200 con un `h1` `Proyectos`, mostrar el proyecto sembrado `Obra norte` con el texto `Por autorizar`, y axe-core SHALL reportar 0 violaciones de impacto serious o critical.",
+      "WHEN el dueño pulsa `Autorizar` en `Obra norte` THE SYSTEM SHALL mostrar `Autorizado` después de la redirección.",
+      "WHEN el dueño agrega la etapa `Cimentación` con peso 1 THE SYSTEM SHALL mostrarla en la tabla de etapas del proyecto.",
+      "WHEN un empleado sin la sección `proyectos` abre `/[org]/proyectos` THE SYSTEM SHALL responder 404.",
+      "WHEN se lee `SECTION_SLUGS` THE SYSTEM SHALL empezar con `mapa`, `objetivos`, `equipo`, `clientes`, `powerups`, `cobros`, `vision`, `scorecard`, `issues`, `junta` en ese orden e incluir `proyectos`, y `scopeFor(\"owner\", null, \"proyectos\")` SHALL devolver `empresa` y `scopeFor(\"employee\", null, \"proyectos\")` SHALL devolver `ninguno`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/erp-sections.test.ts tests/direccion-permissions.test.ts",
+      "pnpm --filter improvement test tests/permissions.test.ts tests/lobby.test.ts tests/direccion-lobby.test.ts",
+      "pnpm --filter improvement test:e2e erp.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-04-si-proyectos-pagina",
+    "files": [
+      "apps/improvement/app/[org]/proyectos/page.tsx",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/direccion-permissions.test.ts",
+      "apps/improvement/tests/erp-sections.test.ts",
+      "apps/improvement/tests/e2e/erp.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T5",
+    "title": "Esquema de CRM: hiperpersonalización y tratos",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `pnpm --filter improvement test tests/crm-schema.test.ts` corre THE SYSTEM SHALL insertar y leer de vuelta un `client_preference` con `answers` lleno y un `deal` en `prospecto` con `closed_at` nulo.",
+      "WHEN se inserta un segundo `client_preference` del mismo cliente, un `deal` con `amount_cents` -1, un `deal` `ganado` con `closed_at` nulo o un `deal` `prospecto` con `closed_at` lleno THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN se inserta un `org_kpi` con `source` `ventas` y un `ai_suggestion` con `category` `siguiente_movimiento` THE SYSTEM SHALL aceptar ambos.",
+      "WHEN un empleado sin tipo de permiso consulta `client_preference` y `deal` como rol `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta un empleado con grants `{\"clientes\":\"empresa\"}` o el dueño THE SYSTEM SHALL devolver las filas de su org.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/crm-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-05-si-crm-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/crm-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T6",
+    "title": "Motor de ventas, hiperpersonalización y KPI ventas",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T5",
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `mxMonthStart` recibe `2026-11-01T05:59:00Z` THE SYSTEM SHALL devolver `2026-10-01`, y con `2026-11-01T06:00:00Z` SHALL devolver `2026-11-01`.",
+      "WHEN el dueño mueve un trato a `ganado` THE SYSTEM SHALL fijar `closed_at`, y WHEN lo regresa a `negociacion` THE SYSTEM SHALL dejar `closed_at` en null.",
+      "WHEN `computeKpiValues` corre para un org con dos tratos ganados este mes de 150000 y 50000 centavos, uno ganado hace 40 días y uno perdido THE SYSTEM SHALL devolver `2000` para `ventas` con `{}` y `2` con `{\"metrica\":\"tratos_ganados\"}`.",
+      "WHEN `saveClientPreference` recibe las seis respuestas THE SYSTEM SHALL guardarlas en `answers`, y WHEN una respuesta pasa de 1000 caracteres THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN un empleado sin la sección `clientes` llama `createDeal` o `saveClientPreference` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN llama `getClientPreference` THE SYSTEM SHALL devolver `null`.",
+      "WHEN se lee `HIPER_QUESTIONS` THE SYSTEM SHALL tener seis entradas con las llaves `como_atenderlo`, `expectativa`, `como_arreglarlo`, `valor_agregado`, `extra_por_ser_cliente` y `como_se_siente_valorado`, en ese orden."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/crm.test.ts",
+      "pnpm --filter improvement test tests/clients.test.ts tests/owner-panel.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/crm || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-06-si-crm-motor",
+    "files": [
+      "apps/improvement/server/crm/deals.ts",
+      "apps/improvement/server/crm/preferences.ts",
+      "apps/improvement/server/kpis/sources.ts",
+      "apps/improvement/tests/crm.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T7",
+    "title": "IA de atención al cliente en el servidor",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T6"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `suggestAttention` corre con un proveedor simulado que devuelve `expectativaIncumplida: true` y `motivo` `\"Pidió entrega el viernes\"` THE SYSTEM SHALL insertar una `ai_suggestion` con `category` `servicio_cliente` y `based_on.clientIds` igual a `[clientId]`, una fila `llm_calls` con `purpose` `atencion_cliente`, y guardar `unmet_note` `Pidió entrega el viernes` con `unmet_flagged_at` no nulo.",
+      "WHEN el proveedor simulado devuelve `expectativaIncumplida: false` THE SYSTEM SHALL dejar `unmet_note` y `unmet_flagged_at` en null.",
+      "WHEN el proveedor simulado devuelve dos veces un texto que no cumple `attentionSchema` THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin insertar en `ai_suggestion`.",
+      "WHEN el cliente no tiene ninguna respuesta de hiperpersonalización, o quien llama es un empleado sin `{\"clientes\":\"empresa\"}` THE SYSTEM SHALL devolver `VALIDATION_ERROR` o `FORBIDDEN` respectivamente sin llamar al proveedor.",
+      "WHEN se buscan archivos que importen `@anthropic-ai/sdk` en `apps/improvement/server`, `app`, `lib` y `components` THE SYSTEM SHALL encontrar solo `apps/improvement/server/ai/gateway.ts`.",
+      "WHEN `pnpm --filter improvement test tests/ai-gateway.test.ts` corre THE SYSTEM SHALL salir con código 0 — el gateway existente sin cambios de comportamiento."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/crm-attention.test.ts tests/ai-gateway.test.ts",
+      "test \"$(grep -rl '@anthropic-ai/sdk' apps/improvement/server apps/improvement/app apps/improvement/lib apps/improvement/components)\" = apps/improvement/server/ai/gateway.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-07-si-crm-atencion",
+    "files": [
+      "apps/improvement/server/ai/gateway.ts",
+      "apps/improvement/server/ai/prompts/attention.ts",
+      "apps/improvement/server/crm/attention.ts",
+      "apps/improvement/tests/crm-attention.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T8",
+    "title": "Pantallas del CRM: pipeline, ficha y entradas",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T7",
+      "E1-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/clientes/pipeline` THE SYSTEM SHALL responder 200 con un `h1` `Pipeline de ventas` y el trato sembrado `Remodelación baño`, y axe-core SHALL reportar 0 violaciones serious o critical.",
+      "WHEN el dueño abre la ficha de `Cliente Uno` desde el enlace `Ficha` de `/[org]/clientes` THE SYSTEM SHALL responder 200 con un `h1` `Cliente Uno` y mostrar las seis preguntas de hiperpersonalización.",
+      "WHEN el dueño abre `/[org]/clientes` THE SYSTEM SHALL mostrar el enlace `Pipeline de ventas`.",
+      "WHEN un empleado sin tipo de permiso abre `/[org]/clientes/pipeline` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e erp.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-08-si-crm-pantallas",
+    "files": [
+      "apps/improvement/app/[org]/clientes/pipeline/page.tsx",
+      "apps/improvement/app/[org]/clientes/[clienteId]/page.tsx",
+      "apps/improvement/app/[org]/clientes/page.tsx",
+      "apps/improvement/tests/e2e/erp.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T9",
+    "title": "Postventa: esquema, sección y motor de tickets",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T5",
+      "E1-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN se inserta un `ticket` `resuelto` sin `resolved_at`, un `ticket` `abierto` con `satisfaction` 4 o uno con `severity` 4 THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN el dueño abre un ticket y lo mueve a `resuelto` THE SYSTEM SHALL fijar `resolved_at`, y WHEN lo califica con 5 THE SYSTEM SHALL guardar `satisfaction` 5.",
+      "WHEN `rateTicket` corre sobre un ticket `abierto` THE SYSTEM SHALL devolver `code: \"INVALID_TRANSITION\"`, y WHEN un ticket `resuelto` se regresa a `en_proceso` THE SYSTEM SHALL dejar `resolved_at` y `satisfaction` en null.",
+      "WHEN un empleado sin la sección `postventa` llama `openTicket` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN llama `listTickets` THE SYSTEM SHALL devolver `[]`.",
+      "WHEN un empleado sin tipo de permiso consulta `ticket` como rol `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta uno con grants `{\"postventa\":\"empresa\"}` THE SYSTEM SHALL devolver los tickets de su org.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/postventa.test.ts",
+      "pnpm --filter improvement test tests/erp-sections.test.ts tests/direccion-permissions.test.ts tests/lobby.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/erp || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-09-si-postventa-motor",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/erp/tickets.ts",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/postventa.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T10",
+    "title": "Pantalla de Postventa y KPI postventa",
+    "epic": "01-operacion",
+    "dependencies": [
+      "E1-T9",
+      "E1-T8"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `computeKpiValues` corre para un org con dos tickets resueltos de 2 y 5 horas calificados con 4 y 5, y un ticket abierto THE SYSTEM SHALL devolver `1` para `postventa` con `{}`, `4.5` con `{\"metrica\":\"satisfaccion_promedio\"}` y `4` con `{\"metrica\":\"horas_promedio_resolucion\"}`.",
+      "WHEN un org no tiene tickets resueltos THE SYSTEM SHALL devolver `0` para `{\"metrica\":\"satisfaccion_promedio\"}` y para `{\"metrica\":\"horas_promedio_resolucion\"}`.",
+      "WHEN el dueño abre `/[org]/postventa` THE SYSTEM SHALL responder 200 con un `h1` `Postventa` y el ticket sembrado bajo `Abiertos`, axe-core SHALL reportar 0 violaciones serious o critical, y WHEN el dueño lo mueve a resuelto THE SYSTEM SHALL mostrarlo bajo `Resueltos`.",
+      "WHEN un empleado sin la sección `postventa` abre `/[org]/postventa` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/kpi-postventa.test.ts",
+      "pnpm --filter improvement test:e2e erp.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-10-si-postventa-pagina",
+    "files": [
+      "apps/improvement/app/[org]/postventa/page.tsx",
+      "apps/improvement/server/kpis/sources.ts",
+      "apps/improvement/tests/kpi-postventa.test.ts",
+      "apps/improvement/tests/e2e/erp.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T1",
+    "title": "Siguiente mejor movimiento en el servidor",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E1-T7"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `refreshNextMove` corre para el dueño con un proveedor simulado y un org con una necesidad `abierta` THE SYSTEM SHALL insertar una `ai_suggestion` con `category` `siguiente_movimiento` cuyo `based_on.needIds` contiene esa necesidad, y una fila `llm_calls` con `purpose` `siguiente_movimiento`.",
+      "WHEN existe una sugerencia `siguiente_movimiento` de hace 2 días en un org del dueño THE SYSTEM SHALL hacer que `getPortfolioNextMove` devuelva `fuente` `ia` con su texto.",
+      "WHEN no hay sugerencia y el dueño tiene objetivos abiertos THE SYSTEM SHALL hacer que `getPortfolioNextMove` devuelva `fuente` `pareto` con el título de la primera tarea de `loadOwnerTasks`.",
+      "WHEN la única sugerencia tiene 8 días THE SYSTEM SHALL ignorarla y devolver `fuente` `pareto`, y WHEN el dueño no tiene ni sugerencias ni tareas THE SYSTEM SHALL devolver `null`.",
+      "WHEN un empleado llama `refreshNextMove` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"` sin llamar al proveedor."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/next-move.test.ts tests/ai-gateway.test.ts",
+      "test \"$(grep -rl '@anthropic-ai/sdk' apps/improvement/server apps/improvement/app apps/improvement/lib apps/improvement/components)\" = apps/improvement/server/ai/gateway.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-11-si-movimiento-motor",
+    "files": [
+      "apps/improvement/server/ai/nextMove.ts",
+      "apps/improvement/server/ai/prompts/nextMove.ts",
+      "apps/improvement/tests/next-move.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T2",
+    "title": "Tarjeta del siguiente movimiento en el inicio del dueño",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T1"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño sin sugerencias de IA abre `/empresas` THE SYSTEM SHALL mostrar un `h2` `Siguiente mejor movimiento` con `Llamar al proveedor` y la etiqueta `Lo más urgente (80/20)`, y axe-core SHALL reportar 0 violaciones serious o critical.",
+      "WHEN existe una `ai_suggestion` `siguiente_movimiento` reciente del org del dueño THE SYSTEM SHALL mostrar en esa tarjeta `Cerrar la venta grande` con la etiqueta `Sugerido por Improvement`.",
+      "WHEN el dueño abre `/empresas/[orgId]` THE SYSTEM SHALL mostrar el botón `Pedir siguiente movimiento`, y WHEN lo abre el empleado THE SYSTEM SHALL no mostrarlo.",
+      "WHEN `pnpm --filter improvement test tests/company-list.test.ts tests/owner-panel.test.ts` corre THE SYSTEM SHALL salir con código 0 — el panel del dueño existente sin cambios."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e movimiento.spec.ts",
+      "pnpm --filter improvement test tests/company-list.test.ts tests/owner-panel.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-12-si-movimiento-tarjeta",
+    "files": [
+      "apps/improvement/app/empresas/PendingList.tsx",
+      "apps/improvement/app/empresas/page.tsx",
+      "apps/improvement/app/empresas/[orgId]/page.tsx",
+      "apps/improvement/tests/e2e/movimiento.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T3",
+    "title": "Esquema de afiliadas, especialidades y personalidad",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E1-T9"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se insertan un `specialty`, un `affiliate` y un `personality_profile` y se actualiza el `specialty_key` de un `area` THE SYSTEM SHALL leerlos de vuelta con los mismos valores.",
+      "WHEN se inserta un segundo `affiliate` del mismo perfil en el mismo muelle, un `affiliate` con un `public_slug` repetido, una `specialty` con `key` repetida en el mismo muelle o un `personality_profile` con `subject_kind` `otro` THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN la afiliada consulta `affiliate` y `personality_profile` como rol `authenticated` THE SYSTEM SHALL ver solo sus filas, y WHEN consulta un dueño del muelle THE SYSTEM SHALL ver las filas `affiliate` del muelle y 0 filas de `personality_profile` ajenas.",
+      "WHEN un perfil sin relación con el muelle consulta `specialty` como rol `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta una afiliada `activa` del muelle THE SYSTEM SHALL devolver sus especialidades.",
+      "WHEN `personalityAnswersValid` recibe las nueve respuestas válidas THE SYSTEM SHALL devolver `true`, con una llave faltante o un valor fuera de `options` SHALL devolver `false`, y WHEN `personalityMatch` compara dos respuestas con 6 de 9 iguales THE SYSTEM SHALL devolver `67`.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/afiliadas-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-13-si-afiliadas-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/afiliadas-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T4",
+    "title": "Motor de afiliadas especialistas y su cuestionario",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN un dueño del muelle registra con `registerAffiliate` el correo de un perfil existente con una especialidad del muelle THE SYSTEM SHALL crear una fila `affiliate` `activa` con un `public_slug` único, y WHEN registra otra vez el mismo perfil THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }`.",
+      "WHEN un perfil que no es dueño del muelle llama `registerAffiliate` o `listAffiliates` THE SYSTEM SHALL lanzar el 404 de `assertDockOwner`.",
+      "WHEN la afiliada activa contesta el cuestionario con las nueve respuestas válidas THE SYSTEM SHALL guardar un `personality_profile` con `subject_kind` `afiliada` y `questionnaire_version` 1, y WHEN falta una respuesta THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }` sin escribir.",
+      "WHEN una afiliada `suspendida` contesta el cuestionario THE SYSTEM SHALL devolver `ok: false` sin escribir.",
+      "WHEN `saveAffiliateProfile` recibe un `barcoOrgId` de un barco donde la afiliada no es dueña THE SYSTEM SHALL devolver `ok: false` y dejar `barco_org_id` sin cambio.",
+      "WHEN `createSpecialty` recibe la llave `Ventas Top` THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/affiliates.test.ts",
+      "pnpm --filter @jotapuntoce/summum test tests/guard.test.ts tests/fee-changes.test.ts tests/error-codes.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/affiliates || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-14-si-afiliadas-summum",
+    "files": [
+      "apps/summum/server/affiliates/affiliates.ts",
+      "apps/summum/tests/affiliates.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T5",
+    "title": "Esquema del Sello Cénit y de la sinapsis con su RLS",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se insertan un `muelle_settings`, un `seal_requirement` de cada fuente, un `seal_requirement_result`, una `seal_evaluation` de un barco, un `barco_listing` y un `specialist_proposal` THE SYSTEM SHALL leerlos de vuelta, con `min_seal_score` null, `grace_days` 30 y `proposal_min_severity` 3 por defecto en `muelle_settings`.",
+      "WHEN se inserta una `seal_evaluation` con `second_approver_id` igual a `first_approver_id`, una `seal_evaluation` `barco` sin `barco_org_id`, o una segunda `seal_evaluation` `pendiente` del mismo barco THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN se inserta un `specialist_proposal` con `second_partner_id` igual a `first_partner_id`, o un segundo `specialist_proposal` `propuesta` para la misma necesidad THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN el dueño del barco consulta `seal_evaluation` como rol `authenticated` THE SYSTEM SHALL ver las de su barco y 0 de otro barco del mismo muelle, y WHEN consulta un empleado de ese barco THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN un dueño del muelle consulta `seal_evaluation`, `seal_requirement` y `specialist_proposal` como rol `authenticated` THE SYSTEM SHALL ver las filas de su muelle, y WHEN consulta una afiliada THE SYSTEM SHALL ver solo sus propias evaluaciones.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/sello-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-15-si-sello-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/sello-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T6",
+    "title": "Motor de puntaje del Sello desde el expediente",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T5"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN un muelle no tiene requisitos ni `muelle_settings` THE SYSTEM SHALL devolver `score` 0, `minScore` null y `meets` false.",
+      "WHEN un barco cumple un requisito manual de 10 puntos, no cumple otro manual de 5 y cumple un requisito `kpi` de 20 puntos con `{\"source\":\"proyectos\",\"config\":{\"estado\":\"en_obra\"},\"op\":\"gte\",\"threshold\":1}`, con `min_seal_score` 25 THE SYSTEM SHALL devolver `score` 30 y `meets` true.",
+      "WHEN el mismo barco se evalúa con `min_seal_score` 40 THE SYSTEM SHALL devolver `score` 30 y `meets` false.",
+      "WHEN un requisito `kpi` trae `source` `manual`, una fuente inexistente o una config sin `threshold` THE SYSTEM SHALL contarlo como no cumplido sin lanzar.",
+      "WHEN se evalúa una afiliada sin `barco_org_id` THE SYSTEM SHALL contar como no cumplidos sus requisitos `kpi` y sumar sus requisitos manuales cumplidos.",
+      "WHEN un requisito tiene `active` false THE SYSTEM SHALL dejarlo fuera de `detail` y de `score`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seal-score.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/seal || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-16-si-sello-puntaje",
+    "files": [
+      "apps/improvement/server/seal/score.ts",
+      "apps/improvement/tests/seal-score.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T7",
+    "title": "Requisitos, mínimo y aprobación de dos socios en Summum",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T5",
+      "E2-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el primer socio aprueba una evaluación `pendiente` THE SYSTEM SHALL guardar `first_approver_id` y dejarla `pendiente`, WHEN el mismo socio aprueba otra vez THE SYSTEM SHALL devolver `{ ok: false, error: \"Necesita la firma del otro dueño.\" }`, y WHEN aprueba el otro socio THE SYSTEM SHALL dejarla `aprobada` con `vigencia` `vigente` y `approved_at` no nulo.",
+      "WHEN se aprueba o rechaza una evaluación ya `aprobada` o `rechazada` THE SYSTEM SHALL devolver `{ ok: false, error: \"Este cambio ya se decidió.\" }`.",
+      "WHEN un perfil que no es dueño del muelle llama `approveEvaluation`, `createRequirement` o `upsertSettings` THE SYSTEM SHALL lanzar el 404 de `assertDockOwner`.",
+      "WHEN `createRequirement` corre en un muelle sin requisitos THE SYSTEM SHALL crear la fila, y WHEN recibe un `code` inválido o un `kpi` sin `threshold` THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }`.",
+      "WHEN `markManualResult` recibe un barco de otro muelle o un requisito `kpi` THE SYSTEM SHALL devolver `ok: false` sin escribir.",
+      "WHEN `upsertSettings` recibe `minSealScore` null THE SYSTEM SHALL guardarlo, y WHEN recibe `graceDays` 0 THE SYSTEM SHALL devolver `ok: false`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/seal-approvals.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/seal || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-17-si-sello-socios",
+    "files": [
+      "apps/summum/server/seal/requirements.ts",
+      "apps/summum/server/seal/approvals.ts",
+      "apps/summum/tests/seal-approvals.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T8",
+    "title": "Pantallas de afiliadas y del Sello en Summum",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T7"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN un dueño del muelle abre `/muelle/[muelleId]/afiliadas` THE SYSTEM SHALL responder 200 con un `h1` `Afiliadas` y la afiliada sembrada en la lista.",
+      "WHEN un dueño del muelle abre `/muelle/[muelleId]/sello` en un muelle sin `muelle_settings` THE SYSTEM SHALL responder 200 con un `h1` `Sello Cénit` y el texto `Sin mínimo definido: nadie se puede certificar todavía.`",
+      "WHEN la afiliada abre `/red/[muelleId]/afiliada` THE SYSTEM SHALL responder 200 con un `h1` `Mi perfil de afiliada` y un `fieldset` por cada pregunta de `PERSONALITY_QUESTIONS`.",
+      "WHEN el perfil sin relación con el muelle abre `/red/[muelleId]/afiliada` o `/muelle/[muelleId]/afiliadas` THE SYSTEM SHALL responder 404 en las dos."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-18-si-afiliadas-sello-pantallas",
+    "files": [
+      "apps/summum/app/muelle/[muelleId]/afiliadas/page.tsx",
+      "apps/summum/app/red/[muelleId]/afiliada/page.tsx",
+      "apps/summum/app/muelle/[muelleId]/sello/page.tsx",
+      "apps/summum/app/muelle/[muelleId]/layout.tsx",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T9",
+    "title": "Vigencia continua del Sello con cron protegido",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `nextVigencia` recibe `vigente` sin cumplir THE SYSTEM SHALL devolver `en_riesgo` con `riskSince` igual a `now`, y WHEN recibe `en_riesgo` cumpliendo THE SYSTEM SHALL devolver `vigente` con `riskSince` null.",
+      "WHEN `nextVigencia` recibe `en_riesgo` sin cumplir con `riskSince` `2026-09-01T00:00:00Z`, `graceDays` 30 y `now` `2026-10-01T00:00:00Z` THE SYSTEM SHALL devolver `reevaluacion`; con `now` `2026-09-30T23:59:00Z` SHALL devolver `en_riesgo`; y con `reevaluacion` y `now` `2026-10-31T00:00:00Z` SHALL devolver `suspendido`.",
+      "WHEN `runSealCycle` corre dos veces sobre un barco que cumple el mínimo y no tiene evaluaciones THE SYSTEM SHALL dejar exactamente una `seal_evaluation` `pendiente` con su puntaje.",
+      "WHEN un barco con evaluación `aprobada` `vigente` baja del mínimo y corre `runSealCycle` THE SYSTEM SHALL dejarla `en_riesgo` con `risk_since` igual a `now`.",
+      "WHEN `GET /api/cron/sello` llega con `Authorization: Bearer incorrecto` THE SYSTEM SHALL responder 401 sin escribir ninguna `seal_evaluation`.",
+      "WHEN se lee `apps/improvement/vercel.json` THE SYSTEM SHALL contener un cron con `path` `/api/cron/sello`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seal-vigencia.test.ts tests/seal-score.test.ts",
+      "grep -qF '\"/api/cron/sello\"' apps/improvement/vercel.json",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-19-si-sello-vigencia",
+    "files": [
+      "apps/improvement/server/seal/vigencia.ts",
+      "apps/improvement/app/api/cron/sello/route.ts",
+      "apps/improvement/vercel.json",
+      "apps/improvement/tests/seal-vigencia.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T10",
+    "title": "Directorio público con perfil y Sello",
+    "epic": "02-movimiento-afiliadas-sello",
+    "dependencies": [
+      "E2-T8",
+      "E2-T9"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN un visitante sin sesión abre `/directorio` THE SYSTEM SHALL responder 200 con la afiliada aprobada y `Vigente`, sin la afiliada que solo tiene una evaluación `pendiente` y sin el barco que no dio opt-in.",
+      "WHEN un visitante abre `/directorio/<slug de la afiliada>` THE SYSTEM SHALL responder 200 con su nombre y `Puntaje 30`, y WHEN abre `/directorio/no-existe` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño del barco guarda el opt-in con un slug en `/barco/[orgId]` THE SYSTEM SHALL hacer que `/directorio` muestre ese barco con el texto `En riesgo`.",
+      "WHEN se descarga el HTML de `/directorio` THE SYSTEM SHALL no contener el id del barco ni el id de ninguna afiliada."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/directory || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-20-si-directorio",
+    "files": [
+      "apps/summum/server/directory/directory.ts",
+      "apps/summum/app/directorio/page.tsx",
+      "apps/summum/app/directorio/[slug]/page.tsx",
+      "apps/summum/app/barco/[orgId]/page.tsx",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T1",
+    "title": "Cuestionario del dueño y propuestas de especialista",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E2-T9",
+      "E2-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `generateProposals` corre con una necesidad `abierta` de severidad 3 en un área con llave `comercial` y dos afiliadas `comercial` con Sello aprobado de 50 y 80 puntos THE SYSTEM SHALL crear un solo `specialist_proposal` `propuesta` para la afiliada de 80 con `seal_score` 80, y WHEN corre otra vez THE SYSTEM SHALL seguir con exactamente uno.",
+      "WHEN las dos afiliadas tienen el mismo puntaje y las respuestas del dueño coinciden 9 de 9 con una y 3 de 9 con la otra THE SYSTEM SHALL proponer a la primera con `match_score` 100.",
+      "WHEN la necesidad tiene severidad 2 con `proposal_min_severity` 3, o su área no tiene `specialty_key` THE SYSTEM SHALL no crear ninguna propuesta.",
+      "WHEN el dueño aprueba una propuesta `aprobada_socios` THE SYSTEM SHALL dejarla `activa` y la `org_need` con `status` `derivada` y `referred_at` no nulo, y WHEN la propuesta está en `propuesta` THE SYSTEM SHALL devolver `code: \"INVALID_TRANSITION\"`.",
+      "WHEN un empleado llama `decideProposalAsOwner` o `saveOwnerPersonality` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN el dueño manda respuestas inválidas THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"`.",
+      "WHEN `setAreaSpecialty` recibe una llave que no existe en el muelle del org THE SYSTEM SHALL devolver `code: \"NOT_FOUND\"` sin escribir."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/sinapsis.test.ts tests/seal-vigencia.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/sinapsis apps/improvement/server/owner || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-21-si-sinapsis-motor",
+    "files": [
+      "apps/improvement/server/owner/personality.ts",
+      "apps/improvement/server/sinapsis/proposals.ts",
+      "apps/improvement/app/api/cron/sello/route.ts",
+      "apps/improvement/tests/sinapsis.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T2",
+    "title": "Aprobación de especialistas por los socios en Summum",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T1",
+      "E2-T8"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el primer socio aprueba una propuesta THE SYSTEM SHALL guardar `first_partner_id` y dejarla `propuesta`, WHEN el mismo socio aprueba otra vez THE SYSTEM SHALL devolver `{ ok: false, error: \"Necesita la firma del otro dueño.\" }`, y WHEN aprueba el otro socio THE SYSTEM SHALL dejarla `aprobada_socios` con `partners_approved_at` no nulo.",
+      "WHEN los dos socios aprobaron THE SYSTEM SHALL dejar la `org_need` de la propuesta con su `status` original `abierta`.",
+      "WHEN un socio rechaza una propuesta THE SYSTEM SHALL dejarla `rechazada`, y WHEN alguien la aprueba después THE SYSTEM SHALL devolver `{ ok: false, error: \"Este cambio ya se decidió.\" }`.",
+      "WHEN un dueño de otro muelle llama `approveProposal` o `listProposals` THE SYSTEM SHALL lanzar el 404 de `assertDockOwner`.",
+      "WHEN un dueño del muelle abre `/muelle/[muelleId]/sinapsis` THE SYSTEM SHALL responder 200 con un `h1` `Sinapsis` y el texto `El dueño del negocio decide al final.`, y WHEN la abre el perfil sin relación con el muelle THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/sinapsis-approvals.test.ts",
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/sinapsis || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-22-si-sinapsis-aprobacion",
+    "files": [
+      "apps/summum/server/sinapsis/approvals.ts",
+      "apps/summum/app/muelle/[muelleId]/sinapsis/page.tsx",
+      "apps/summum/app/muelle/[muelleId]/layout.tsx",
+      "apps/summum/tests/sinapsis-approvals.test.ts",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T3",
+    "title": "Catálogo de premios de la red con interruptor de corte",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E2-T5"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `listCatalogForOrg` corre para un org sin muelle THE SYSTEM SHALL devolver las filas globales activas y ninguna fila con `network_org_id`.",
+      "WHEN el muelle de un barco tiene `catalog_mode` `red` THE SYSTEM SHALL devolver solo los premios activos de ese muelle, con las filas globales todavía en la tabla y con `is_active` sin cambio.",
+      "WHEN un empleado de un barco en modo `red` canjea un premio global THE SYSTEM SHALL devolver `code: \"NOT_FOUND\"` sin insertar en `powerup_redemption`, y WHEN canjea un premio de la red con puntos suficientes THE SYSTEM SHALL insertar exactamente un canje.",
+      "WHEN el muelle vuelve a `catalog_mode` `global` THE SYSTEM SHALL devolver otra vez las filas globales para ese barco.",
+      "WHEN `pnpm --filter improvement test tests/powerups.test.ts` corre THE SYSTEM SHALL salir con código 0 — el canje existente sin cambios para orgs en modo global.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/powerups-red.test.ts tests/powerups.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-23-si-premios-catalogo",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/powerups/catalog.ts",
+      "apps/improvement/server/powerups/mutations.ts",
+      "apps/improvement/tests/powerups-red.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T4",
+    "title": "Publicar beneficios de la red desde Summum",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T3",
+      "E3-T2",
+      "E2-T8"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN una afiliada activa publica un beneficio como `afiliada` THE SYSTEM SHALL crear una fila `powerup_partner` con `network_org_id` igual al muelle, `affiliate_id` de la afiliada, `business_name` igual a su `display_name` e `is_active` true.",
+      "WHEN el dueño de un barco del muelle publica como `negocio` THE SYSTEM SHALL guardar `barco_org_id`, y WHEN lo intenta con un barco de otro muelle THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }` sin escribir.",
+      "WHEN un dueño del muelle llama `setCatalogMode` con `red` THE SYSTEM SHALL dejar `muelle_settings.catalog_mode` en `red`, y WHEN lo llama alguien que no es dueño del muelle THE SYSTEM SHALL lanzar el 404 de `assertDockOwner`.",
+      "WHEN la afiliada abre `/red/[muelleId]/beneficios` y publica `Masaje de la red` THE SYSTEM SHALL responder 200 con un `h1` `Beneficios de la red` y mostrar `Masaje de la red` en la lista, y WHEN el dueño del muelle abre la misma página THE SYSTEM SHALL mostrar el texto `Catálogo de PowerUps`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/benefits.test.ts",
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/benefits || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-24-si-premios-publicar",
+    "files": [
+      "apps/summum/server/benefits/benefits.ts",
+      "apps/summum/app/red/[muelleId]/beneficios/page.tsx",
+      "apps/summum/tests/benefits.test.ts",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T5",
+    "title": "Pantallas del dueño: perfil, especialistas y PowerUps",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño del barco abre `/[org]/improvement/perfil` THE SYSTEM SHALL responder 200 con un `h1` `Tu perfil y tu red` y un `select` de especialidad para el área sembrada, y axe-core SHALL reportar 0 violaciones serious o critical.",
+      "WHEN el dueño del org sin muelle abre su `/[org]/improvement/perfil` THE SYSTEM SHALL mostrar `Tu empresa todavía no está en una red Summum.`, y WHEN el empleado abre `/[org]/improvement/perfil` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño del barco abre `/[org]/necesidades` THE SYSTEM SHALL mostrar la sección `Especialistas propuestos` con `Ana Comercial`, y WHEN pulsa `Aceptar especialista` THE SYSTEM SHALL mostrarla como `En curso`.",
+      "WHEN el dueño del barco abre `/[org]/powerups` THE SYSTEM SHALL responder 200 y mostrar `Masaje de la red`.",
+      "WHEN `pnpm --filter improvement test tests/lobby.test.ts tests/powerups.test.ts tests/powerups-red.test.ts` corre THE SYSTEM SHALL salir con código 0 — recepción y canje con el catálogo por org."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/lobby.test.ts tests/powerups.test.ts tests/powerups-red.test.ts",
+      "pnpm --filter improvement test:e2e sinapsis.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-25-si-dueno-red-pantallas",
+    "files": [
+      "apps/improvement/app/[org]/improvement/perfil/page.tsx",
+      "apps/improvement/app/[org]/necesidades/page.tsx",
+      "apps/improvement/server/lobby/loadLobby.ts",
+      "apps/improvement/app/[org]/powerups/page.tsx",
+      "apps/improvement/tests/e2e/sinapsis.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T6",
+    "title": "Esquema del Pacto con consentimiento y RLS estricta",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T3"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN se insertan un `pacto_consent`, un `pacto_pillar`, un `pacto_entry` y un `pacto_pause` THE SYSTEM SHALL leerlos de vuelta.",
+      "WHEN se inserta un segundo `pacto_entry` del mismo perfil, pilar y fecha, un `pacto_pause` con `ends_on` antes de `starts_on` o un segundo `pacto_consent` del mismo perfil THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN la persona consulta `pacto_entry`, `pacto_consent` y `pacto_pause` como rol `authenticated` THE SYSTEM SHALL ver solo sus filas, y WHEN consulta un dueño del muelle THE SYSTEM SHALL devolver 0 filas de esas tres tablas que no sean suyas.",
+      "WHEN una afiliada activa del muelle consulta `pacto_pillar` THE SYSTEM SHALL ver los pilares de su muelle, y WHEN consulta un perfil sin relación con el muelle THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/pacto-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-26-si-pacto-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/pacto-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T7",
+    "title": "Motor de racha y riesgo del Pacto y su servidor",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T6"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `mxDate` recibe `2026-10-27T05:59:00Z` THE SYSTEM SHALL devolver `2026-10-26`, y con `2026-10-27T06:00:00Z` SHALL devolver `2026-10-27`.",
+      "WHEN `pillarStatus` corre con `today` `2026-10-26`, `since` `2026-10-01` y registros el 23, 24 y 25 THE SYSTEM SHALL devolver `streak` 3 y `risk` `pendiente`; con registros del 23 al 26 SHALL devolver `streak` 4 y `al_dia`; con registros del 20 al 22 y posada del 23 al 25 SHALL devolver `streak` 3 y `pendiente`; con solo un registro el 24 SHALL devolver `streak` 0 y `peligro`; y con solo un registro el 22 SHALL devolver `streak` 0 y `desliz`.",
+      "WHEN `pillarStatus` corre con `today` `2026-10-26`, `since` `2026-10-26` y sin registros THE SYSTEM SHALL devolver `streak` 0 y `risk` `pendiente`.",
+      "WHEN una persona sin consentimiento llama `logEntry` THE SYSTEM SHALL devolver `{ ok: false, error: \"Primero acepta el Pacto.\" }` sin escribir, y WHEN ya aceptó y registra dos veces el mismo pilar el mismo día THE SYSTEM SHALL dejar una sola fila con `entry_date` igual a `mxDate(now)`.",
+      "WHEN la persona llama `revokeConsent` con `borrar` true THE SYSTEM SHALL dejar 0 filas `pacto_entry` suyas y `revoked_at` no nulo, y WHEN pide una posada de 31 días THE SYSTEM SHALL devolver `ok: false`.",
+      "WHEN un perfil sin relación con el muelle llama `giveConsent` THE SYSTEM SHALL lanzar el 404 de `assertPactoAccess`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/pacto-streak.test.ts tests/pacto.test.ts",
+      "pnpm --filter @jotapuntoce/summum test tests/guard.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/pacto || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-27-si-pacto-motor",
+    "files": [
+      "apps/summum/server/pacto/streak.ts",
+      "apps/summum/server/pacto/pacto.ts",
+      "apps/summum/server/auth/guard.ts",
+      "apps/summum/tests/pacto-streak.test.ts",
+      "apps/summum/tests/pacto.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T8",
+    "title": "Escuadras y retos con fecha del Pacto",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T7"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `squadBoard` corre para un miembro THE SYSTEM SHALL devolver objetos cuyas únicas llaves son `name` y `supportStatus`.",
+      "WHEN un miembro de la escuadra tiene un pilar en `peligro` THE SYSTEM SHALL mostrarlo con `supportStatus` `apoyo`, y WHEN todos sus pilares están `al_dia` THE SYSTEM SHALL mostrar `bien`.",
+      "WHEN `addSquadMember` recibe un perfil sin consentimiento vigente THE SYSTEM SHALL devolver `ok: false` sin insertar en `squad_member`, y WHEN alguien que no es miembro ni dueño llama `squadBoard` THE SYSTEM SHALL lanzar el 404.",
+      "WHEN un miembro consulta `squad_member` como rol `authenticated` THE SYSTEM SHALL ver los miembros de su escuadra y 0 filas `pacto_entry` de sus compañeros, y WHEN consulta un perfil fuera de la escuadra THE SYSTEM SHALL devolver 0 filas de `squad_member`.",
+      "WHEN `createChallenge` recibe `endsOn` antes de `startsOn` THE SYSTEM SHALL devolver `ok: false` sin escribir.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/squads.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/pacto || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-28-si-pacto-escuadras",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/summum/server/pacto/squads.ts",
+      "apps/summum/tests/squads.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T9",
+    "title": "Mi transformación y panel del Pacto",
+    "epic": "03-sinapsis-premios-pacto",
+    "dependencies": [
+      "E3-T8",
+      "E3-T4",
+      "E2-T8"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN la afiliada sin consentimiento abre `/red/[muelleId]/mi-transformacion` THE SYSTEM SHALL mostrar la casilla `Acepto que Summum guarde mis registros del Pacto` y ningún botón `Registrar hoy`.",
+      "WHEN la afiliada acepta THE SYSTEM SHALL mostrar el pilar `Cuerpo` con `Pendiente hoy`, y WHEN pulsa `Registrar hoy` THE SYSTEM SHALL mostrar `Al día` y `Racha 1`.",
+      "WHEN un perfil sin relación con el muelle abre `/red/[muelleId]/mi-transformacion` THE SYSTEM SHALL responder 404.",
+      "WHEN la afiliada abre `/red` THE SYSTEM SHALL mostrar el nombre del muelle con un enlace a su `mi-transformacion`.",
+      "WHEN un dueño del muelle crea el pilar `Descanso` en `/muelle/[muelleId]/pacto` THE SYSTEM SHALL responder 200 con un `h1` `Pacto` y mostrar `Descanso` en la lista de pilares."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-29-si-pacto-pantallas",
+    "files": [
+      "apps/summum/app/red/[muelleId]/mi-transformacion/page.tsx",
+      "apps/summum/app/muelle/[muelleId]/pacto/page.tsx",
+      "apps/summum/app/muelle/[muelleId]/layout.tsx",
+      "apps/summum/app/red/page.tsx",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T1",
+    "title": "Esquema de la comunidad: feed, calendario y aula",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E3-T8"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN se insertan un `post`, un `comment`, un `community_event`, un `course`, una `lesson` y un `lesson_completion` THE SYSTEM SHALL leerlos de vuelta.",
+      "WHEN se inserta un `course` con `min_level` 10, un `community_event` con `live_url` `http://ejemplo.com`, un `comment` con cuerpo vacío o un segundo `lesson_completion` de la misma lección y persona THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN una afiliada `activa` del muelle consulta `post`, `course` y `community_event` como rol `authenticated` THE SYSTEM SHALL ver las filas de su muelle, y WHEN consulta una afiliada `suspendida` o un empleado de un barco del muelle THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/comunidad-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-30-si-comunidad-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/comunidad-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T2",
+    "title": "Motor de comunidad: feed, calendario y niveles",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E4-T1",
+      "E3-T7"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `levelFor` recibe 0, 9, 10, 400 y 5000 THE SYSTEM SHALL devolver 1, 1, 2, 9 y 9.",
+      "WHEN una afiliada tiene 2 posts, 1 comentario y 1 lección completada en el muelle THE SYSTEM SHALL hacer que `memberPoints` le dé 10 puntos y `levelFor` nivel 2.",
+      "WHEN una afiliada `suspendida` llama `createPost` THE SYSTEM SHALL lanzar el 404 de `assertNetworkMember` sin escribir.",
+      "WHEN un dueño del muelle llama `createEvent` con `liveUrl` `http://ejemplo.com` THE SYSTEM SHALL devolver `ok: false`, y WHEN `listUpcoming` corre THE SYSTEM SHALL excluir los eventos que empezaron antes de `now`.",
+      "WHEN una afiliada que no es autora ni dueña del muelle llama `deletePost` THE SYSTEM SHALL devolver `{ ok: false, error: \"Revisa los datos del formulario.\" }` y el post SHALL seguir existiendo."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/comunidad.test.ts tests/guard.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/community || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-31-si-comunidad-motor",
+    "files": [
+      "apps/summum/server/community/feed.ts",
+      "apps/summum/server/community/events.ts",
+      "apps/summum/server/community/levels.ts",
+      "apps/summum/server/auth/guard.ts",
+      "apps/summum/tests/comunidad.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T3",
+    "title": "Motor del aula con candado por nivel",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E4-T2"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN una afiliada de nivel 1 llama `listCourses` THE SYSTEM SHALL devolver un curso con `min_level` 2 con `locked` true y sin lecciones, y WHEN llama `completeLesson` sobre una de sus lecciones THE SYSTEM SHALL devolver `ok: false` sin escribir.",
+      "WHEN la misma afiliada llega a 10 puntos THE SYSTEM SHALL devolver ese curso con `locked` false y sus lecciones.",
+      "WHEN la afiliada completa dos veces la misma lección THE SYSTEM SHALL dejar una sola fila `lesson_completion`.",
+      "WHEN un perfil que no es de la red llama `listCourses` THE SYSTEM SHALL lanzar el 404 de `assertNetworkMember`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/classroom.test.ts tests/comunidad.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/community || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-32-si-comunidad-aula",
+    "files": [
+      "apps/summum/server/community/classroom.ts",
+      "apps/summum/tests/classroom.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T4",
+    "title": "Referidos con atribución, comisión devengada y reporte",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E4-T1",
+      "E3-T7"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `ensureReferralLink` corre dos veces para la misma persona y muelle THE SYSTEM SHALL devolver el mismo `code` de 16 caracteres `[A-Za-z0-9_-]`.",
+      "WHEN el socio que propuso una atribución intenta aprobarla THE SYSTEM SHALL devolver `{ ok: false, error: \"Necesita la firma del otro dueño.\" }`, y WHEN la aprueba el otro socio THE SYSTEM SHALL fijar `approved_by` y `approved_at`.",
+      "WHEN `accrueCommissions` corre sobre una atribución aprobada de 2500 puntos base y un `ledger_entry` del barco dentro del recorrido con `summum_fee_cents` 1000 THE SYSTEM SHALL insertar una `referral_commission` de 250 centavos, y WHEN corre otra vez THE SYSTEM SHALL no insertar otra.",
+      "WHEN un `ledger_entry` del barco es anterior a `starts_at` o posterior al fin del recorrido THE SYSTEM SHALL no generar comisión.",
+      "WHEN el referente consulta `referral_commission` como rol `authenticated` THE SYSTEM SHALL ver sus comisiones, y WHEN consulta otro referente del mismo muelle THE SYSTEM SHALL devolver 0 filas de esas comisiones.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/referrals.test.ts tests/ledger.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/summum/server/referrals || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-33-si-referidos",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/summum/server/referrals/referrals.ts",
+      "apps/summum/tests/referrals.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T5",
+    "title": "Pantallas de aula, comunidad, calendario y referidos",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E4-T4",
+      "E4-T3",
+      "E3-T9"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN la afiliada abre `/red/[muelleId]/aula` THE SYSTEM SHALL responder 200 con un `h1` `Aula`, el texto `Nivel 1` y el curso `Ventas consultivas` con `Se abre en el nivel 9`.",
+      "WHEN la afiliada publica `Hola red` en `/red/[muelleId]/comunidad` THE SYSTEM SHALL responder 200 con un `h1` `Comunidad` y mostrar `Hola red` en el feed.",
+      "WHEN la afiliada abre `/red/[muelleId]/calendario` THE SYSTEM SHALL responder 200 con un `h1` `Calendario`.",
+      "WHEN la afiliada abre `/red/[muelleId]/referidos` THE SYSTEM SHALL responder 200 con un `h1` `Referidos` y un enlace que contiene `/r/`, y WHEN el dueño del muelle la abre THE SYSTEM SHALL mostrar `Devengado, no pagado`.",
+      "WHEN el perfil sin relación con el muelle abre `/red/[muelleId]/aula` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-34-si-comunidad-pantallas",
+    "files": [
+      "apps/summum/app/red/[muelleId]/aula/page.tsx",
+      "apps/summum/app/red/[muelleId]/comunidad/page.tsx",
+      "apps/summum/app/red/[muelleId]/calendario/page.tsx",
+      "apps/summum/app/red/[muelleId]/referidos/page.tsx",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T6",
+    "title": "Ranking entre afiliadas y página pública del enlace",
+    "epic": "04-comunidad",
+    "dependencies": [
+      "E4-T5",
+      "E2-T8"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `leaderboard` corre en un muelle con dos afiliadas activas de 10 y 30 puntos, una suspendida y un dueño del muelle con publicaciones THE SYSTEM SHALL devolver solo las dos activas, la de 30 primero, con `level` 3 y 2.",
+      "WHEN `referrerByCode` recibe un código que no cumple `/^[A-Za-z0-9_-]{16}$/` o que no existe THE SYSTEM SHALL devolver `null`.",
+      "WHEN la afiliada abre `/red/[muelleId]/ranking` THE SYSTEM SHALL responder 200 con un `h1` `Ranking de afiliadas`, su nombre y el texto `Nivel`.",
+      "WHEN un visitante sin sesión abre `/r/<código existente>` THE SYSTEM SHALL responder 200 con `Te recomendó`, y WHEN abre `/r/AAAAAAAAAAAAAAAA` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/summum test tests/leaderboard.test.ts",
+      "pnpm --filter @jotapuntoce/summum test:e2e red.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-35-si-ranking",
+    "files": [
+      "apps/summum/server/community/leaderboard.ts",
+      "apps/summum/app/red/[muelleId]/ranking/page.tsx",
+      "apps/summum/app/r/[code]/page.tsx",
+      "apps/summum/tests/leaderboard.test.ts",
+      "apps/summum/tests/e2e/red.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T1",
+    "title": "Accountability Chart: asientos, roles y responsables",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E4-T4"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN el dueño crea un asiento raíz y dos que cuelgan de él THE SYSTEM SHALL hacer que `listSeats` devuelva un árbol con la raíz y sus dos hijos en orden de `position`.",
+      "WHEN `updateSeat` intenta colgar un asiento de uno de sus descendientes THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN un empleado llama `createSeat` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN el dueño pone de responsable a un perfil que no es miembro THE SYSTEM SHALL devolver `code: \"NOT_FOUND\"`.",
+      "WHEN un empleado sin tipo de permiso consulta `seat` como rol `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta uno con grants `{\"equipo\":\"area\"}` THE SYSTEM SHALL ver los asientos de su org.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/organigrama.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/people || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-36-si-organigrama",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/people/seats.ts",
+      "apps/improvement/tests/organigrama.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T2",
+    "title": "1-a-1 y check-in semanal privados",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T1"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN un empleado manda dos check-ins en la misma semana THE SYSTEM SHALL dejar una sola fila con el `mood` del segundo y `week_start` igual a `weekStart(now)`.",
+      "WHEN un empleado llama `checkinsFor` sobre un compañero THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN manda `mood` 6 THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN un empleado consulta `checkin` y `one_on_one` como rol `authenticated` THE SYSTEM SHALL ver solo los suyos y 0 filas de un compañero, y WHEN consulta el dueño del org THE SYSTEM SHALL ver los de todo su equipo.",
+      "WHEN el dueño registra un 1-a-1 con un empleado THE SYSTEM SHALL hacer que `myOneOnOnes` de ese empleado lo devuelva y que el de otro empleado no.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/checkins.test.ts tests/direccion-week.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/people || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-37-si-checkin",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/people/checkins.ts",
+      "apps/improvement/tests/checkins.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T3",
+    "title": "People Analyzer privado y sin ranking",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T2"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN el dueño guarda la evaluación de un empleado con una calificación por cada valor central THE SYSTEM SHALL hacer que `myReviews` de ese empleado la devuelva.",
+      "WHEN un empleado consulta `people_review` como rol `authenticated` THE SYSTEM SHALL ver solo la suya y 0 filas de un compañero, y WHEN un empleado llama `reviewsForOwner` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`.",
+      "WHEN `reviewsForOwner` corre con dos empleados `Beto` y `Ana` donde Beto tiene mejores calificaciones THE SYSTEM SHALL devolver `Ana` primero y ninguna fila SHALL tener una llave `score` ni `total`.",
+      "WHEN `saveReview` recibe una calificación para un valor que no está en `core_values`, o el org no tiene visión THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/people-review.test.ts tests/responsibility.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/people || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-38-si-people-analyzer",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/people/reviews.ts",
+      "apps/improvement/tests/people-review.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T4",
+    "title": "Pantallas de organigrama, check-in y People Analyzer",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T3"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/equipo/organigrama` THE SYSTEM SHALL responder 200 con un `h1` `Accountability Chart` y el asiento `Dirección general`, y axe-core SHALL reportar 0 violaciones serious o critical.",
+      "WHEN el dueño abre `/[org]/equipo/checkin` y `/[org]/equipo/analizador` THE SYSTEM SHALL responder 200 con los `h1` `Check-in semanal` y `People Analyzer` respectivamente, y axe-core SHALL reportar 0 violaciones serious o critical en cada una.",
+      "WHEN el empleado sin tipo de permiso abre `/[org]/equipo/checkin` THE SYSTEM SHALL responder 200 con la opción `Muy bien`, y WHEN abre `/[org]/equipo/organigrama` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e personas.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-39-si-personas-pantallas",
+    "files": [
+      "apps/improvement/app/[org]/equipo/organigrama/page.tsx",
+      "apps/improvement/app/[org]/equipo/checkin/page.tsx",
+      "apps/improvement/app/[org]/equipo/analizador/page.tsx",
+      "apps/improvement/tests/e2e/personas.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T5",
+    "title": "Celebraciones automáticas e insights de cultura agregados",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T4"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `cultureInsights` corre sobre una semana con 2 check-ins THE SYSTEM SHALL devolver `averageMood` null para esa semana, y WHEN la semana tiene check-ins de 3, 4 y 5 THE SYSTEM SHALL devolver `averageMood` 4 y `responses` 3.",
+      "WHEN se recorre el resultado de `cultureInsights` THE SYSTEM SHALL no contener ningún `profile_id` ni nombre de persona.",
+      "WHEN un miembro aceptó hace 2 años y su aniversario cae en 3 días THE SYSTEM SHALL incluirlo en `celebrations`, y WHEN un empleado sin la sección `equipo` llama `celebrations` THE SYSTEM SHALL devolver `[]`.",
+      "WHEN el dueño abre `/[org]/equipo/cultura` THE SYSTEM SHALL responder 200 con un `h1` `Cultura` y axe-core SHALL reportar 0 violaciones serious o critical.",
+      "WHEN el empleado sin tipo de permiso abre `/[org]/equipo/cultura` THE SYSTEM SHALL responder 404."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/culture.test.ts",
+      "pnpm --filter improvement test:e2e personas.spec.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/people || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-40-si-cultura",
+    "files": [
+      "apps/improvement/server/people/culture.ts",
+      "apps/improvement/app/[org]/equipo/cultura/page.tsx",
+      "apps/improvement/tests/culture.test.ts",
+      "apps/improvement/tests/e2e/personas.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T6",
+    "title": "Lealtad: niveles VIP, experiencias y KPI de retorno",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T3",
+      "E1-T10"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN un org tiene este mes experiencias por 10000 centavos y tratos ganados por 100000 centavos THE SYSTEM SHALL devolver `10` para `retorno_experiencias` con `{}`, y WHEN no tiene tratos ganados THE SYSTEM SHALL devolver `0`.",
+      "WHEN un cliente tiene 3 tratos ganados y el org tiene niveles con `min_purchases` 0, 2 y 5 THE SYSTEM SHALL hacer que `tierForClient` devuelva el de 2.",
+      "WHEN `setFeatures` recibe la llave `cashback` THE SYSTEM SHALL devolver `code: \"VALIDATION_ERROR\"` sin escribir.",
+      "WHEN un empleado sin `{\"clientes\":\"empresa\"}` llama `grantExperience` THE SYSTEM SHALL devolver `code: \"FORBIDDEN\"`, y WHEN consulta `experience_grant` como rol `authenticated` sin tipo de permiso THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN se inserta un `client` con un `wallet_token` repetido THE SYSTEM SHALL rechazar el insert en la base.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/lealtad.test.ts tests/crm.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/crm || status=$?; test \"$status\" -eq 1",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-41-si-lealtad-motor",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/server/crm/loyalty.ts",
+      "apps/improvement/server/kpis/sources.ts",
+      "apps/improvement/tests/lealtad.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T7",
+    "title": "Monedero web del cliente final y gate completo",
+    "epic": "05-personas-lealtad",
+    "dependencies": [
+      "E5-T6",
+      "E5-T5",
+      "E4-T6",
+      "E3-T5",
+      "E2-T2",
+      "E1-T10"
+    ],
+    "priority": "p2",
+    "acceptance": [
+      "WHEN `issueWalletToken` corre THE SYSTEM SHALL guardar un token de 32 caracteres `[A-Za-z0-9_-]`, y WHEN corre otra vez para el mismo cliente THE SYSTEM SHALL reemplazarlo y `loadWallet` con el token anterior SHALL devolver `null`.",
+      "WHEN `loadWallet` recibe un token válido THE SYSTEM SHALL devolver un objeto cuyas llaves son exactamente `orgName`, `clientName`, `tierName`, `perks` y `experiences`, y cada experiencia SHALL tener solo `title` y `grantedOn`.",
+      "WHEN un visitante sin sesión abre `/w/<token>` THE SYSTEM SHALL responder 200 con `Cena de aniversario` y un HTML que no contiene el id del cliente ni el texto `50000`, y WHEN abre `/w/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA` THE SYSTEM SHALL responder 404.",
+      "WHEN el dueño abre `/[org]/clientes/lealtad` THE SYSTEM SHALL responder 200 con un `h1` `Lealtad` y 0 violaciones serious o critical, y WHEN la abre el empleado sin la sección `clientes` THE SYSTEM SHALL responder 404.",
+      "WHEN `pnpm --filter improvement test:e2e` y `pnpm --filter @jotapuntoce/summum test:e2e` corren completos THE SYSTEM SHALL salir con código 0 en ambos.",
+      "WHEN `pnpm build` corre THE SYSTEM SHALL salir con código 0 para todas las apps del monorepo."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/wallet.test.ts tests/lealtad.test.ts",
+      "pnpm --filter improvement test:e2e",
+      "pnpm --filter @jotapuntoce/summum test:e2e",
+      "pnpm build",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/crm || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-42-si-monedero",
+    "files": [
+      "apps/improvement/server/crm/wallet.ts",
+      "apps/improvement/app/w/[token]/page.tsx",
+      "apps/improvement/app/[org]/clientes/lealtad/page.tsx",
+      "apps/improvement/tests/wallet.test.ts",
+      "apps/improvement/tests/e2e/lealtad.spec.ts"
+    ],
+    "status": "pending"
+  }
+]
