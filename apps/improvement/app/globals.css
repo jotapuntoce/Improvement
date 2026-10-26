@@ -558,6 +558,13 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   color: var(--text-secondary);
 }
 
+/* El enlace a Dirección de app/[org]/layout.tsx: el mismo chip que "← Volver al edificio", una
+   fila abajo en la columna derecha (libre en todas las rutas [org]). Mismo color que ese chip: estas
+   páginas pintan sobre el fondo claro del body y --text-secondary ahí queda en 2.29:1. */
+.direccion-nav .jpc-back-link--fixed {
+  top: 56px;
+}
+
 /* --- Áreas del organigrama (/empresas/configuracion) — misma fila que .config-kpi-row. --- */
 .config-area-row {
   display: grid;

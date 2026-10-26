@@ -71,7 +71,7 @@ describe("updateVisionSection", () => {
     const eight = Array.from({ length: 8 }, (_, i) => `Valor ${i}`);
     expect(await updateVisionSection(owner, o, "core_values", eight)).toMatchObject({
       ok: false,
-      error: { code: "VALIDATION_ERROR" },
+      error: { code: "VALIDATION_ERROR", message: expect.stringContaining("máximo 7 valores") },
     });
     expect(await updateVisionSection(owner, o, "mision", ["x"])).toMatchObject({
       ok: false,

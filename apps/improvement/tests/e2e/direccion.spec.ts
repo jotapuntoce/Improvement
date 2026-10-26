@@ -291,12 +291,16 @@ test.describe("Junta", () => {
   test("WHEN el dueño recorre, califica con 9 y cierra THE SYSTEM SHALL mostrar Promedio 9.0 y quitar la tarjeta", async ({ page, context, baseURL }) => {
     await as(context, ownerToken, baseURL);
     await page.goto(sesion());
+    // Nueve viajes al servidor contra el Supabase remoto no caben en los 30 s por defecto.
+    test.slow();
+    // La URL no cambia al avanzar, así que waitForURL no espera nada: se espera a que cambie el bloque.
+    const current = page.locator('li[aria-current="step"]');
     for (let i = 0; i < 6; i++) {
+      const before = await current.textContent();
       await page.getByRole("button", { name: "Siguiente bloque" }).click();
-      await page.waitForURL(`**/direccion/junta?id=${meetingId}`);
-      await page.waitForLoadState("networkidle");
+      await expect(current).not.toHaveText(before ?? "");
     }
-    await expect(page.locator('li[aria-current="step"]')).toContainText("Cierre");
+    await expect(current).toContainText("Cierre");
 
     const rate = page.getByRole("form", { name: "Calificar la junta" });
     await rate.getByLabel("Calificación (1-10)").fill("9");

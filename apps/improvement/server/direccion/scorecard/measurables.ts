@@ -86,11 +86,11 @@ export async function listScorecard(userId: string, orgId: string, now = new Dat
 }
 
 const measurableSchema = z.object({
-  title: z.string().trim().min(3, "Ponle un nombre de al menos 3 letras.").max(120),
-  ownerProfileId: z.uuid(),
-  goal: z.coerce.number().finite(),
-  goalDirection: z.enum(MEASURABLE_DIRECTIONS),
-  unit: z.enum(MEASURABLE_UNITS),
+  title: z.string().trim().min(3, "Ponle un nombre de al menos 3 letras.").max(120, "El nombre cabe en 120 caracteres."),
+  ownerProfileId: z.uuid("Elige quién es responsable."),
+  goal: z.coerce.number("La meta tiene que ser un número.").finite("La meta tiene que ser un número."),
+  goalDirection: z.enum(MEASURABLE_DIRECTIONS, "Elige si la meta es mínimo o máximo."),
+  unit: z.enum(MEASURABLE_UNITS, "Elige la unidad."),
 });
 
 export async function createMeasurable(userId: string, orgId: string, input: unknown): Promise<Result<{ id: string }>> {
@@ -126,8 +126,8 @@ export async function archiveMeasurable(userId: string, orgId: string, measurabl
 }
 
 const valueSchema = z.object({
-  weekStart: z.iso.date(),
-  value: z.coerce.number().finite(),
+  weekStart: z.iso.date("Esa semana no es válida."),
+  value: z.coerce.number("El valor tiene que ser un número.").finite("El valor tiene que ser un número."),
 });
 
 export async function enterValue(

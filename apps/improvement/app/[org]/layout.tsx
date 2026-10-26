@@ -23,8 +23,10 @@ export default async function OrgLayout({
     <>
       <BackLink href={`/empresas/${org}`} label="Volver al edificio" />
       {direccion.length > 0 && (
-        <nav aria-label="Dirección">
-          <Link href={`/${org}/direccion`}>Dirección</Link>
+        <nav aria-label="Dirección" className="direccion-nav">
+          <Link href={`/${org}/direccion`} className="jpc-back-link jpc-back-link--fixed">
+            Dirección
+          </Link>
         </nav>
       )}
       {children}
