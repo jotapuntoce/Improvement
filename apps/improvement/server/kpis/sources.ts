@@ -10,9 +10,9 @@
 // Ningún adaptador nombra un org, empresa o empleado literal: todo entra por `orgIds` y `config`
 // (.claude/rules/motor-generico.md).
 import { z } from "zod";
-import { and, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, client, employeePointsLedger, membership, objective, profile } from "@jotapuntoce/db/schema";
+import { area, client, employeePointsLedger, membership, objective, profile, project } from "@jotapuntoce/db/schema";
 
 /** Una fila de org_kpi tal como la usa el panel. */
 export interface KpiRow {
@@ -33,6 +33,16 @@ const objetivosConfig = z.object({
   areaId: z.uuid().nullish(),
 });
 const clientesConfig = z.object({ enRiesgo: z.boolean().default(false) });
+const proyectosConfig = z.object({
+  estado: z.enum(["por_autorizar", "en_obra", "avance_promedio"]).default("en_obra"),
+});
+const pendientesConfig = z.object({ responsable: z.enum(["todos", "con", "sin"]).default("todos") });
+
+const PROYECTOS_TEXTO: Record<z.infer<typeof proyectosConfig>["estado"], string> = {
+  por_autorizar: "Proyectos por autorizar",
+  en_obra: "Proyectos en obra",
+  avance_promedio: "Avance promedio de obra",
+};
 
 /**
  * La config guardada, o la que sale de `{}` si la fila trae basura. Nunca lanza: un jsonb escrito a
@@ -157,6 +167,52 @@ export const KPI_SOURCES: KpiSource[] = [
           .from(client)
           .where(and(...filters))
           .groupBy(client.orgId),
+      );
+    },
+  },
+  {
+    id: "proyectos",
+    label: "Proyectos",
+    describe: (raw) => PROYECTOS_TEXTO[parseConfig(proyectosConfig, raw).estado],
+    // Solo proyectos activos: uno pausado o entregado ya no es obra en curso ni espera decisión.
+    load: async (orgIds, raw) => {
+      const c = parseConfig(proyectosConfig, raw);
+      const authorization = c.estado === "por_autorizar" ? "pendiente" : "autorizado";
+      const where = and(
+        inArray(project.orgId, orgIds),
+        eq(project.status, "activo"),
+        eq(project.authorizationStatus, authorization),
+      );
+      if (c.estado !== "avance_promedio") {
+        return byOrg(
+          await db.select({ orgId: project.orgId, value: count }).from(project).where(where).groupBy(project.orgId),
+        );
+      }
+      const avg = byOrg(
+        await db
+          .select({ orgId: project.orgId, value: sql<number>`avg(${project.progress})` })
+          .from(project)
+          .where(where)
+          .groupBy(project.orgId),
+      );
+      return new Map([...avg].map(([orgId, value]) => [orgId, Math.round(value)]));
+    },
+  },
+  {
+    id: "pendientes",
+    label: "Pendientes de Dirección",
+    describe: () => "Pendientes abiertos de los issues",
+    load: async (orgIds, raw) => {
+      const c = parseConfig(pendientesConfig, raw);
+      const filters = [inArray(objective.orgId, orgIds), isNotNull(objective.needId), ne(objective.status, "completed")];
+      if (c.responsable === "con") filters.push(isNotNull(objective.assignedEmployeeId));
+      else if (c.responsable === "sin") filters.push(isNull(objective.assignedEmployeeId));
+      return byOrg(
+        await db
+          .select({ orgId: objective.orgId, value: count })
+          .from(objective)
+          .where(and(...filters))
+          .groupBy(objective.orgId),
       );
     },
   },

@@ -89,7 +89,7 @@
       "apps/improvement/server/kpis/sources.ts",
       "apps/improvement/tests/kpi-erp.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T4",
