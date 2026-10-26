@@ -295,6 +295,10 @@ export const orgNeed = pgTable(
  * Distinto de `assembly` (Planos): eso es la herramienta con la que Jose Carlos dibuja cómo se
  * arma un producto. Esto es la cartera de trabajo del cliente.
  */
+// Antes de `project` y no junto a las de Dirección: pgTable evalúa el `enum` al definir la tabla.
+export const PROJECT_AUTHORIZATION = ["pendiente", "autorizado", "rechazado"] as const;
+export const STAGE_STATUSES = ["pendiente", "en_curso", "terminada"] as const;
+
 export const project = pgTable(
   "project",
   {
@@ -313,14 +317,57 @@ export const project = pgTable(
     // cero objetivos cerrados, y un porcentaje calculado mentiría con cara de dato duro.
     progress: integer("progress").notNull().default(0),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    // Proyectos/obra (blueprint summum-improvement §4): un proyecto nace 'pendiente' y el dueño lo
+    // autoriza. Los que ya existían quedan 'autorizado' en la migración proyectos_rls.
+    authorizationStatus: text("authorization_status", { enum: PROJECT_AUTHORIZATION })
+      .notNull()
+      .default("pendiente"),
+    authorizedBy: uuid("authorized_by").references(() => profile.id, { onDelete: "set null" }),
+    authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+    ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("idx_project_org_id").on(t.orgId),
     index("idx_project_org_status").on(t.orgId, t.status),
+    index("idx_project_org_authorization").on(t.orgId, t.authorizationStatus),
     check("project_status_check", sql`${t.status} in ('activo','pausado','terminado')`),
     check("project_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    check(
+      "project_authorization_check",
+      sql`${t.authorizationStatus} in ('pendiente','autorizado','rechazado')`,
+    ),
+  ],
+);
+
+/**
+ * Las etapas de un proyecto. `weight` dice cuánto pesa cada una en el avance del proyecto y
+ * `progress` cuánto lleva; el avance ponderado lo calcula server/erp/projects.ts, no una columna.
+ */
+export const projectStage = pgTable(
+  "project_stage",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull().default(0),
+    weight: integer("weight").notNull().default(1),
+    progress: integer("progress").notNull().default(0),
+    status: text("status", { enum: STAGE_STATUSES }).notNull().default("pendiente"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_project_stage_project_position").on(t.projectId, t.position),
+    check("project_stage_weight_range", sql`${t.weight} >= 1 AND ${t.weight} <= 100`),
+    check("project_stage_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    check("project_stage_status_check", sql`${t.status} in ('pendiente','en_curso','terminada')`),
   ],
 );
 /**
@@ -753,7 +800,7 @@ export const orgKpi = pgTable(
     index("idx_org_kpi_org_position").on(t.orgId, t.position),
     check(
       "org_kpi_source_check",
-      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual')`,
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],

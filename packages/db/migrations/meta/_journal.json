@@ -218,6 +218,20 @@
       "when": 1792798897249,
       "tag": "0030_direccion_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793058256172,
+      "tag": "0031_majestic_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793058259031,
+      "tag": "0032_proyectos_rls",
+      "breakpoints": true
     }
   ]
 }
