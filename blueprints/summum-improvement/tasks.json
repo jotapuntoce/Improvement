@@ -60,7 +60,7 @@
       "apps/improvement/server/erp/projects.ts",
       "apps/improvement/tests/erp-projects.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T3",
