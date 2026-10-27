@@ -118,3 +118,6 @@ export async function tierForClient(orgId: string, clientId: string): Promise<Lo
     .limit(1);
   return tier ?? null;
 }
+
+// Las rutas no importan @jotapuntoce/db: la página lee las llaves desde aquí.
+export { LOYALTY_FEATURES };

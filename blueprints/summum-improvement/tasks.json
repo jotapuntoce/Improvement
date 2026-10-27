@@ -1353,6 +1353,6 @@
       "apps/improvement/tests/wallet.test.ts",
       "apps/improvement/tests/e2e/lealtad.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   }
 ]
