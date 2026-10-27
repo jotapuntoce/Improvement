@@ -480,6 +480,63 @@ export const client = pgTable(
   ],
 );
 
+// ── CRM (blueprint summum-improvement §4) ────────────────────────────────────────────────────────
+// Antes de `deal`: pgTable evalúa el `enum` al definir la tabla.
+export const DEAL_STAGES = ["prospecto", "propuesta", "negociacion", "ganado", "perdido"] as const;
+
+/**
+ * La hiperpersonalización de un cliente: sus respuestas a las seis preguntas de HIPER_QUESTIONS
+ * (server/crm/preferences.ts) y, si se le falló, qué expectativa no se cumplió. Una fila por cliente.
+ */
+export const clientPreference = pgTable(
+  "client_preference",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .unique()
+      .references(() => client.id, { onDelete: "cascade" }),
+    answers: jsonb("answers").notNull().default(sql`'{}'::jsonb`),
+    unmetNote: text("unmet_note"),
+    unmetFlaggedAt: timestamp("unmet_flagged_at", { withTimezone: true }),
+    updatedBy: uuid("updated_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+);
+
+/** Un trato de venta con un cliente. Cerrado ⇔ `ganado` o `perdido`, y la base lo hace cumplir. */
+export const deal = pgTable(
+  "deal",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    currency: text("currency").notNull().default("mxn"),
+    stage: text("stage", { enum: DEAL_STAGES }).notNull().default("prospecto"),
+    ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_deal_org_stage").on(t.orgId, t.stage),
+    index("idx_deal_client").on(t.clientId),
+    check("deal_stage_check", sql`${t.stage} in ('prospecto','propuesta','negociacion','ganado','perdido')`),
+    check("deal_amount_nonneg", sql`${t.amountCents} >= 0`),
+    check("deal_closed_consistency", sql`(${t.stage} in ('ganado','perdido')) = (${t.closedAt} is not null)`),
+  ],
+);
+
 export const aiSuggestion = pgTable(
   "ai_suggestion",
   {
@@ -495,7 +552,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento')`),
   ],
 );
 
@@ -800,7 +857,7 @@ export const orgKpi = pgTable(
     index("idx_org_kpi_org_position").on(t.orgId, t.position),
     check(
       "org_kpi_source_check",
-      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes')`,
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],

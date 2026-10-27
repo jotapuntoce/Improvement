@@ -232,6 +232,20 @@
       "when": 1793058259031,
       "tag": "0032_proyectos_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793061352779,
+      "tag": "0033_glossy_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793061355752,
+      "tag": "0034_crm_rls",
+      "breakpoints": true
     }
   ]
 }

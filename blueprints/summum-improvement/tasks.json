@@ -153,7 +153,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/crm-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T6",
