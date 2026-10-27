@@ -989,7 +989,7 @@
       "apps/summum/server/auth/guard.ts",
       "apps/summum/tests/comunidad.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T3",

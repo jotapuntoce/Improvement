@@ -86,6 +86,21 @@ export async function assertPactoAccess(userId: string, muelleId: string): Promi
   notFound();
 }
 
+/** La comunidad: dueño del muelle o afiliada `activa` del muelle. Empleados de barco no entran. */
+export async function assertNetworkMember(userId: string, muelleId: string): Promise<void> {
+  if (!UUID.test(muelleId)) notFound();
+  const [dock, aff] = await Promise.all([
+    ownedOrg(userId, muelleId),
+    db
+      .select({ id: affiliate.id })
+      .from(affiliate)
+      .where(and(eq(affiliate.profileId, userId), eq(affiliate.muelleOrgId, muelleId), eq(affiliate.status, "activa")))
+      .limit(1),
+  ]);
+  if (dock?.kind === "muelle" || aff.length > 0) return;
+  notFound();
+}
+
 export async function listMyDocks(userId: string) {
   return db
     .select({ id: organization.id, name: organization.name })
