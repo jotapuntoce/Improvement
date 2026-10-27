@@ -409,7 +409,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/afiliadas-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T4",

@@ -172,6 +172,8 @@ export const area = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color").notNull(),
+    // La especialidad de la red (specialty.key) que atiende esta área. Dato, no FK: la red vive en otro org.
+    specialtyKey: text("specialty_key"),
     createdAt: createdAt(),
   },
   (t) => [index("idx_area_org_id").on(t.orgId)],
@@ -1229,5 +1231,138 @@ export const meetingRating = pgTable(
   (t) => [
     unique("uq_meeting_rating_person").on(t.meetingId, t.profileId),
     check("meeting_rating_range", sql`${t.rating} between 1 and 10`),
+  ],
+);
+
+// ─── Red de afiliadas (blueprint summum-improvement §4) ────────────────────────────────────────
+
+export const AFFILIATE_STATUSES = ["activa", "suspendida"] as const;
+export const PERSONALITY_SUBJECTS = ["afiliada", "dueno"] as const;
+
+const FRECUENCIA = [
+  { value: "siempre", label: "Siempre" },
+  { value: "casi_siempre", label: "Casi siempre" },
+  { value: "a_veces", label: "A veces" },
+] as const;
+
+export const PERSONALITY_VERSION = 1;
+
+/** Cuestionario de personalidad y enfoque, v1. Producto, no cliente: lo usan Summum e Improvement. */
+export const PERSONALITY_QUESTIONS = [
+  { key: "valor_cumplir", question: "Cumplo lo que prometo, en tiempo y forma.", options: FRECUENCIA },
+  { key: "valor_venta_pull", question: "Vendo sin presionar: el cliente llega porque ve el valor.", options: FRECUENCIA },
+  { key: "valor_relacion", question: "Conozco a fondo a cada cliente y personalizo lo que le doy.", options: FRECUENCIA },
+  { key: "valor_retorno", question: "Reinvierto en experiencias para mis clientes, no en descuentos.", options: FRECUENCIA },
+  { key: "valor_transformacion", question: "Trabajo en mi propia transformación: cuerpo, mente y orden.", options: FRECUENCIA },
+  {
+    key: "ritmo",
+    question: "¿A qué ritmo trabajas mejor?",
+    options: [
+      { value: "rapido_iterativo", label: "Rápido, probando y corrigiendo" },
+      { value: "constante_planeado", label: "Constante y planeado" },
+      { value: "por_proyectos", label: "Por proyectos, con picos de trabajo" },
+    ],
+  },
+  {
+    key: "comunicacion",
+    question: "¿Cómo prefieres comunicarte?",
+    options: [
+      { value: "directo_breve", label: "Directo y breve" },
+      { value: "detallado_escrito", label: "Detallado y por escrito" },
+      { value: "conversado", label: "Conversado, en persona o llamada" },
+    ],
+  },
+  {
+    key: "decision",
+    question: "¿Cómo tomas decisiones?",
+    options: [
+      { value: "datos", label: "Con datos" },
+      { value: "experiencia", label: "Con experiencia e intuición" },
+      { value: "consenso", label: "En consenso con el equipo" },
+    ],
+  },
+  {
+    key: "tipo_negocio",
+    question: "¿Con qué tipo de negocio trabajas mejor?",
+    options: [
+      { value: "servicios", label: "Servicios" },
+      { value: "productos", label: "Productos" },
+      { value: "proyectos_obra", label: "Proyectos y obra" },
+    ],
+  },
+] as const;
+
+/** true solo con exactamente las nueve llaves y cada valor dentro de sus options. */
+export function personalityAnswersValid(answers: unknown): answers is Record<string, string> {
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
+  const entries = answers as Record<string, unknown>;
+  if (Object.keys(entries).length !== PERSONALITY_QUESTIONS.length) return false;
+  return PERSONALITY_QUESTIONS.every((q) => q.options.some((o) => o.value === entries[q.key]));
+}
+
+/** Porcentaje (0-100, redondeado) de respuestas iguales entre dos cuestionarios. */
+export function personalityMatch(a: Record<string, string>, b: Record<string, string>): number {
+  const iguales = PERSONALITY_QUESTIONS.filter((q) => a[q.key] !== undefined && a[q.key] === b[q.key]).length;
+  return Math.round((iguales / PERSONALITY_QUESTIONS.length) * 100);
+}
+
+export const specialty = pgTable(
+  "specialty",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_specialty_muelle_key").on(t.muelleOrgId, t.key)],
+);
+
+export const affiliate = pgTable(
+  "affiliate",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "set null" }),
+    displayName: text("display_name").notNull(),
+    specialtyKeys: text("specialty_keys").array().notNull().default(sql`'{}'`),
+    status: text("status", { enum: AFFILIATE_STATUSES }).notNull().default("activa"),
+    publicSlug: text("public_slug").notNull().unique(),
+    publicBio: text("public_bio"),
+    directoryOptIn: boolean("directory_opt_in").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_affiliate_profile_muelle").on(t.profileId, t.muelleOrgId),
+    check("affiliate_status_check", sql`${t.status} in ('activa','suspendida')`),
+  ],
+);
+
+export const personalityProfile = pgTable(
+  "personality_profile",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: PERSONALITY_SUBJECTS }).notNull(),
+    // El org donde contestó el dueño; null para una afiliada.
+    orgId: uuid("org_id").references(() => organization.id, { onDelete: "set null" }),
+    answers: jsonb("answers").notNull(),
+    questionnaireVersion: integer("questionnaire_version").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_personality_profile_subject").on(t.profileId, t.subjectKind),
+    check("personality_subject_check", sql`${t.subjectKind} in ('afiliada','dueno')`),
   ],
 );

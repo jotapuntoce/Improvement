@@ -260,6 +260,20 @@
       "when": 1793071509842,
       "tag": "0036_postventa_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793072831231,
+      "tag": "0037_green_psynapse",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793072833943,
+      "tag": "0038_afiliadas_rls",
+      "breakpoints": true
     }
   ]
 }
