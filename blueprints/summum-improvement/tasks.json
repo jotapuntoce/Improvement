@@ -502,7 +502,7 @@
       "apps/improvement/server/seal/score.ts",
       "apps/improvement/tests/seal-score.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T7",
