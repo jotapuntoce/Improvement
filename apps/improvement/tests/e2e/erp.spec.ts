@@ -5,7 +5,7 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { client, deal, organization, profile, membership, project } from "@jotapuntoce/db/schema";
+import { client, deal, organization, profile, membership, project, ticket } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -44,6 +44,7 @@ test.beforeAll(async () => {
   const [cliente] = await db.insert(client).values({ orgId, name: "Cliente Uno" }).returning();
   if (!cliente) throw new Error("insert de client no devolvió fila");
   await db.insert(deal).values({ orgId, clientId: cliente.id, title: "Remodelación baño", amountCents: 1250000 });
+  await db.insert(ticket).values({ orgId, clientId: cliente.id, title: "Fuga en regadera" });
 
   ownerToken = await signInTestUser(OWNER_EMAIL, OWNER_PASSWORD);
   employeeToken = await signInTestUser(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
@@ -126,6 +127,30 @@ test.describe("CRM", () => {
   test("WHEN un empleado sin tipo de permiso abre /[org]/clientes/pipeline THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
     await as(context, employeeToken, baseURL);
     const response = await page.goto(`/${orgId}/clientes/pipeline`);
+    expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("Postventa", () => {
+  test("WHEN el dueño abre /[org]/postventa THE SYSTEM SHALL responder 200 con el ticket bajo Abiertos y sin violaciones serias de axe", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/postventa`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1, name: "Postventa" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Abiertos" })).toContainText("Fuga en regadera");
+    await expectNoSeriousA11y(page);
+  });
+
+  test("WHEN el dueño resuelve el ticket THE SYSTEM SHALL mostrarlo bajo Resueltos", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/postventa`);
+    await page.getByRole("button", { name: "Resolver: Fuga en regadera" }).click();
+    await expect(page.getByRole("region", { name: "Resueltos" })).toContainText("Fuga en regadera");
+  });
+
+  test("WHEN un empleado sin la sección abre /[org]/postventa THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(`/${orgId}/postventa`);
     expect(response?.status()).toBe(404);
   });
 });

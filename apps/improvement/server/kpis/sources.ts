@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { and, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, client, deal, employeePointsLedger, membership, objective, profile, project } from "@jotapuntoce/db/schema";
+import { area, client, deal, employeePointsLedger, membership, objective, profile, project, ticket } from "@jotapuntoce/db/schema";
 import { mxMonthStart } from "../crm/deals.ts";
 
 /** Una fila de org_kpi tal como la usa el panel. */
@@ -40,6 +40,14 @@ const proyectosConfig = z.object({
 const ventasConfig = z.object({
   metrica: z.enum(["monto_ganado", "tratos_ganados"]).default("monto_ganado"),
 });
+const postventaConfig = z.object({
+  metrica: z.enum(["abiertos", "satisfaccion_promedio", "horas_promedio_resolucion"]).default("abiertos"),
+});
+const POSTVENTA_TEXTO: Record<z.infer<typeof postventaConfig>["metrica"], string> = {
+  abiertos: "Tickets de postventa sin resolver",
+  satisfaccion_promedio: "Satisfacción promedio de los tickets resueltos (1-5)",
+  horas_promedio_resolucion: "Horas promedio para resolver un ticket",
+};
 const pendientesConfig =z.object({ responsable: z.enum(["todos", "con", "sin"]).default("todos") });
 
 const PROYECTOS_TEXTO: Record<z.infer<typeof proyectosConfig>["estado"], string> = {
@@ -247,6 +255,36 @@ export const KPI_SOURCES: KpiSource[] = [
       );
       if (c.metrica === "tratos_ganados") return perOrg;
       return new Map([...perOrg].map(([orgId, cents]) => [orgId, Math.round(cents / 100)]));
+    },
+  },
+  {
+    id: "postventa",
+    label: "Postventa",
+    describe: (raw) => POSTVENTA_TEXTO[parseConfig(postventaConfig, raw).metrica],
+    load: async (orgIds, raw) => {
+      const { metrica } = parseConfig(postventaConfig, raw);
+      if (metrica === "abiertos") {
+        return byOrg(
+          await db
+            .select({ orgId: ticket.orgId, value: count })
+            .from(ticket)
+            .where(and(inArray(ticket.orgId, orgIds), ne(ticket.status, "resuelto")))
+            .groupBy(ticket.orgId),
+        );
+      }
+      const value =
+        metrica === "satisfaccion_promedio"
+          ? sql<number>`avg(${ticket.satisfaction})`
+          : sql<number>`avg(extract(epoch from ${ticket.resolvedAt} - ${ticket.openedAt}) / 3600)`;
+      const perOrg = byOrg(
+        await db
+          .select({ orgId: ticket.orgId, value })
+          .from(ticket)
+          .where(and(inArray(ticket.orgId, orgIds), eq(ticket.status, "resuelto")))
+          .groupBy(ticket.orgId),
+      );
+      const round = metrica === "satisfaccion_promedio" ? (n: number) => Math.round(n * 10) / 10 : Math.round;
+      return new Map([...perOrg].map(([orgId, n]) => [orgId, round(n)]));
     },
   },
   {
