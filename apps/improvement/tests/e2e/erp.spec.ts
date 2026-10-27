@@ -5,7 +5,7 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { organization, profile, membership, project } from "@jotapuntoce/db/schema";
+import { client, deal, organization, profile, membership, project } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -41,6 +41,9 @@ test.beforeAll(async () => {
     { userId: employeeId, orgId, role: "employee", acceptedAt: new Date() },
   ]);
   await db.insert(project).values({ orgId, name: "Obra norte", status: "activo", authorizationStatus: "pendiente" });
+  const [cliente] = await db.insert(client).values({ orgId, name: "Cliente Uno" }).returning();
+  if (!cliente) throw new Error("insert de client no devolvió fila");
+  await db.insert(deal).values({ orgId, clientId: cliente.id, title: "Remodelación baño", amountCents: 1250000 });
 
   ownerToken = await signInTestUser(OWNER_EMAIL, OWNER_PASSWORD);
   employeeToken = await signInTestUser(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
@@ -97,6 +100,32 @@ test.describe("Proyectos", () => {
   test("WHEN un empleado sin la sección abre /[org]/proyectos THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
     await as(context, employeeToken, baseURL);
     const response = await page.goto(`/${orgId}/proyectos`);
+    expect(response?.status()).toBe(404);
+  });
+});
+
+test.describe("CRM", () => {
+  test("WHEN el dueño abre /[org]/clientes/pipeline THE SYSTEM SHALL responder 200 con el trato bajo Prospecto y sin violaciones serias de axe", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    const response = await page.goto(`/${orgId}/clientes/pipeline`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1, name: "Pipeline de ventas" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Prospecto" })).toContainText("Remodelación baño");
+    await expectNoSeriousA11y(page);
+  });
+
+  test("WHEN el dueño abre /[org]/clientes THE SYSTEM SHALL mostrar Pipeline de ventas y la Ficha lleva a Cliente Uno con las seis preguntas", async ({ page, context, baseURL }) => {
+    await as(context, ownerToken, baseURL);
+    await page.goto(`/${orgId}/clientes`);
+    await expect(page.getByRole("link", { name: "Pipeline de ventas" })).toBeVisible();
+    await page.getByRole("link", { name: "Ficha" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Cliente Uno" })).toBeVisible();
+    await expect(page.getByRole("form", { name: "Hiperpersonalización" }).getByRole("textbox")).toHaveCount(6);
+  });
+
+  test("WHEN un empleado sin tipo de permiso abre /[org]/clientes/pipeline THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+    await as(context, employeeToken, baseURL);
+    const response = await page.goto(`/${orgId}/clientes/pipeline`);
     expect(response?.status()).toBe(404);
   });
 });

@@ -80,6 +80,9 @@ export default async function ClientesPage({
       }}
     >
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Clientes</h1>
+      <a href={`/${orgId}/clientes/pipeline`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
+        Pipeline de ventas
+      </a>
 
       <form action={create} style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <input name="name" placeholder="Nombre del cliente" required style={inputStyle} />
@@ -158,6 +161,9 @@ export default async function ClientesPage({
             >
               <div>
                 <p style={{ fontWeight: 600, margin: 0 }}>{c.name}</p>
+                <a href={`/${orgId}/clientes/${c.id}`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
+                  Ficha
+                </a>
                 {c.notes && (
                   <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "4px 0 0" }}>{c.notes}</p>
                 )}

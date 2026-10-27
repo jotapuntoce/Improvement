@@ -249,7 +249,7 @@
       "apps/improvement/app/[org]/clientes/page.tsx",
       "apps/improvement/tests/e2e/erp.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T9",
