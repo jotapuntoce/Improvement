@@ -1794,3 +1794,70 @@ export const lessonCompletion = pgTable(
   },
   (t) => [unique("uq_lesson_completion").on(t.lessonId, t.profileId)],
 );
+
+// ─── Referidos ──────────────────────────────────────────────────────────────────────────────────
+// La comisión se devenga sobre ledger_entry.summum_fee_cents de los barcos referidos y solo se reporta.
+
+export const referralLink = pgTable(
+  "referral_link",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    code: text("code").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_referral_link_profile_muelle").on(t.profileId, t.muelleOrgId)],
+);
+
+export const referralAttribution = pgTable(
+  "referral_attribution",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    referralLinkId: uuid("referral_link_id")
+      .notNull()
+      .references(() => referralLink.id, { onDelete: "restrict" }),
+    shareBps: integer("share_bps").notNull(),
+    journeyMonths: integer("journey_months").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    proposedBy: uuid("proposed_by")
+      .notNull()
+      .references(() => profile.id),
+    approvedBy: uuid("approved_by").references(() => profile.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("referral_attribution_share_range", sql`${t.shareBps} between 0 and 10000`),
+    check("referral_attribution_journey_range", sql`${t.journeyMonths} between 1 and 60`),
+    check("referral_attribution_otra_firma", sql`${t.approvedBy} is null or ${t.approvedBy} <> ${t.proposedBy}`),
+  ],
+);
+
+export const referralCommission = pgTable(
+  "referral_commission",
+  {
+    id: id(),
+    attributionId: uuid("attribution_id")
+      .notNull()
+      .references(() => referralAttribution.id, { onDelete: "restrict" }),
+    ledgerEntryId: uuid("ledger_entry_id")
+      .notNull()
+      .unique()
+      .references(() => ledgerEntry.id, { onDelete: "restrict" }),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("referral_commission_amount_nonneg", sql`${t.amountCents} >= 0`)],
+);
