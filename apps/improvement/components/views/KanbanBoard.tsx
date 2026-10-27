@@ -23,7 +23,8 @@ export function KanbanBoard({
     if (id) start(() => move(id, stage));
   };
   return (
-    <div className="view-kanban" aria-busy={pending}>
+    // Desplaza en horizontal: tabIndex y nombre para que se recorra con teclado (axe scrollable-region-focusable).
+    <div className="view-kanban" aria-busy={pending} role="region" aria-label="Tablero por etapa" tabIndex={0}>
       {stages.map((s) => (
         <section key={s.key} className="view-column" aria-labelledby={`col-${s.key}`} onDragOver={(e) => e.preventDefault()} onDrop={drop(s.key)}>
           <h2 id={`col-${s.key}`} className="config-card-title">{s.name}</h2>

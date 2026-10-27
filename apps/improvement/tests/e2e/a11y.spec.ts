@@ -78,14 +78,12 @@ test.beforeEach(async ({ context, baseURL }) => {
   ]);
 });
 
-const ROUTES: { label: string; path: () => string; entrar?: boolean }[] = [
+const ROUTES: { label: string; path: () => string }[] = [
   { label: "/login", path: () => "/login" },
   { label: "/empresas", path: () => "/empresas" },
-  { label: "/empresas/[orgId]", path: () => `/empresas/${orgId}` },
-  // La recepción no tiene ruta propia: se abre desde el edificio, de un clic. Sin ese clic axe
-  // auditaría la fachada y nunca los muebles — que es donde vive hoy todo lo que antes eran las
-  // pantallas del panel. `entrar` lo da antes de auditar.
-  { label: "/empresas/[orgId] (recepción)", path: () => `/empresas/${orgId}`, entrar: true },
+  { label: "/[org] (inicio)", path: () => `/${orgId}` },
+  { label: "/[org]/a/ventas (lista)", path: () => `/${orgId}/a/ventas` },
+  { label: "/[org]/a/ventas (kanban)", path: () => `/${orgId}/a/ventas?vista=kanban` },
   { label: "/[org]/objetivos", path: () => `/${orgId}/objetivos` },
   { label: "/[org]/mapa", path: () => `/${orgId}/mapa` },
 ];
@@ -97,12 +95,6 @@ for (const route of ROUTES) {
     async ({ page }) => {
       await page.goto(route.path());
       await page.waitForLoadState("networkidle");
-
-      if (route.entrar) {
-        await page.getByRole("button", { name: `Entrar a ${ORG_NAME}` }).click();
-        // El edificio corre una animación antes de montar la recepción.
-        await page.locator(".jpc-lobby").waitFor();
-      }
 
       const results = await new AxeBuilder({ page }).analyze();
       const seriousOrCritical = results.violations.filter(
