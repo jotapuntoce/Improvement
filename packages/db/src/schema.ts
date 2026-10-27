@@ -12,6 +12,7 @@ import {
   integer,
   boolean,
   timestamp,
+  date,
   jsonb,
   numeric,
   uniqueIndex,
@@ -264,12 +265,17 @@ export const orgNeed = pgTable(
     // Summum recibe, no diagnostica (ver la memoria del proyecto improvement-director-general).
     referredAt: timestamp("referred_at", { withTimezone: true }),
     referralNote: text("referral_note"),
+    // Dirección (blueprint direccion-jaime §4): responsable del issue y en qué lista semanal está.
+    // Nulas a propósito — ninguna necesidad existente las tiene, y la migración es solo aditiva.
+    ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    priorityWeek: date("priority_week"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("idx_org_need_org_id").on(t.orgId),
     index("idx_org_need_org_status").on(t.orgId, t.status),
+    index("idx_org_need_org_priority").on(t.orgId, t.priorityWeek),
     check("org_need_severity_range", sql`${t.severity} >= 1 AND ${t.severity} <= 3`),
     check(
       "org_need_status_check",
@@ -953,5 +959,134 @@ export const ledgerEntry = pgTable(
     index("idx_ledger_entry_barco_created").on(t.barcoOrgId, t.createdAt),
     check("ledger_entry_kind_check", sql`${t.chargeKind} in ('membresia','venta_propia','proyecto_summum')`),
     check("ledger_entry_fee_le_gross", sql`${t.summumFeeCents} between 0 and ${t.grossCents}`),
+  ],
+);
+
+// ── Dirección (blueprint direccion-jaime) ─────────────────────────────────────────────────────────
+// Módulos tipo EOS: V/TO, Scorecard semanal, Issues (= org_need) y Junta L10. Toda personalización de
+// un cliente vive en estas filas; ninguna rama de código sabe de un cliente específico.
+
+export const MEASURABLE_DIRECTIONS = ["gte", "lte"] as const;
+export const MEASURABLE_UNITS = ["numero", "porcentaje", "dinero"] as const;
+// Orden fijo de la junta semanal. Fuente única de los bloques: el check de meeting.current_block y
+// apps/improvement/server/direccion/meetings/agenda.ts (que agrega los minutos) leen esta lista.
+export const MEETING_BLOCKS = ["segue", "scorecard", "rocks", "headlines", "todos", "ids", "conclude"] as const;
+
+export const orgVision = pgTable("org_vision", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  coreValues: jsonb("core_values").notNull().default(sql`'[]'::jsonb`),
+  coreFocus: jsonb("core_focus").notNull().default(sql`'{}'::jsonb`),
+  tenYearTarget: jsonb("ten_year_target").notNull().default(sql`'{}'::jsonb`),
+  marketingStrategy: jsonb("marketing_strategy").notNull().default(sql`'{}'::jsonb`),
+  threeYearPicture: jsonb("three_year_picture").notNull().default(sql`'{}'::jsonb`),
+  oneYearPlan: jsonb("one_year_plan").notNull().default(sql`'{}'::jsonb`),
+  updatedBy: uuid("updated_by").references(() => profile.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const orgMeasurable = pgTable(
+  "org_measurable",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    ownerProfileId: uuid("owner_profile_id")
+      .notNull()
+      .references(() => profile.id),
+    goal: numeric("goal", { precision: 14, scale: 2, mode: "number" }).notNull(),
+    goalDirection: text("goal_direction", { enum: MEASURABLE_DIRECTIONS }).notNull(),
+    unit: text("unit", { enum: MEASURABLE_UNITS }).notNull().default("numero"),
+    position: integer("position").notNull().default(0),
+    // Archivar y no borrar: la historia de measurable_value se queda.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_org_measurable_org_position").on(t.orgId, t.position),
+    check("org_measurable_direction_check", sql`${t.goalDirection} in ('gte','lte')`),
+    check("org_measurable_unit_check", sql`${t.unit} in ('numero','porcentaje','dinero')`),
+  ],
+);
+
+export const measurableValue = pgTable(
+  "measurable_value",
+  {
+    id: id(),
+    measurableId: uuid("measurable_id")
+      .notNull()
+      .references(() => orgMeasurable.id, { onDelete: "cascade" }),
+    // Lunes de la semana en America/Mexico_City — sale de weekStart(), nunca se calcula en otro lado.
+    weekStart: date("week_start").notNull(),
+    value: numeric("value", { precision: 14, scale: 2, mode: "number" }).notNull(),
+    enteredBy: uuid("entered_by")
+      .notNull()
+      .references(() => profile.id),
+    // Se reescribe en cada recaptura de la misma semana: hace de updated_at.
+    enteredAt: timestamp("entered_at", { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("uq_measurable_value_week").on(t.measurableId, t.weekStart),
+    check("measurable_value_monday", sql`extract(isodow from ${t.weekStart}) = 1`),
+  ],
+);
+
+export const meeting = pgTable(
+  "meeting",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    facilitatorProfileId: uuid("facilitator_profile_id").references(() => profile.id, {
+      onDelete: "set null",
+    }),
+    currentBlock: text("current_block", { enum: MEETING_BLOCKS }),
+    notes: jsonb("notes").notNull().default(sql`'{}'::jsonb`),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_meeting_org_scheduled").on(t.orgId, t.scheduledFor),
+    index("idx_meeting_org_ended").on(t.orgId, t.endedAt),
+    check(
+      "meeting_block_check",
+      sql`${t.currentBlock} is null or ${t.currentBlock} in ('segue','scorecard','rocks','headlines','todos','ids','conclude')`,
+    ),
+    check(
+      "meeting_end_after_start",
+      sql`${t.endedAt} is null or (${t.startedAt} is not null and ${t.endedAt} >= ${t.startedAt})`,
+    ),
+  ],
+);
+
+export const meetingRating = pgTable(
+  "meeting_rating",
+  {
+    id: id(),
+    meetingId: uuid("meeting_id")
+      .notNull()
+      .references(() => meeting.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id),
+    rating: integer("rating").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("uq_meeting_rating_person").on(t.meetingId, t.profileId),
+    check("meeting_rating_range", sql`${t.rating} between 1 and 10`),
   ],
 );

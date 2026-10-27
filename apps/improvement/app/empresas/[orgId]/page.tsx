@@ -7,28 +7,39 @@
 //
 // Sin BackLink propio: la recepción ya tiene su "Salir a la calle" y el edificio su "Volver a mis
 // empresas", y dos formas de volver en la misma pantalla es una de más.
+import Link from "next/link";
 import { requireOrgMembership } from "@/server/auth/guard.ts";
 import { loadBuilding } from "@/server/building/loadBuilding.ts";
+import { isMeetingPending } from "@/server/direccion/meetings/meetings.ts";
 import { loadLobby } from "@/server/lobby/loadLobby.ts";
 import { BuildingExperience } from "./BuildingExperience.tsx";
 
 export default async function EmpresaBuildingPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
   const memberRow = await requireOrgMembership(orgId);
-  const [graph, lobby] = await Promise.all([
+  const [graph, lobby, juntaPendiente] = await Promise.all([
     loadBuilding(memberRow.userId, orgId),
     loadLobby(memberRow.userId, orgId),
+    isMeetingPending(memberRow.userId, orgId),
   ]);
 
   // El diagnóstico y el chat con Improvement son solo del dueño (404 para todos los demás, ver
   // /[org]/necesidades). La puerta se decide aquí, en el servidor, y no dentro del componente: que
   // una pantalla ofrezca una puerta que devuelve 404 al tocarla es peor que no ofrecerla.
   return (
-    <BuildingExperience
-      orgId={orgId}
-      graph={graph}
-      lobby={lobby}
-      esDueno={memberRow.role === "owner"}
-    />
+    <>
+      {juntaPendiente && (
+        <aside className="config-card" aria-label="Junta pendiente">
+          <p>Junta pendiente</p>
+          <Link href={`/${orgId}/direccion/junta`}>Ir a la junta semanal</Link>
+        </aside>
+      )}
+      <BuildingExperience
+        orgId={orgId}
+        graph={graph}
+        lobby={lobby}
+        esDueno={memberRow.role === "owner"}
+      />
+    </>
   );
 }
