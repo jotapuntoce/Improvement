@@ -1924,3 +1924,30 @@ export const checkin = pgTable(
     check("checkin_mood_range", sql`${t.mood} between 1 and 5`),
   ],
 );
+
+// ─── Personas: People Analyzer ──────────────────────────────────────────────────────────────────
+// Mismo cuidado que responsibility_level: la persona evaluada y el dueño, nadie más. Nunca un ranking.
+
+export const PEOPLE_RATINGS = ["+", "+/-", "-"] as const;
+
+export const peopleReview = pgTable(
+  "people_review",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    reviewerId: uuid("reviewer_id").references(() => profile.id, { onDelete: "set null" }),
+    periodStart: date("period_start").notNull(),
+    // { [valor central]: "+" | "+/-" | "-" }
+    ratings: jsonb("ratings").$type<Record<string, (typeof PEOPLE_RATINGS)[number]>>().notNull(),
+    gwc: jsonb("gwc").$type<{ entiende: boolean; quiere: boolean; capacidad: boolean }>().notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("uq_people_review_period").on(t.orgId, t.employeeId, t.periodStart)],
+);
