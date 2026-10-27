@@ -1366,3 +1366,180 @@ export const personalityProfile = pgTable(
     check("personality_subject_check", sql`${t.subjectKind} in ('afiliada','dueno')`),
   ],
 );
+
+// ─── Sello Cénit y sinapsis (blueprint summum-improvement §4) ──────────────────────────────────
+
+export const SEAL_SOURCES = ["manual", "kpi"] as const;
+export const SEAL_SUBJECTS = ["barco", "afiliada"] as const;
+export const SEAL_APPROVAL = ["pendiente", "aprobada", "rechazada"] as const;
+export const SEAL_VIGENCIA = ["vigente", "en_riesgo", "reevaluacion", "suspendido"] as const;
+export const PROPOSAL_STATUSES = ["propuesta", "aprobada_socios", "activa", "rechazada"] as const;
+
+/** Los parámetros de la red de un muelle, como datos. min_seal_score null = sin mínimo: nadie se certifica. */
+export const muelleSettings = pgTable(
+  "muelle_settings",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    minSealScore: integer("min_seal_score"),
+    graceDays: integer("grace_days").notNull().default(30),
+    proposalMinSeverity: integer("proposal_min_severity").notNull().default(3),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("muelle_settings_grace_days_range", sql`${t.graceDays} between 1 and 365`),
+    check("muelle_settings_min_severity_range", sql`${t.proposalMinSeverity} between 1 and 3`),
+  ],
+);
+
+export const sealRequirement = pgTable(
+  "seal_requirement",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    points: integer("points").notNull(),
+    source: text("source", { enum: SEAL_SOURCES }).notNull(),
+    // Para `kpi`: { source, config, op: "gte" | "lte", threshold }.
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_seal_requirement_code").on(t.muelleOrgId, t.code),
+    check("seal_requirement_points_range", sql`${t.points} between 1 and 100`),
+    check("seal_requirement_source_check", sql`${t.source} in ('manual','kpi')`),
+  ],
+);
+
+/** La marca de un requisito manual para un sujeto (un barco o una afiliada). */
+export const sealRequirementResult = pgTable(
+  "seal_requirement_result",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    requirementId: uuid("requirement_id")
+      .notNull()
+      .references(() => sealRequirement.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: SEAL_SUBJECTS }).notNull(),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "cascade" }),
+    met: boolean("met").notNull(),
+    evidenceNote: text("evidence_note"),
+    decidedBy: uuid("decided_by").references(() => profile.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    check("seal_result_subject_kind_check", sql`${t.subjectKind} in ('barco','afiliada')`),
+    check(
+      "seal_result_subject",
+      sql`(${t.subjectKind} = 'barco' and ${t.barcoOrgId} is not null and ${t.affiliateId} is null) or (${t.subjectKind} = 'afiliada' and ${t.affiliateId} is not null and ${t.barcoOrgId} is null)`,
+    ),
+    uniqueIndex("uq_seal_result_barco").on(t.requirementId, t.barcoOrgId).where(sql`${t.barcoOrgId} is not null`),
+    uniqueIndex("uq_seal_result_affiliate").on(t.requirementId, t.affiliateId).where(sql`${t.affiliateId} is not null`),
+  ],
+);
+
+export const sealEvaluation = pgTable(
+  "seal_evaluation",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: SEAL_SUBJECTS }).notNull(),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "cascade" }),
+    score: integer("score").notNull(),
+    // El mínimo vigente al calcular.
+    minScore: integer("min_score"),
+    approvalStatus: text("approval_status", { enum: SEAL_APPROVAL }).notNull().default("pendiente"),
+    firstApproverId: uuid("first_approver_id").references(() => profile.id),
+    secondApproverId: uuid("second_approver_id").references(() => profile.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    vigencia: text("vigencia", { enum: SEAL_VIGENCIA }),
+    riskSince: timestamp("risk_since", { withTimezone: true }),
+    lastComputedAt: timestamp("last_computed_at", { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("seal_evaluation_subject_kind_check", sql`${t.subjectKind} in ('barco','afiliada')`),
+    check(
+      "seal_evaluation_subject",
+      sql`(${t.subjectKind} = 'barco' and ${t.barcoOrgId} is not null and ${t.affiliateId} is null) or (${t.subjectKind} = 'afiliada' and ${t.affiliateId} is not null and ${t.barcoOrgId} is null)`,
+    ),
+    check("seal_evaluation_approval_check", sql`${t.approvalStatus} in ('pendiente','aprobada','rechazada')`),
+    check("seal_evaluation_otra_firma", sql`${t.secondApproverId} is null or ${t.secondApproverId} <> ${t.firstApproverId}`),
+    check(
+      "seal_evaluation_vigencia_check",
+      sql`${t.vigencia} is null or ${t.vigencia} in ('vigente','en_riesgo','reevaluacion','suspendido')`,
+    ),
+    uniqueIndex("uq_seal_eval_pending_barco").on(t.barcoOrgId).where(sql`${t.approvalStatus} = 'pendiente'`),
+    uniqueIndex("uq_seal_eval_pending_affiliate").on(t.affiliateId).where(sql`${t.approvalStatus} = 'pendiente'`),
+  ],
+);
+
+/** Opt-in del barco al directorio público. */
+export const barcoListing = pgTable("barco_listing", {
+  id: id(),
+  barcoOrgId: uuid("barco_org_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  publicSlug: text("public_slug").notNull().unique(),
+  publicBio: text("public_bio"),
+  optIn: boolean("opt_in").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Una afiliada propuesta para una necesidad de un barco: firman dos socios y decide el dueño del barco. */
+export const specialistProposal = pgTable(
+  "specialist_proposal",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // El barco.
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    orgNeedId: uuid("org_need_id")
+      .notNull()
+      .references(() => orgNeed.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id")
+      .notNull()
+      .references(() => affiliate.id, { onDelete: "cascade" }),
+    // Puntaje del Sello al proponer.
+    sealScore: integer("seal_score"),
+    matchScore: integer("match_score").notNull(),
+    status: text("status", { enum: PROPOSAL_STATUSES }).notNull().default("propuesta"),
+    firstPartnerId: uuid("first_partner_id").references(() => profile.id),
+    secondPartnerId: uuid("second_partner_id").references(() => profile.id),
+    partnersApprovedAt: timestamp("partners_approved_at", { withTimezone: true }),
+    ownerDecidedBy: uuid("owner_decided_by").references(() => profile.id),
+    ownerDecidedAt: timestamp("owner_decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("specialist_proposal_match_range", sql`${t.matchScore} between 0 and 100`),
+    check("specialist_proposal_status_check", sql`${t.status} in ('propuesta','aprobada_socios','activa','rechazada')`),
+    check("specialist_proposal_otra_firma", sql`${t.secondPartnerId} is null or ${t.secondPartnerId} <> ${t.firstPartnerId}`),
+    unique("uq_proposal_need_affiliate").on(t.orgNeedId, t.affiliateId),
+    uniqueIndex("uq_proposal_open_need").on(t.orgNeedId).where(sql`${t.status} in ('propuesta','aprobada_socios','activa')`),
+  ],
+);
