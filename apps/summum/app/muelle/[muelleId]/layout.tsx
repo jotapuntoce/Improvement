@@ -13,6 +13,7 @@ export default async function MuelleLayout({ children, params }: { children: Rea
         {link("afiliadas", "Afiliadas")}
         {link("sello", "Sello")}
         {link("sinapsis", "Sinapsis")}
+        {link("pacto", "Pacto")}
       </nav>
       {children}
     </div>

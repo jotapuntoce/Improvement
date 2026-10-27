@@ -1,6 +1,6 @@
 // Escuadras y retos del Pacto. Las arma un dueño del muelle; la escuadra se ve entre sí, pero solo como
 // nombre y estado de apoyo (bien / apoyo): nunca registros, notas ni pilares de nadie.
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, count, eq, gte, lte } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
@@ -120,4 +120,27 @@ export async function listChallenges(userId: string, muelleId: string, now = new
     .from(challenge)
     .where(and(eq(challenge.muelleOrgId, muelleId), lte(challenge.startsOn, today), gte(challenge.endsOn, today)))
     .orderBy(asc(challenge.endsOn));
+}
+
+/** Las escuadras del muelle con cuántos integrantes tienen, para el panel de los socios. */
+export async function listSquads(userId: string, muelleId: string) {
+  await assertDockOwner(userId, muelleId);
+  return db
+    .select({ id: squad.id, name: squad.name, members: count(squadMember.id) })
+    .from(squad)
+    .leftJoin(squadMember, eq(squadMember.squadId, squad.id))
+    .where(eq(squad.muelleOrgId, muelleId))
+    .groupBy(squad.id, squad.name)
+    .orderBy(asc(squad.name));
+}
+
+/** Las escuadras de la persona en este muelle (normalmente una). */
+export async function mySquads(userId: string, muelleId: string) {
+  await assertPactoAccess(userId, muelleId);
+  return db
+    .select({ id: squad.id, name: squad.name })
+    .from(squadMember)
+    .innerJoin(squad, eq(squad.id, squadMember.squadId))
+    .where(and(eq(squadMember.profileId, userId), eq(squad.muelleOrgId, muelleId)))
+    .orderBy(asc(squad.name));
 }

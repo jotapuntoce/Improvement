@@ -5,7 +5,7 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { affiliate, membership, organization, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
+import { affiliate, membership, organization, pactoPillar, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -35,6 +35,7 @@ test.beforeAll(async () => {
   muelleId = dock.id;
   await db.insert(membership).values({ userId: people.owner.id, orgId: muelleId, role: "owner", acceptedAt: new Date() });
   await db.insert(specialty).values({ muelleOrgId: muelleId, key: "comercial", label: "Comercial" });
+  await db.insert(pactoPillar).values({ muelleOrgId: muelleId, name: "Cuerpo" });
   const [ana] = await db
     .insert(affiliate)
     .values({
@@ -190,4 +191,44 @@ test("WHEN la afiliada publica Masaje de la red en /red/[muelleId]/beneficios TH
   await as(context, people.owner.token, baseURL);
   await page.goto(`/red/${muelleId}/beneficios`);
   await expect(page.getByRole("heading", { name: "Catálogo de PowerUps" })).toBeVisible();
+});
+
+test("WHEN la afiliada abre Mi transformación sin consentimiento THE SYSTEM SHALL mostrar el aviso sin Registrar hoy; al aceptar y registrar queda Al día con Racha 1", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  const url = `/red/${muelleId}/mi-transformacion`;
+  expect((await page.goto(url))?.status()).toBe(200);
+  await expect(page.getByLabel("Acepto que Summum guarde mis registros del Pacto")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registrar hoy" })).toHaveCount(0);
+  await page.getByLabel("Acepto que Summum guarde mis registros del Pacto").check();
+  await Promise.all([page.waitForResponse((r) => r.request().method() === "POST"), page.getByRole("button", { name: "Aceptar" }).click()]);
+  await page.goto(url);
+  await expect(page.getByRole("listitem").filter({ hasText: "Cuerpo" })).toContainText("Pendiente hoy");
+  await Promise.all([page.waitForResponse((r) => r.request().method() === "POST"), page.getByRole("button", { name: "Registrar hoy" }).click()]);
+  await page.goto(url);
+  const cuerpo = page.getByRole("listitem").filter({ hasText: "Cuerpo" });
+  await expect(cuerpo).toContainText("Al día");
+  await expect(cuerpo).toContainText("Racha 1");
+});
+
+test("WHEN un perfil sin relación abre Mi transformación THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+  await as(context, people.ajeno.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/mi-transformacion`))?.status()).toBe(404);
+});
+
+test("WHEN la afiliada abre /red THE SYSTEM SHALL listar Red E2E con su enlace a Mi transformación", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  expect((await page.goto("/red"))?.status()).toBe(200);
+  const red = page.getByRole("listitem").filter({ hasText: "Red E2E" });
+  await expect(red.getByRole("link", { name: "Mi transformación" })).toHaveAttribute("href", `/red/${muelleId}/mi-transformacion`);
+});
+
+test("WHEN el dueño crea el pilar Descanso en /muelle/[muelleId]/pacto THE SYSTEM SHALL listarlo", async ({ page, context, baseURL }) => {
+  await as(context, people.owner.token, baseURL);
+  const url = `/muelle/${muelleId}/pacto`;
+  expect((await page.goto(url))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Pacto" })).toBeVisible();
+  await page.getByLabel("Nombre del pilar").fill("Descanso");
+  await Promise.all([page.waitForResponse((r) => r.request().method() === "POST"), page.getByRole("button", { name: "Crear pilar" }).click()]);
+  await page.goto(url);
+  await expect(page.getByRole("listitem").filter({ hasText: "Descanso" })).toBeVisible();
 });

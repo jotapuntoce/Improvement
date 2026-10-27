@@ -4,14 +4,25 @@
 import { and, asc, eq, gte, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { PACTO_CONSENT_VERSION, pactoConsent, pactoEntry, pactoPause, pactoPillar } from "@jotapuntoce/db/schema";
-import { assertDockOwner, assertPactoAccess } from "../auth/guard.ts";
+import { alias } from "drizzle-orm/pg-core";
+import {
+  affiliate,
+  membership,
+  organization,
+  PACTO_CONSENT_VERSION,
+  pactoConsent,
+  pactoEntry,
+  pactoPause,
+  pactoPillar,
+} from "@jotapuntoce/db/schema";
+import { assertDockOwner, assertPactoAccess, listMyDocks } from "../auth/guard.ts";
 import type { Result } from "../result.ts";
 import { mxDate, pillarStatus } from "./streak.ts";
 
 const INVALIDO = "Revisa los datos del formulario.";
 const SIN_CONSENTIMIENTO = "Primero acepta el Pacto.";
 const MAX_PAUSE_DAYS = 30;
+const muelle = alias(organization, "muelle");
 
 /** Uso interno de server/pacto: el llamador ya pasó su guard. */
 export async function activeConsent(userId: string) {
@@ -152,4 +163,36 @@ export async function upsertPillar(userId: string, muelleId: string, input: unkn
   }
   const [row] = await db.insert(pactoPillar).values({ muelleOrgId: muelleId, ...values }).returning({ id: pactoPillar.id });
   return { ok: true, data: row! };
+}
+
+/** Todos los pilares del muelle, activos e inactivos, para el panel de los socios. */
+export async function listPillars(userId: string, muelleId: string) {
+  await assertDockOwner(userId, muelleId);
+  return db
+    .select()
+    .from(pactoPillar)
+    .where(eq(pactoPillar.muelleOrgId, muelleId))
+    .orderBy(asc(pactoPillar.position), asc(pactoPillar.name));
+}
+
+/** Los muelles de la persona: los suyos, donde es afiliada activa o donde trabaja en un barco. */
+export async function listMyNetworks(userId: string) {
+  const [docks, affiliations, crews] = await Promise.all([
+    listMyDocks(userId),
+    db
+      .select({ id: organization.id, name: organization.name })
+      .from(affiliate)
+      .innerJoin(organization, eq(organization.id, affiliate.muelleOrgId))
+      .where(and(eq(affiliate.profileId, userId), eq(affiliate.status, "activa"))),
+    db
+      .select({ id: muelle.id, name: muelle.name })
+      .from(membership)
+      .innerJoin(organization, eq(organization.id, membership.orgId))
+      .innerJoin(muelle, eq(muelle.id, organization.parentOrgId))
+      .where(eq(membership.userId, userId)),
+  ]);
+  const byId = new Map<string, { id: string; name: string; isAffiliate: boolean }>();
+  for (const n of [...docks, ...crews]) byId.set(n.id, { ...n, isAffiliate: byId.get(n.id)?.isAffiliate ?? false });
+  for (const n of affiliations) byId.set(n.id, { ...n, isAffiliate: true });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
