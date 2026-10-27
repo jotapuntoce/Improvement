@@ -6,6 +6,9 @@ import { db } from "@jotapuntoce/db";
 import { membership, orgVision, PEOPLE_RATINGS, peopleReview, profile } from "@jotapuntoce/db/schema";
 import { assertMembership, findOwnerMembership } from "../auth/guard.ts";
 
+// Las rutas no importan packages/db: leen las calificaciones posibles de aquí.
+export { PEOPLE_RATINGS };
+
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
 function fail(message: string, code = "VALIDATION_ERROR"): Result<never> {
