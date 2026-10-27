@@ -5,7 +5,7 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { affiliate, course, membership, organization, pactoPillar, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
+import { affiliate, course, membership, organization, pactoPillar, PERSONALITY_QUESTIONS, powerupPartner, profile, referralLink, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -23,6 +23,7 @@ const pendienteProfileId = crypto.randomUUID();
 const affiliateIds: string[] = [];
 const anaSlug = `ana-comercial-${stamp}`;
 const barcoName = `Barco Rojo ${stamp}`;
+const refCode = `ref${stamp}`.padEnd(16, "x").slice(0, 16);
 
 test.beforeAll(async () => {
   for (const p of Object.values(people)) {
@@ -61,6 +62,7 @@ test.beforeAll(async () => {
     })
     .returning();
   if (!ana || !beto) throw new Error("insert de affiliate no devolvió fila");
+  await db.insert(referralLink).values({ profileId: people.afiliada.id, muelleOrgId: muelleId, code: refCode });
   affiliateIds.push(ana.id, beto.id);
   const [boat] = await db
     .insert(organization)
@@ -273,4 +275,19 @@ test("WHEN la afiliada abre referidos THE SYSTEM SHALL mostrar su enlace con /r/
 test("WHEN un perfil sin relación abre el aula THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
   await as(context, people.ajeno.token, baseURL);
   expect((await page.goto(`/red/${muelleId}/aula`))?.status()).toBe(404);
+});
+
+test("WHEN la afiliada abre el ranking THE SYSTEM SHALL mostrar su nombre y su Nivel", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/ranking`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Ranking de afiliadas" })).toBeVisible();
+  const fila = page.getByRole("listitem").filter({ hasText: "Ana Comercial" });
+  await expect(fila).toContainText("Nivel");
+});
+
+test("WHEN un visitante abre /r/<código> THE SYSTEM SHALL mostrar Te recomendó; un código inexistente da 404", async ({ page, context }) => {
+  await context.clearCookies();
+  expect((await page.goto(`/r/${refCode}`))?.status()).toBe(200);
+  await expect(page.getByText("Te recomendó")).toBeVisible();
+  expect((await page.goto("/r/AAAAAAAAAAAAAAAA"))?.status()).toBe(404);
 });

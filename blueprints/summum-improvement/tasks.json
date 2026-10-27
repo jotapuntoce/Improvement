@@ -1117,7 +1117,7 @@
       "apps/summum/tests/leaderboard.test.ts",
       "apps/summum/tests/e2e/red.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T1",
