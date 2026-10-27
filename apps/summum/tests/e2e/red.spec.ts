@@ -5,7 +5,7 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { affiliate, membership, organization, PERSONALITY_QUESTIONS, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
+import { affiliate, membership, organization, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -76,6 +76,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  // Los beneficios antes que el muelle: network_org_id es `set null` y quedarían en el catálogo global.
+  if (muelleId) await db.delete(powerupPartner).where(eq(powerupPartner.networkOrgId, muelleId));
   if (barcoId) await db.delete(organization).where(eq(organization.id, barcoId));
   if (muelleId) await db.delete(organization).where(eq(organization.id, muelleId)); // cascade
   await db.delete(profile).where(eq(profile.id, pendienteProfileId));
@@ -167,4 +169,25 @@ test("WHEN un dueño del muelle abre /muelle/[muelleId]/sinapsis THE SYSTEM SHAL
   await expect(page.getByText("El dueño del negocio decide al final.")).toBeVisible();
   await as(context, people.ajeno.token, baseURL);
   expect((await page.goto(`/muelle/${muelleId}/sinapsis`))?.status()).toBe(404);
+});
+
+test("WHEN la afiliada publica Masaje de la red en /red/[muelleId]/beneficios THE SYSTEM SHALL mostrarlo en la lista; el dueño del muelle ve el Catálogo de PowerUps", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  const response = await page.goto(`/red/${muelleId}/beneficios`);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Beneficios de la red" })).toBeVisible();
+  await page.getByLabel("Categoría").fill("Bienestar");
+  await page.getByLabel("Beneficio", { exact: true }).fill("Masaje de la red");
+  await page.getByLabel("Cómo se canjea").fill("Agenda por WhatsApp");
+  await page.getByLabel("Puntos").fill("300");
+  await Promise.all([
+    page.waitForResponse((r) => r.request().method() === "POST"),
+    page.getByRole("button", { name: "Publicar beneficio" }).click(),
+  ]);
+  await page.goto(`/red/${muelleId}/beneficios`);
+  await expect(page.getByRole("listitem").filter({ hasText: "Masaje de la red" })).toBeVisible();
+
+  await as(context, people.owner.token, baseURL);
+  await page.goto(`/red/${muelleId}/beneficios`);
+  await expect(page.getByRole("heading", { name: "Catálogo de PowerUps" })).toBeVisible();
 });
