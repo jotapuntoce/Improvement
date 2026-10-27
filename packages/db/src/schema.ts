@@ -1557,3 +1557,69 @@ export const specialistProposal = pgTable(
     uniqueIndex("uq_proposal_open_need").on(t.orgNeedId).where(sql`${t.status} in ('propuesta','aprobada_socios','activa')`),
   ],
 );
+
+// ─── Pacto (blueprint summum-improvement §4) ────────────────────────────────────────────────────
+// Hábitos de salud (LFPDPPP, datos sensibles): consentimiento expreso antes del primer registro, y cada
+// fila de consentimiento, registro o pausa la lee SOLO su dueño (RLS en la migración pacto_rls).
+
+/** La versión del texto de consentimiento que acepta la persona; súbela cuando cambie el texto. */
+export const PACTO_CONSENT_VERSION = 1;
+
+export const pactoConsent = pgTable("pacto_consent", {
+  id: id(),
+  profileId: uuid("profile_id")
+    .notNull()
+    .unique()
+    .references(() => profile.id, { onDelete: "cascade" }),
+  consentTextVersion: integer("consent_text_version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Los pilares del Pacto de un muelle, como filas. */
+export const pactoPillar = pgTable("pacto_pillar", {
+  id: id(),
+  muelleOrgId: uuid("muelle_org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const pactoEntry = pgTable(
+  "pacto_entry",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    pillarId: uuid("pillar_id")
+      .notNull()
+      .references(() => pactoPillar.id, { onDelete: "cascade" }),
+    entryDate: date("entry_date").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_pacto_entry_day").on(t.profileId, t.pillarId, t.entryDate)],
+);
+
+/** La posada: días en que la racha no se rompe. */
+export const pactoPause = pgTable(
+  "pacto_pause",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    reason: text("reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [check("pacto_pause_range", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
