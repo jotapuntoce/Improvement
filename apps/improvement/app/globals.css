@@ -677,3 +677,20 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   .shell { grid-template-columns: 1fr; }
   .shell-sidebar { position: static; height: auto; }
 }
+
+/* Vistas genéricas lista, kanban y ficha (blueprint improvement-odoo, fase 1). Solo tokens. */
+.view-page { max-width: none; }
+.view-control { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.view-switch { display: flex; gap: 0.25rem; }
+.view-switch a { padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); color: var(--text-secondary); }
+.view-switch a[aria-current="page"], .view-stagebar li[aria-current="step"] { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: var(--bg); }
+.view-table { width: 100%; border-collapse: collapse; }
+.view-table th, .view-table td { text-align: left; padding: 0.6rem; border-bottom: 1px solid var(--border); }
+.view-kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(16rem, 1fr); gap: 0.75rem; overflow-x: auto; }
+.view-column { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; }
+.view-column ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.view-card { display: grid; gap: 0.35rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem; cursor: grab; }
+.view-stagebar { display: flex; flex-wrap: wrap; gap: 0.25rem; list-style: none; padding: 0; margin: 0.75rem 0; }
+.view-stagebar li { padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); }
+.home-cover { position: relative; height: 12rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); background-size: cover; background-position: center; margin-bottom: 3rem; }
+.home-logo { position: absolute; left: 1.5rem; bottom: -2.5rem; width: 5.5rem; height: 5.5rem; border-radius: var(--radius-md); border: 3px solid var(--bg); object-fit: cover; background: var(--bg-elevated); }
