@@ -23,6 +23,14 @@ describe("ensureOrgApps", () => {
     expect(stages.map((s) => s.key)).toEqual(["prospecto", "propuesta", "negociacion", "ganado", "perdido"]);
   });
 
+  it("WHEN corre dos veces a la vez THE SYSTEM SHALL dejar exactamente 2 grupos y 4 apps", async () => {
+    const [o] = await db.insert(organization).values({ name: "t-cat", slug: `t-cat-${crypto.randomUUID()}` }).returning();
+    orgIds.push(o!.id);
+    await Promise.all([ensureOrgApps(o!.id), ensureOrgApps(o!.id)]);
+    expect(await db.select().from(appModel).where(eq(appModel.orgId, o!.id))).toHaveLength(4);
+    expect(await db.select().from(appGroup).where(eq(appGroup.orgId, o!.id))).toHaveLength(2);
+  });
+
   it("WHEN se lee BASE_APPS THE SYSTEM SHALL tener una sección válida por app", () => {
     for (const app of BASE_APPS) expect(["clientes", "proyectos", "postventa"]).toContain(app.section);
   });

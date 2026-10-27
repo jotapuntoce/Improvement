@@ -1,6 +1,6 @@
 // Las apps base que toda empresa trae (catálogo genérico, igual para todos) y la siembra por org. Lo
 // que cada dueño cambia —nombres, orden, grupos, campos extra— vive en filas, no aquí.
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { appGroup, appModel, appStage, DEAL_STAGES, PROJECT_AUTHORIZATION, TICKET_STATUSES } from "@jotapuntoce/db/schema";
 import type { SectionSlug } from "../permissions/sections.ts";
@@ -41,10 +41,15 @@ export const BASE_APPS: BaseApp[] = [
 export async function ensureOrgApps(orgId: string): Promise<void> {
   const existing = await db.select({ key: appModel.key }).from(appModel).where(eq(appModel.orgId, orgId));
   const have = new Set(existing.map((r) => r.key));
-  const missing = BASE_APPS.filter((a) => !have.has(a.key));
-  if (missing.length === 0) return;
+  if (BASE_APPS.every((a) => have.has(a.key))) return;
 
   await db.transaction(async (tx) => {
+    // Serializa siembras simultáneas de la misma org (layout y página en la primera carga).
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${orgId}))`);
+    const again = await tx.select({ key: appModel.key }).from(appModel).where(eq(appModel.orgId, orgId));
+    const haveNow = new Set(again.map((r) => r.key));
+    const missing = BASE_APPS.filter((a) => !haveNow.has(a.key));
+    if (missing.length === 0) return;
     const groups = new Map<string, string>();
     for (const [position, name] of [...new Set(BASE_APPS.map((a) => a.group))].entries()) {
       const [found] = await tx.select({ id: appGroup.id }).from(appGroup).where(and(eq(appGroup.orgId, orgId), eq(appGroup.name, name)));
