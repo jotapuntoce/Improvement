@@ -729,7 +729,7 @@
       "apps/improvement/server/powerups/mutations.ts",
       "apps/improvement/tests/powerups-red.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T4",

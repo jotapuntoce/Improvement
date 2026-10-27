@@ -429,16 +429,28 @@ export const employeePointsLedger = pgTable(
 );
 
 // Catálogo GLOBAL — no org-scoped, compartido entre todas las empresas cliente.
-export const powerupPartner = pgTable("powerup_partner", {
-  id: id(),
-  businessName: text("business_name").notNull(),
-  category: text("category").notNull(),
-  discountDescription: text("discount_description").notNull(),
-  redemptionInstructions: text("redemption_instructions").notNull(),
-  pointsCost: integer("points_cost").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: createdAt(),
-});
+/** Qué catálogo de PowerUps ven los barcos de un muelle: el global de siempre o el de su red. */
+export const CATALOG_MODES = ["global", "red"] as const;
+
+export const powerupPartner = pgTable(
+  "powerup_partner",
+  {
+    id: id(),
+    businessName: text("business_name").notNull(),
+    category: text("category").notNull(),
+    discountDescription: text("discount_description").notNull(),
+    redemptionInstructions: text("redemption_instructions").notNull(),
+    pointsCost: integer("points_cost").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    // Catálogo de la red (blueprint summum-improvement §9.1): null = premio del catálogo global.
+    networkOrgId: uuid("network_org_id").references(() => organization.id, { onDelete: "set null" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "set null" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "set null" }),
+    publishedBy: uuid("published_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("idx_powerup_partner_network").on(t.networkOrgId, t.isActive)],
+);
 
 export const powerupRedemption = pgTable(
   "powerup_redemption",
@@ -1387,12 +1399,14 @@ export const muelleSettings = pgTable(
     minSealScore: integer("min_seal_score"),
     graceDays: integer("grace_days").notNull().default(30),
     proposalMinSeverity: integer("proposal_min_severity").notNull().default(3),
+    catalogMode: text("catalog_mode", { enum: CATALOG_MODES }).notNull().default("global"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("muelle_settings_grace_days_range", sql`${t.graceDays} between 1 and 365`),
     check("muelle_settings_min_severity_range", sql`${t.proposalMinSeverity} between 1 and 3`),
+    check("muelle_settings_catalog_check", sql`${t.catalogMode} in ('global','red')`),
   ],
 );
 
