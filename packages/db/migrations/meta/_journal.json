@@ -246,6 +246,20 @@
       "when": 1793061355752,
       "tag": "0034_crm_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793071507064,
+      "tag": "0035_wealthy_ender_wiggin",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793071509842,
+      "tag": "0036_postventa_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -537,6 +537,43 @@ export const deal = pgTable(
   ],
 );
 
+export const TICKET_STATUSES = ["abierto", "en_proceso", "resuelto"] as const;
+
+/** Un ticket de postventa de un cliente. Resuelto ⇔ `resolved_at`; la satisfacción solo se califica resuelto. */
+export const ticket = pgTable(
+  "ticket",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => project.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    severity: integer("severity").notNull().default(2),
+    status: text("status", { enum: TICKET_STATUSES }).notNull().default("abierto"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().default(sql`now()`),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    satisfaction: integer("satisfaction"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_ticket_org_status").on(t.orgId, t.status),
+    check("ticket_severity_range", sql`${t.severity} between 1 and 3`),
+    check("ticket_status_check", sql`${t.status} in ('abierto','en_proceso','resuelto')`),
+    check("ticket_resolved_consistency", sql`(${t.status} = 'resuelto') = (${t.resolvedAt} is not null)`),
+    check(
+      "ticket_satisfaction_range",
+      sql`${t.satisfaction} is null or (${t.satisfaction} between 1 and 5 and ${t.status} = 'resuelto')`,
+    ),
+  ],
+);
+
 export const aiSuggestion = pgTable(
   "ai_suggestion",
   {
@@ -857,7 +894,7 @@ export const orgKpi = pgTable(
     index("idx_org_kpi_org_position").on(t.orgId, t.position),
     check(
       "org_kpi_source_check",
-      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas')`,
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas','postventa')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],

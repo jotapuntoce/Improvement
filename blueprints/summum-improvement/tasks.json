@@ -286,7 +286,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/postventa.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T10",
