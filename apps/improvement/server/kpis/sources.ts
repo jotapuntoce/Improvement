@@ -12,7 +12,8 @@
 import { z } from "zod";
 import { and, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, client, employeePointsLedger, membership, objective, profile, project } from "@jotapuntoce/db/schema";
+import { area, client, deal, employeePointsLedger, membership, objective, profile, project } from "@jotapuntoce/db/schema";
+import { mxMonthStart } from "../crm/deals.ts";
 
 /** Una fila de org_kpi tal como la usa el panel. */
 export interface KpiRow {
@@ -36,7 +37,10 @@ const clientesConfig = z.object({ enRiesgo: z.boolean().default(false) });
 const proyectosConfig = z.object({
   estado: z.enum(["por_autorizar", "en_obra", "avance_promedio"]).default("en_obra"),
 });
-const pendientesConfig = z.object({ responsable: z.enum(["todos", "con", "sin"]).default("todos") });
+const ventasConfig = z.object({
+  metrica: z.enum(["monto_ganado", "tratos_ganados"]).default("monto_ganado"),
+});
+const pendientesConfig =z.object({ responsable: z.enum(["todos", "con", "sin"]).default("todos") });
 
 const PROYECTOS_TEXTO: Record<z.infer<typeof proyectosConfig>["estado"], string> = {
   por_autorizar: "Proyectos por autorizar",
@@ -214,6 +218,35 @@ export const KPI_SOURCES: KpiSource[] = [
           .where(and(...filters))
           .groupBy(objective.orgId),
       );
+    },
+  },
+  {
+    id: "ventas",
+    label: "Ventas del mes",
+    describe: (raw) =>
+      parseConfig(ventasConfig, raw).metrica === "tratos_ganados"
+        ? "Tratos ganados este mes"
+        : "Monto ganado este mes, en pesos",
+    // El mes se cuenta en hora de Ciudad de México (mxMonthStart), nunca con la hora del servidor.
+    load: async (orgIds, raw) => {
+      const c = parseConfig(ventasConfig, raw);
+      const value =
+        c.metrica === "tratos_ganados" ? count : sql<number>`coalesce(sum(${deal.amountCents}), 0)`;
+      const perOrg = byOrg(
+        await db
+          .select({ orgId: deal.orgId, value })
+          .from(deal)
+          .where(
+            and(
+              inArray(deal.orgId, orgIds),
+              eq(deal.stage, "ganado"),
+              sql`${deal.closedAt} >= (${mxMonthStart(new Date())})::timestamp at time zone 'America/Mexico_City'`,
+            ),
+          )
+          .groupBy(deal.orgId),
+      );
+      if (c.metrica === "tratos_ganados") return perOrg;
+      return new Map([...perOrg].map(([orgId, cents]) => [orgId, Math.round(cents / 100)]));
     },
   },
   {
