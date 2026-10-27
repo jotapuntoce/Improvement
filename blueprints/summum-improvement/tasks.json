@@ -347,7 +347,7 @@
       "apps/improvement/server/ai/prompts/nextMove.ts",
       "apps/improvement/tests/next-move.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T2",
