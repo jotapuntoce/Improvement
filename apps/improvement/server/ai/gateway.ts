@@ -3,6 +3,7 @@
 // de escribir esta llamada (blueprint §17) — vive en MODEL_ID, nunca inline en el call site.
 import Anthropic from "@anthropic-ai/sdk";
 import { and, eq, gte, isNotNull } from "drizzle-orm";
+import type { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, objective, orgNeed, client, aiSuggestion, llmCalls } from "@jotapuntoce/db/schema";
 import { requireEnv } from "../../lib/env.ts";
@@ -133,7 +134,7 @@ export type GatewayResult =
  * llamar al proveedor (criterio #4) — el conteo corre ANTES de resolver el proveedor o tocar áreas
  * /objetivos/clientes, para que un org bloqueado nunca dispare ni una query de más.
  */
-async function hasReachedHourlyLimit(orgId: string): Promise<boolean> {
+async function hasReachedHourlyLimit(orgId: string, purpose = "suggestion"): Promise<boolean> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const rows = await db
     .select({ id: llmCalls.id })
@@ -141,7 +142,7 @@ async function hasReachedHourlyLimit(orgId: string): Promise<boolean> {
     .where(
       and(
         eq(llmCalls.orgId, orgId),
-        eq(llmCalls.purpose, "suggestion"),
+        eq(llmCalls.purpose, purpose),
         gte(llmCalls.createdAt, oneHourAgo),
       ),
     );
@@ -256,6 +257,92 @@ export async function generateSuggestion(
   if (!suggestion) throw new Error("transacción de generateSuggestion no devolvió fila");
 
   return { ok: true, data: suggestion };
+}
+
+// ─── Salida estructurada ───────────────────────────────────────────────────────────────────────
+//
+// Para los módulos que traen su propio prompt y esquema (atención al cliente, siguiente movimiento).
+// Mismas reglas que generateSuggestion: límite antes del proveedor, un reintento, uso real en
+// llm_calls. Es interna: la llaman funciones de server/** que ya autorizaron a quien pide.
+
+type AiSuggestionRow = typeof aiSuggestion.$inferSelect;
+
+export type StructuredResult<T> =
+  | { ok: true; data: { suggestion: AiSuggestionRow; parsed: T } }
+  | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
+
+export async function generateStructured<T>(args: {
+  orgId: string;
+  purpose: "atencion_cliente" | "siguiente_movimiento";
+  category: "servicio_cliente" | "siguiente_movimiento";
+  system: string;
+  prompt: string;
+  schema: z.ZodType<T>;
+  toText: (parsed: T) => string;
+  basedOn: Record<string, string[]>;
+  provider?: SuggestionProvider;
+}): Promise<StructuredResult<T>> {
+  if (await hasReachedHourlyLimit(args.orgId, args.purpose)) {
+    return {
+      ok: false,
+      error: { code: "RATE_LIMITED", retryable: false, message: "Este org ya hizo 10 solicitudes de este tipo en la última hora." },
+    };
+  }
+
+  const resolvedProvider = args.provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  const startedAt = Date.now();
+  let completion: SuggestionCompletion | null = null;
+  let parsed: T | null = null;
+
+  // Un solo reintento en fallo de validación (regla ia-gateway.md), después falla explícito.
+  for (let attempt = 0; attempt < 2 && parsed === null; attempt++) {
+    try {
+      completion = await resolvedProvider.complete(args.system, args.prompt);
+    } catch (err) {
+      if (err instanceof ProviderRateLimitError) {
+        return { ok: false, error: { code: "PROVIDER_RATE_LIMIT", retryable: true, message: err.message } };
+      }
+      if (err instanceof ProviderRequestError) {
+        return { ok: false, error: { code: "VALIDATION_ERROR", retryable: false, message: err.message } };
+      }
+      return { ok: false, error: { code: "INTERNAL", retryable: false, message: "Error inesperado del proveedor de IA." } };
+    }
+    const result = args.schema.safeParse(parseCompletion(completion.text));
+    if (result.success) parsed = result.data;
+  }
+  if (parsed === null || completion === null) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", retryable: false, message: "La respuesta del modelo no cumplió el esquema esperado tras un reintento." },
+    };
+  }
+
+  const usage = completion.usage;
+  const finishReason = completion.finishReason;
+  const latencyMs = Date.now() - startedAt;
+  const result = parsed;
+  const suggestion = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(aiSuggestion)
+      .values({ orgId: args.orgId, category: args.category, suggestionText: args.toText(result), basedOn: args.basedOn })
+      .returning();
+    if (!row) throw new Error("insert de ai_suggestion no devolvió fila");
+    await tx.insert(llmCalls).values({
+      orgId: args.orgId,
+      purpose: args.purpose,
+      modelId: MODEL_ID,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+      latencyMs,
+      finishReason,
+      costUsd: estimateCostUsd(usage).toFixed(6),
+    });
+    return row;
+  });
+
+  return { ok: true, data: { suggestion, parsed: result } };
 }
 
 // ─── Agente revisor ────────────────────────────────────────────────────────────────────────────
