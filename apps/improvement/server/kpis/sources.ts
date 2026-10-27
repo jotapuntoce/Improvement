@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { and, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { area, client, deal, employeePointsLedger, membership, objective, profile, project, ticket } from "@jotapuntoce/db/schema";
+import { area, client, deal, employeePointsLedger, experienceGrant, membership, objective, profile, project, ticket } from "@jotapuntoce/db/schema";
 import { mxMonthStart } from "../crm/deals.ts";
 
 /** Una fila de org_kpi tal como la usa el panel. */
@@ -40,6 +40,7 @@ const proyectosConfig = z.object({
 const ventasConfig = z.object({
   metrica: z.enum(["monto_ganado", "tratos_ganados"]).default("monto_ganado"),
 });
+const retornoConfig = z.object({ periodo: z.enum(["mes", "anio"]).default("mes") });
 const postventaConfig = z.object({
   metrica: z.enum(["abiertos", "satisfaccion_promedio", "horas_promedio_resolucion"]).default("abiertos"),
 });
@@ -285,6 +286,42 @@ export const KPI_SOURCES: KpiSource[] = [
       );
       const round = metrica === "satisfaccion_promedio" ? (n: number) => Math.round(n * 10) / 10 : Math.round;
       return new Map([...perOrg].map(([orgId, n]) => [orgId, round(n)]));
+    },
+  },
+  {
+    id: "retorno_experiencias",
+    label: "Retorno en experiencias",
+    describe: (raw) =>
+      parseConfig(retornoConfig, raw).periodo === "anio"
+        ? "Experiencias entregadas ÷ ventas ganadas este año, en %"
+        : "Experiencias entregadas ÷ ventas ganadas este mes, en %",
+    // Lealtad = experiencias, no descuentos. La meta (p. ej. 10 %) es dato del Sello, no de aquí.
+    load: async (orgIds, raw) => {
+      const month = mxMonthStart(new Date());
+      const start = parseConfig(retornoConfig, raw).periodo === "anio" ? `${month.slice(0, 4)}-01-01` : month;
+      const given = byOrg(
+        await db
+          .select({ orgId: experienceGrant.orgId, value: sql<number>`coalesce(sum(${experienceGrant.valueCents}), 0)` })
+          .from(experienceGrant)
+          .where(and(inArray(experienceGrant.orgId, orgIds), sql`${experienceGrant.grantedOn} >= ${start}::date`))
+          .groupBy(experienceGrant.orgId),
+      );
+      const sold = byOrg(
+        await db
+          .select({ orgId: deal.orgId, value: sql<number>`coalesce(sum(${deal.amountCents}), 0)` })
+          .from(deal)
+          .where(
+            and(
+              inArray(deal.orgId, orgIds),
+              eq(deal.stage, "ganado"),
+              sql`${deal.closedAt} >= (${start})::timestamp at time zone 'America/Mexico_City'`,
+            ),
+          )
+          .groupBy(deal.orgId),
+      );
+      return new Map(
+        [...sold].filter(([, cents]) => cents > 0).map(([orgId, cents]) => [orgId, Math.round(((given.get(orgId) ?? 0) * 100) / cents)]),
+      );
     },
   },
   {

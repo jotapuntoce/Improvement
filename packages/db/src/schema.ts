@@ -485,6 +485,8 @@ export const client = pgTable(
     name: text("name").notNull(),
     healthStatus: text("health_status").notNull().default("neutral"),
     notes: text("notes"),
+    // La llave del monedero público del cliente (lealtad). Única: es la que viaja en el enlace.
+    walletToken: text("wallet_token").unique(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -908,7 +910,7 @@ export const orgKpi = pgTable(
     index("idx_org_kpi_org_position").on(t.orgId, t.position),
     check(
       "org_kpi_source_check",
-      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas','postventa')`,
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas','postventa','retorno_experiencias')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],
@@ -1950,4 +1952,56 @@ export const peopleReview = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [unique("uq_people_review_period").on(t.orgId, t.employeeId, t.periodStart)],
+);
+
+// ─── Lealtad ────────────────────────────────────────────────────────────────────────────────────
+// "10 % de retorno" = experiencias, no descuentos. El porcentaje meta es dato (requisito kpi del Sello).
+
+export const LOYALTY_FEATURES = ["vip", "referidos", "cumpleanos", "retos"] as const;
+
+export const loyaltyProgram = pgTable("loyalty_program", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  features: jsonb("features").$type<Partial<Record<(typeof LOYALTY_FEATURES)[number], boolean>>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const loyaltyTier = pgTable(
+  "loyalty_tier",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    minPurchases: integer("min_purchases").notNull().default(0),
+    perks: text("perks").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("loyalty_tier_min_purchases_nonneg", sql`${t.minPurchases} >= 0`)],
+);
+
+export const experienceGrant = pgTable(
+  "experience_grant",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    valueCents: bigint("value_cents", { mode: "number" }).notNull(),
+    grantedOn: date("granted_on").notNull(),
+    grantedBy: uuid("granted_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [check("experience_grant_value_nonneg", sql`${t.valueCents} >= 0`)],
 );
