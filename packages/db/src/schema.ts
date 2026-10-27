@@ -1861,3 +1861,25 @@ export const referralCommission = pgTable(
   },
   (t) => [check("referral_commission_amount_nonneg", sql`${t.amountCents} >= 0`)],
 );
+
+// ─── Personas: Accountability Chart ─────────────────────────────────────────────────────────────
+// Asientos (no personas): cada uno con sus roles y, si lo hay, su responsable. Sección `equipo`.
+
+export const seat = pgTable(
+  "seat",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    parentSeatId: uuid("parent_seat_id").references((): AnyPgColumn => seat.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    roles: text("roles").array().notNull().default(sql`'{}'::text[]`),
+    holderProfileId: uuid("holder_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_seat_org_parent").on(t.orgId, t.parentSeatId)],
+);
