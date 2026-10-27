@@ -377,7 +377,7 @@
       "apps/improvement/app/empresas/[orgId]/page.tsx",
       "apps/improvement/tests/e2e/movimiento.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",

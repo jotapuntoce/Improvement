@@ -10,6 +10,7 @@ import { LogoutButton } from "@/components/LogoutButton.tsx";
 import { loadClients } from "@/server/companies/loadClients.ts";
 import { defaultSelection, loadOwnerPanel } from "@/server/companies/loadOwnerPanel.ts";
 import { loadOwnerTasks } from "@/server/tasks/loadOwnerTasks.ts";
+import { getPortfolioNextMove } from "@/server/ai/nextMove.ts";
 import { createCompanyRequest } from "@/server/companyRequests/mutations.ts";
 import { CONSTRUCTION_PRICE, formatMoney } from "@/server/billing/payments.ts";
 import { ClientPicker } from "./ClientPicker.tsx";
@@ -36,7 +37,7 @@ async function solicitarEmpresa(formData: FormData) {
 export default async function EmpresasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ empresa?: string; solicitar?: string }>;
+  searchParams: Promise<{ empresa?: string; solicitar?: string; error?: string }>;
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
@@ -60,9 +61,10 @@ export default async function EmpresasPage({
     );
   }
 
-  const [{ profile, companies }, tasks, { empresa, solicitar }] = await Promise.all([
+  const [{ profile, companies }, tasks, move, { empresa, solicitar, error }] = await Promise.all([
     loadOwnerPanel(userId),
     loadOwnerTasks(userId),
+    getPortfolioNextMove(userId),
     searchParams,
   ]);
 
@@ -92,7 +94,8 @@ export default async function EmpresasPage({
         </div>
       </div>
 
-      <PendingList tasks={tasks} />
+      {error && <p className="invite-error">{error}</p>}
+      <PendingList tasks={tasks} move={move} />
 
       {!selected && (
         <p className="owner-panel-empty">
