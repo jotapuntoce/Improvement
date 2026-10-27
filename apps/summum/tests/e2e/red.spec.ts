@@ -5,7 +5,7 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { affiliate, membership, organization, pactoPillar, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
+import { affiliate, course, membership, organization, pactoPillar, PERSONALITY_QUESTIONS, powerupPartner, profile, sealEvaluation, specialty } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -36,6 +36,7 @@ test.beforeAll(async () => {
   await db.insert(membership).values({ userId: people.owner.id, orgId: muelleId, role: "owner", acceptedAt: new Date() });
   await db.insert(specialty).values({ muelleOrgId: muelleId, key: "comercial", label: "Comercial" });
   await db.insert(pactoPillar).values({ muelleOrgId: muelleId, name: "Cuerpo" });
+  await db.insert(course).values({ muelleOrgId: muelleId, title: "Ventas consultivas", minLevel: 9, published: true });
   const [ana] = await db
     .insert(affiliate)
     .values({
@@ -231,4 +232,45 @@ test("WHEN el dueño crea el pilar Descanso en /muelle/[muelleId]/pacto THE SYST
   await Promise.all([page.waitForResponse((r) => r.request().method() === "POST"), page.getByRole("button", { name: "Crear pilar" }).click()]);
   await page.goto(url);
   await expect(page.getByRole("listitem").filter({ hasText: "Descanso" })).toBeVisible();
+});
+
+test("WHEN la afiliada abre el aula sin publicaciones THE SYSTEM SHALL mostrar Nivel 1 y Ventas consultivas bloqueado hasta el nivel 9", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/aula`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Aula" })).toBeVisible();
+  await expect(page.getByText("Nivel 1", { exact: true })).toBeVisible();
+  const curso = page.getByRole("region", { name: "Ventas consultivas" });
+  await expect(curso).toContainText("Se abre en el nivel 9");
+});
+
+test("WHEN la afiliada publica Hola red en la comunidad THE SYSTEM SHALL mostrarlo en el feed", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  const url = `/red/${muelleId}/comunidad`;
+  expect((await page.goto(url))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Comunidad" })).toBeVisible();
+  await page.getByLabel("Publicación").fill("Hola red");
+  await Promise.all([page.waitForResponse((r) => r.request().method() === "POST"), page.getByRole("button", { name: "Publicar" }).click()]);
+  await page.goto(url);
+  await expect(page.getByRole("listitem").filter({ hasText: "Hola red" })).toBeVisible();
+});
+
+test("WHEN la afiliada abre el calendario THE SYSTEM SHALL responder 200 con h1 Calendario", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/calendario`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Calendario" })).toBeVisible();
+});
+
+test("WHEN la afiliada abre referidos THE SYSTEM SHALL mostrar su enlace con /r/; el dueño ve Devengado, no pagado", async ({ page, context, baseURL }) => {
+  await as(context, people.afiliada.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/referidos`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Referidos" })).toBeVisible();
+  await expect(page.locator('a[href*="/r/"]')).toHaveCount(1);
+  await as(context, people.owner.token, baseURL);
+  await page.goto(`/red/${muelleId}/referidos`);
+  await expect(page.getByText("Devengado, no pagado")).toBeVisible();
+});
+
+test("WHEN un perfil sin relación abre el aula THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+  await as(context, people.ajeno.token, baseURL);
+  expect((await page.goto(`/red/${muelleId}/aula`))?.status()).toBe(404);
 });
