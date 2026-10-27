@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization, profile } from "@jotapuntoce/db/schema";
-import { assertBarcoOwner, assertDockOwner, listMyBarcos, listMyDocks, requireBarcoOwnership, requireDockOwnership } from "../server/auth/guard.ts";
+import { affiliate, membership, organization, profile } from "@jotapuntoce/db/schema";
+import { assertBarcoOwner, assertDockOwner, assertNetworkMember, listMyBarcos, listMyDocks, requireBarcoOwnership, requireDockOwnership } from "../server/auth/guard.ts";
 
 // Sin cookie de sesión: getSessionUserId() devuelve null.
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
@@ -112,5 +112,24 @@ describe("sin sesión", () => {
   });
   it("WHEN no hay sesión y no hay ruta THE SYSTEM SHALL redirigir a /login a secas", async () => {
     await expect(requireDockOwnership(id)).rejects.toMatchObject({ digest: expect.stringMatching(/NEXT_REDIRECT.*\/login;/) });
+  });
+});
+
+describe("assertNetworkMember", () => {
+  it("WHEN es dueño del muelle o afiliada activa THE SYSTEM SHALL dejar pasar; empleado de barco y suspendida reciben 404", async () => {
+    const dock = await org("muelle");
+    const boat = await org("barco", dock.id);
+    const owner = await person(dock.id);
+    const empleado = await person(boat.id, "employee");
+    const ana = await person();
+    const sus = await person();
+    await db.insert(affiliate).values([
+      { profileId: ana, muelleOrgId: dock.id, displayName: "Ana", publicSlug: `ana-${ana}` },
+      { profileId: sus, muelleOrgId: dock.id, displayName: "Sus", publicSlug: `sus-${sus}`, status: "suspendida" },
+    ]);
+    await expect(assertNetworkMember(owner, dock.id)).resolves.toBeUndefined();
+    await expect(assertNetworkMember(ana, dock.id)).resolves.toBeUndefined();
+    await expect(assertNetworkMember(empleado, dock.id)).rejects.toMatchObject(NOT_FOUND);
+    await expect(assertNetworkMember(sus, dock.id)).rejects.toMatchObject(NOT_FOUND);
   });
 });

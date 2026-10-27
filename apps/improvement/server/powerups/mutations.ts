@@ -3,7 +3,9 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { employeePointsLedger, powerupPartner, powerupRedemption } from "@jotapuntoce/db/schema";
+import { log } from "@/lib/logger.ts";
 import { assertMembership } from "../auth/guard.ts";
+import { isInCatalog } from "./catalog.ts";
 
 /**
  * Balance = suma del ledger de puntos ganados menos suma de puntos gastados en canjes NO
@@ -44,7 +46,11 @@ export async function redeemPowerup(userId: string, orgId: string, partnerId: st
 
   return db.transaction(async (tx) => {
     const [partner] = await tx.select().from(powerupPartner).where(eq(powerupPartner.id, partnerId)).limit(1);
-    if (!partner) {
+    // Un premio fuera del catálogo del org (p. ej. uno global en un barco en modo `red`) no existe para él.
+    // Esa línea de log es la señal del criterio de aborto 3 de §9.1.
+    const inCatalog = partner ? await isInCatalog(partnerId, orgId) : false;
+    if (partner && !inCatalog) log("powerup_not_in_catalog", { org_id: orgId, partner_id: partnerId }, "warn");
+    if (!partner || !inCatalog) {
       return {
         ok: false as const,
         error: { code: "NOT_FOUND" as const, message: "El PowerUp no existe." },

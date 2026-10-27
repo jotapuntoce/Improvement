@@ -172,6 +172,8 @@ export const area = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color").notNull(),
+    // La especialidad de la red (specialty.key) que atiende esta área. Dato, no FK: la red vive en otro org.
+    specialtyKey: text("specialty_key"),
     createdAt: createdAt(),
   },
   (t) => [index("idx_area_org_id").on(t.orgId)],
@@ -295,6 +297,10 @@ export const orgNeed = pgTable(
  * Distinto de `assembly` (Planos): eso es la herramienta con la que Jose Carlos dibuja cómo se
  * arma un producto. Esto es la cartera de trabajo del cliente.
  */
+// Antes de `project` y no junto a las de Dirección: pgTable evalúa el `enum` al definir la tabla.
+export const PROJECT_AUTHORIZATION = ["pendiente", "autorizado", "rechazado"] as const;
+export const STAGE_STATUSES = ["pendiente", "en_curso", "terminada"] as const;
+
 export const project = pgTable(
   "project",
   {
@@ -313,14 +319,57 @@ export const project = pgTable(
     // cero objetivos cerrados, y un porcentaje calculado mentiría con cara de dato duro.
     progress: integer("progress").notNull().default(0),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    // Proyectos/obra (blueprint summum-improvement §4): un proyecto nace 'pendiente' y el dueño lo
+    // autoriza. Los que ya existían quedan 'autorizado' en la migración proyectos_rls.
+    authorizationStatus: text("authorization_status", { enum: PROJECT_AUTHORIZATION })
+      .notNull()
+      .default("pendiente"),
+    authorizedBy: uuid("authorized_by").references(() => profile.id, { onDelete: "set null" }),
+    authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+    ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("idx_project_org_id").on(t.orgId),
     index("idx_project_org_status").on(t.orgId, t.status),
+    index("idx_project_org_authorization").on(t.orgId, t.authorizationStatus),
     check("project_status_check", sql`${t.status} in ('activo','pausado','terminado')`),
     check("project_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    check(
+      "project_authorization_check",
+      sql`${t.authorizationStatus} in ('pendiente','autorizado','rechazado')`,
+    ),
+  ],
+);
+
+/**
+ * Las etapas de un proyecto. `weight` dice cuánto pesa cada una en el avance del proyecto y
+ * `progress` cuánto lleva; el avance ponderado lo calcula server/erp/projects.ts, no una columna.
+ */
+export const projectStage = pgTable(
+  "project_stage",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull().default(0),
+    weight: integer("weight").notNull().default(1),
+    progress: integer("progress").notNull().default(0),
+    status: text("status", { enum: STAGE_STATUSES }).notNull().default("pendiente"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_project_stage_project_position").on(t.projectId, t.position),
+    check("project_stage_weight_range", sql`${t.weight} >= 1 AND ${t.weight} <= 100`),
+    check("project_stage_progress_range", sql`${t.progress} >= 0 AND ${t.progress} <= 100`),
+    check("project_stage_status_check", sql`${t.status} in ('pendiente','en_curso','terminada')`),
   ],
 );
 /**
@@ -380,16 +429,28 @@ export const employeePointsLedger = pgTable(
 );
 
 // Catálogo GLOBAL — no org-scoped, compartido entre todas las empresas cliente.
-export const powerupPartner = pgTable("powerup_partner", {
-  id: id(),
-  businessName: text("business_name").notNull(),
-  category: text("category").notNull(),
-  discountDescription: text("discount_description").notNull(),
-  redemptionInstructions: text("redemption_instructions").notNull(),
-  pointsCost: integer("points_cost").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: createdAt(),
-});
+/** Qué catálogo de PowerUps ven los barcos de un muelle: el global de siempre o el de su red. */
+export const CATALOG_MODES = ["global", "red"] as const;
+
+export const powerupPartner = pgTable(
+  "powerup_partner",
+  {
+    id: id(),
+    businessName: text("business_name").notNull(),
+    category: text("category").notNull(),
+    discountDescription: text("discount_description").notNull(),
+    redemptionInstructions: text("redemption_instructions").notNull(),
+    pointsCost: integer("points_cost").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    // Catálogo de la red (blueprint summum-improvement §9.1): null = premio del catálogo global.
+    networkOrgId: uuid("network_org_id").references(() => organization.id, { onDelete: "set null" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "set null" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "set null" }),
+    publishedBy: uuid("published_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("idx_powerup_partner_network").on(t.networkOrgId, t.isActive)],
+);
 
 export const powerupRedemption = pgTable(
   "powerup_redemption",
@@ -424,12 +485,108 @@ export const client = pgTable(
     name: text("name").notNull(),
     healthStatus: text("health_status").notNull().default("neutral"),
     notes: text("notes"),
+    // La llave del monedero público del cliente (lealtad). Única: es la que viaja en el enlace.
+    walletToken: text("wallet_token").unique(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("idx_client_org_id").on(t.orgId),
     check("client_health_status_check", sql`${t.healthStatus} in ('healthy','neutral','at_risk')`),
+  ],
+);
+
+// ── CRM (blueprint summum-improvement §4) ────────────────────────────────────────────────────────
+// Antes de `deal`: pgTable evalúa el `enum` al definir la tabla.
+export const DEAL_STAGES = ["prospecto", "propuesta", "negociacion", "ganado", "perdido"] as const;
+
+/**
+ * La hiperpersonalización de un cliente: sus respuestas a las seis preguntas de HIPER_QUESTIONS
+ * (server/crm/preferences.ts) y, si se le falló, qué expectativa no se cumplió. Una fila por cliente.
+ */
+export const clientPreference = pgTable(
+  "client_preference",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .unique()
+      .references(() => client.id, { onDelete: "cascade" }),
+    answers: jsonb("answers").notNull().default(sql`'{}'::jsonb`),
+    unmetNote: text("unmet_note"),
+    unmetFlaggedAt: timestamp("unmet_flagged_at", { withTimezone: true }),
+    updatedBy: uuid("updated_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+);
+
+/** Un trato de venta con un cliente. Cerrado ⇔ `ganado` o `perdido`, y la base lo hace cumplir. */
+export const deal = pgTable(
+  "deal",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    currency: text("currency").notNull().default("mxn"),
+    stage: text("stage", { enum: DEAL_STAGES }).notNull().default("prospecto"),
+    ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_deal_org_stage").on(t.orgId, t.stage),
+    index("idx_deal_client").on(t.clientId),
+    check("deal_stage_check", sql`${t.stage} in ('prospecto','propuesta','negociacion','ganado','perdido')`),
+    check("deal_amount_nonneg", sql`${t.amountCents} >= 0`),
+    check("deal_closed_consistency", sql`(${t.stage} in ('ganado','perdido')) = (${t.closedAt} is not null)`),
+  ],
+);
+
+export const TICKET_STATUSES = ["abierto", "en_proceso", "resuelto"] as const;
+
+/** Un ticket de postventa de un cliente. Resuelto ⇔ `resolved_at`; la satisfacción solo se califica resuelto. */
+export const ticket = pgTable(
+  "ticket",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => project.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    severity: integer("severity").notNull().default(2),
+    status: text("status", { enum: TICKET_STATUSES }).notNull().default("abierto"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().default(sql`now()`),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    satisfaction: integer("satisfaction"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_ticket_org_status").on(t.orgId, t.status),
+    check("ticket_severity_range", sql`${t.severity} between 1 and 3`),
+    check("ticket_status_check", sql`${t.status} in ('abierto','en_proceso','resuelto')`),
+    check("ticket_resolved_consistency", sql`(${t.status} = 'resuelto') = (${t.resolvedAt} is not null)`),
+    check(
+      "ticket_satisfaction_range",
+      sql`${t.satisfaction} is null or (${t.satisfaction} between 1 and 5 and ${t.status} = 'resuelto')`,
+    ),
   ],
 );
 
@@ -448,7 +605,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento')`),
   ],
 );
 
@@ -753,7 +910,7 @@ export const orgKpi = pgTable(
     index("idx_org_kpi_org_position").on(t.orgId, t.position),
     check(
       "org_kpi_source_check",
-      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual')`,
+      sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual','proyectos','pendientes','ventas','postventa','retorno_experiencias')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
   ],
@@ -1089,4 +1246,762 @@ export const meetingRating = pgTable(
     unique("uq_meeting_rating_person").on(t.meetingId, t.profileId),
     check("meeting_rating_range", sql`${t.rating} between 1 and 10`),
   ],
+);
+
+// ─── Red de afiliadas (blueprint summum-improvement §4) ────────────────────────────────────────
+
+export const AFFILIATE_STATUSES = ["activa", "suspendida"] as const;
+export const PERSONALITY_SUBJECTS = ["afiliada", "dueno"] as const;
+
+const FRECUENCIA = [
+  { value: "siempre", label: "Siempre" },
+  { value: "casi_siempre", label: "Casi siempre" },
+  { value: "a_veces", label: "A veces" },
+] as const;
+
+export const PERSONALITY_VERSION = 1;
+
+/** Cuestionario de personalidad y enfoque, v1. Producto, no cliente: lo usan Summum e Improvement. */
+export const PERSONALITY_QUESTIONS = [
+  { key: "valor_cumplir", question: "Cumplo lo que prometo, en tiempo y forma.", options: FRECUENCIA },
+  { key: "valor_venta_pull", question: "Vendo sin presionar: el cliente llega porque ve el valor.", options: FRECUENCIA },
+  { key: "valor_relacion", question: "Conozco a fondo a cada cliente y personalizo lo que le doy.", options: FRECUENCIA },
+  { key: "valor_retorno", question: "Reinvierto en experiencias para mis clientes, no en descuentos.", options: FRECUENCIA },
+  { key: "valor_transformacion", question: "Trabajo en mi propia transformación: cuerpo, mente y orden.", options: FRECUENCIA },
+  {
+    key: "ritmo",
+    question: "¿A qué ritmo trabajas mejor?",
+    options: [
+      { value: "rapido_iterativo", label: "Rápido, probando y corrigiendo" },
+      { value: "constante_planeado", label: "Constante y planeado" },
+      { value: "por_proyectos", label: "Por proyectos, con picos de trabajo" },
+    ],
+  },
+  {
+    key: "comunicacion",
+    question: "¿Cómo prefieres comunicarte?",
+    options: [
+      { value: "directo_breve", label: "Directo y breve" },
+      { value: "detallado_escrito", label: "Detallado y por escrito" },
+      { value: "conversado", label: "Conversado, en persona o llamada" },
+    ],
+  },
+  {
+    key: "decision",
+    question: "¿Cómo tomas decisiones?",
+    options: [
+      { value: "datos", label: "Con datos" },
+      { value: "experiencia", label: "Con experiencia e intuición" },
+      { value: "consenso", label: "En consenso con el equipo" },
+    ],
+  },
+  {
+    key: "tipo_negocio",
+    question: "¿Con qué tipo de negocio trabajas mejor?",
+    options: [
+      { value: "servicios", label: "Servicios" },
+      { value: "productos", label: "Productos" },
+      { value: "proyectos_obra", label: "Proyectos y obra" },
+    ],
+  },
+] as const;
+
+/** true solo con exactamente las nueve llaves y cada valor dentro de sus options. */
+export function personalityAnswersValid(answers: unknown): answers is Record<string, string> {
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
+  const entries = answers as Record<string, unknown>;
+  if (Object.keys(entries).length !== PERSONALITY_QUESTIONS.length) return false;
+  return PERSONALITY_QUESTIONS.every((q) => q.options.some((o) => o.value === entries[q.key]));
+}
+
+/** Porcentaje (0-100, redondeado) de respuestas iguales entre dos cuestionarios. */
+export function personalityMatch(a: Record<string, string>, b: Record<string, string>): number {
+  const iguales = PERSONALITY_QUESTIONS.filter((q) => a[q.key] !== undefined && a[q.key] === b[q.key]).length;
+  return Math.round((iguales / PERSONALITY_QUESTIONS.length) * 100);
+}
+
+export const specialty = pgTable(
+  "specialty",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_specialty_muelle_key").on(t.muelleOrgId, t.key)],
+);
+
+export const affiliate = pgTable(
+  "affiliate",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "set null" }),
+    displayName: text("display_name").notNull(),
+    specialtyKeys: text("specialty_keys").array().notNull().default(sql`'{}'`),
+    status: text("status", { enum: AFFILIATE_STATUSES }).notNull().default("activa"),
+    publicSlug: text("public_slug").notNull().unique(),
+    publicBio: text("public_bio"),
+    directoryOptIn: boolean("directory_opt_in").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_affiliate_profile_muelle").on(t.profileId, t.muelleOrgId),
+    check("affiliate_status_check", sql`${t.status} in ('activa','suspendida')`),
+  ],
+);
+
+export const personalityProfile = pgTable(
+  "personality_profile",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: PERSONALITY_SUBJECTS }).notNull(),
+    // El org donde contestó el dueño; null para una afiliada.
+    orgId: uuid("org_id").references(() => organization.id, { onDelete: "set null" }),
+    answers: jsonb("answers").notNull(),
+    questionnaireVersion: integer("questionnaire_version").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_personality_profile_subject").on(t.profileId, t.subjectKind),
+    check("personality_subject_check", sql`${t.subjectKind} in ('afiliada','dueno')`),
+  ],
+);
+
+// ─── Sello Cénit y sinapsis (blueprint summum-improvement §4) ──────────────────────────────────
+
+export const SEAL_SOURCES = ["manual", "kpi"] as const;
+export const SEAL_SUBJECTS = ["barco", "afiliada"] as const;
+export const SEAL_APPROVAL = ["pendiente", "aprobada", "rechazada"] as const;
+export const SEAL_VIGENCIA = ["vigente", "en_riesgo", "reevaluacion", "suspendido"] as const;
+export const PROPOSAL_STATUSES = ["propuesta", "aprobada_socios", "activa", "rechazada"] as const;
+
+/** Los parámetros de la red de un muelle, como datos. min_seal_score null = sin mínimo: nadie se certifica. */
+export const muelleSettings = pgTable(
+  "muelle_settings",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    minSealScore: integer("min_seal_score"),
+    graceDays: integer("grace_days").notNull().default(30),
+    proposalMinSeverity: integer("proposal_min_severity").notNull().default(3),
+    catalogMode: text("catalog_mode", { enum: CATALOG_MODES }).notNull().default("global"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("muelle_settings_grace_days_range", sql`${t.graceDays} between 1 and 365`),
+    check("muelle_settings_min_severity_range", sql`${t.proposalMinSeverity} between 1 and 3`),
+    check("muelle_settings_catalog_check", sql`${t.catalogMode} in ('global','red')`),
+  ],
+);
+
+export const sealRequirement = pgTable(
+  "seal_requirement",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    points: integer("points").notNull(),
+    source: text("source", { enum: SEAL_SOURCES }).notNull(),
+    // Para `kpi`: { source, config, op: "gte" | "lte", threshold }.
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_seal_requirement_code").on(t.muelleOrgId, t.code),
+    check("seal_requirement_points_range", sql`${t.points} between 1 and 100`),
+    check("seal_requirement_source_check", sql`${t.source} in ('manual','kpi')`),
+  ],
+);
+
+/** La marca de un requisito manual para un sujeto (un barco o una afiliada). */
+export const sealRequirementResult = pgTable(
+  "seal_requirement_result",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    requirementId: uuid("requirement_id")
+      .notNull()
+      .references(() => sealRequirement.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: SEAL_SUBJECTS }).notNull(),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "cascade" }),
+    met: boolean("met").notNull(),
+    evidenceNote: text("evidence_note"),
+    decidedBy: uuid("decided_by").references(() => profile.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [
+    check("seal_result_subject_kind_check", sql`${t.subjectKind} in ('barco','afiliada')`),
+    check(
+      "seal_result_subject",
+      sql`(${t.subjectKind} = 'barco' and ${t.barcoOrgId} is not null and ${t.affiliateId} is null) or (${t.subjectKind} = 'afiliada' and ${t.affiliateId} is not null and ${t.barcoOrgId} is null)`,
+    ),
+    uniqueIndex("uq_seal_result_barco").on(t.requirementId, t.barcoOrgId).where(sql`${t.barcoOrgId} is not null`),
+    uniqueIndex("uq_seal_result_affiliate").on(t.requirementId, t.affiliateId).where(sql`${t.affiliateId} is not null`),
+  ],
+);
+
+export const sealEvaluation = pgTable(
+  "seal_evaluation",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind", { enum: SEAL_SUBJECTS }).notNull(),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id").references(() => affiliate.id, { onDelete: "cascade" }),
+    score: integer("score").notNull(),
+    // El mínimo vigente al calcular.
+    minScore: integer("min_score"),
+    approvalStatus: text("approval_status", { enum: SEAL_APPROVAL }).notNull().default("pendiente"),
+    firstApproverId: uuid("first_approver_id").references(() => profile.id),
+    secondApproverId: uuid("second_approver_id").references(() => profile.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    vigencia: text("vigencia", { enum: SEAL_VIGENCIA }),
+    riskSince: timestamp("risk_since", { withTimezone: true }),
+    lastComputedAt: timestamp("last_computed_at", { withTimezone: true }).notNull().default(sql`now()`),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("seal_evaluation_subject_kind_check", sql`${t.subjectKind} in ('barco','afiliada')`),
+    check(
+      "seal_evaluation_subject",
+      sql`(${t.subjectKind} = 'barco' and ${t.barcoOrgId} is not null and ${t.affiliateId} is null) or (${t.subjectKind} = 'afiliada' and ${t.affiliateId} is not null and ${t.barcoOrgId} is null)`,
+    ),
+    check("seal_evaluation_approval_check", sql`${t.approvalStatus} in ('pendiente','aprobada','rechazada')`),
+    check("seal_evaluation_otra_firma", sql`${t.secondApproverId} is null or ${t.secondApproverId} <> ${t.firstApproverId}`),
+    check(
+      "seal_evaluation_vigencia_check",
+      sql`${t.vigencia} is null or ${t.vigencia} in ('vigente','en_riesgo','reevaluacion','suspendido')`,
+    ),
+    uniqueIndex("uq_seal_eval_pending_barco").on(t.barcoOrgId).where(sql`${t.approvalStatus} = 'pendiente'`),
+    uniqueIndex("uq_seal_eval_pending_affiliate").on(t.affiliateId).where(sql`${t.approvalStatus} = 'pendiente'`),
+  ],
+);
+
+/** Opt-in del barco al directorio público. */
+export const barcoListing = pgTable("barco_listing", {
+  id: id(),
+  barcoOrgId: uuid("barco_org_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  publicSlug: text("public_slug").notNull().unique(),
+  publicBio: text("public_bio"),
+  optIn: boolean("opt_in").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Una afiliada propuesta para una necesidad de un barco: firman dos socios y decide el dueño del barco. */
+export const specialistProposal = pgTable(
+  "specialist_proposal",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    // El barco.
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    orgNeedId: uuid("org_need_id")
+      .notNull()
+      .references(() => orgNeed.id, { onDelete: "cascade" }),
+    affiliateId: uuid("affiliate_id")
+      .notNull()
+      .references(() => affiliate.id, { onDelete: "cascade" }),
+    // Puntaje del Sello al proponer.
+    sealScore: integer("seal_score"),
+    matchScore: integer("match_score").notNull(),
+    status: text("status", { enum: PROPOSAL_STATUSES }).notNull().default("propuesta"),
+    firstPartnerId: uuid("first_partner_id").references(() => profile.id),
+    secondPartnerId: uuid("second_partner_id").references(() => profile.id),
+    partnersApprovedAt: timestamp("partners_approved_at", { withTimezone: true }),
+    ownerDecidedBy: uuid("owner_decided_by").references(() => profile.id),
+    ownerDecidedAt: timestamp("owner_decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("specialist_proposal_match_range", sql`${t.matchScore} between 0 and 100`),
+    check("specialist_proposal_status_check", sql`${t.status} in ('propuesta','aprobada_socios','activa','rechazada')`),
+    check("specialist_proposal_otra_firma", sql`${t.secondPartnerId} is null or ${t.secondPartnerId} <> ${t.firstPartnerId}`),
+    unique("uq_proposal_need_affiliate").on(t.orgNeedId, t.affiliateId),
+    uniqueIndex("uq_proposal_open_need").on(t.orgNeedId).where(sql`${t.status} in ('propuesta','aprobada_socios','activa')`),
+  ],
+);
+
+// ─── Pacto (blueprint summum-improvement §4) ────────────────────────────────────────────────────
+// Hábitos de salud (LFPDPPP, datos sensibles): consentimiento expreso antes del primer registro, y cada
+// fila de consentimiento, registro o pausa la lee SOLO su dueño (RLS en la migración pacto_rls).
+
+/** La versión del texto de consentimiento que acepta la persona; súbela cuando cambie el texto. */
+export const PACTO_CONSENT_VERSION = 1;
+
+export const pactoConsent = pgTable("pacto_consent", {
+  id: id(),
+  profileId: uuid("profile_id")
+    .notNull()
+    .unique()
+    .references(() => profile.id, { onDelete: "cascade" }),
+  consentTextVersion: integer("consent_text_version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Los pilares del Pacto de un muelle, como filas. */
+export const pactoPillar = pgTable("pacto_pillar", {
+  id: id(),
+  muelleOrgId: uuid("muelle_org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const pactoEntry = pgTable(
+  "pacto_entry",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    pillarId: uuid("pillar_id")
+      .notNull()
+      .references(() => pactoPillar.id, { onDelete: "cascade" }),
+    entryDate: date("entry_date").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_pacto_entry_day").on(t.profileId, t.pillarId, t.entryDate)],
+);
+
+/** La posada: días en que la racha no se rompe. */
+export const pactoPause = pgTable(
+  "pacto_pause",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    reason: text("reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [check("pacto_pause_range", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
+
+// ─── Escuadras y retos del Pacto ────────────────────────────────────────────────────────────────
+// La escuadra ve a sus miembros y un estado de apoyo (bien / apoyo), nunca registros, notas ni pilares.
+
+export const squad = pgTable("squad", {
+  id: id(),
+  muelleOrgId: uuid("muelle_org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
+
+export const squadMember = pgTable(
+  "squad_member",
+  {
+    id: id(),
+    squadId: uuid("squad_id")
+      .notNull()
+      .references(() => squad.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_squad_member").on(t.squadId, t.profileId)],
+);
+
+export const challenge = pgTable(
+  "challenge",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    squadId: uuid("squad_id").references(() => squad.id, { onDelete: "cascade" }),
+    pillarId: uuid("pillar_id").references(() => pactoPillar.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [check("challenge_range", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
+
+export const challengeParticipant = pgTable(
+  "challenge_participant",
+  {
+    id: id(),
+    challengeId: uuid("challenge_id")
+      .notNull()
+      .references(() => challenge.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [unique("uq_challenge_participant").on(t.challengeId, t.profileId)],
+);
+
+// ─── Comunidad de la red ────────────────────────────────────────────────────────────────────────
+// Feed, calendario y aula de la red de afiliadas: la leen los dueños del muelle y las afiliadas activas.
+
+export const post = pgTable(
+  "post",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_post_muelle_created").on(t.muelleOrgId, t.createdAt),
+    check("post_body_length", sql`length(${t.body}) between 1 and 4000`),
+  ],
+);
+
+export const comment = pgTable(
+  "comment",
+  {
+    id: id(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("comment_body_length", sql`length(${t.body}) between 1 and 2000`)],
+);
+
+export const communityEvent = pgTable(
+  "community_event",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    liveUrl: text("live_url"),
+    description: text("description").notNull().default(""),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("community_event_range", sql`${t.endsAt} is null or ${t.endsAt} >= ${t.startsAt}`),
+    check("community_event_live_url_https", sql`${t.liveUrl} is null or ${t.liveUrl} like 'https://%'`),
+  ],
+);
+
+export const course = pgTable(
+  "course",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    minLevel: integer("min_level").notNull().default(1),
+    position: integer("position").notNull().default(0),
+    published: boolean("published").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("course_min_level_range", sql`${t.minLevel} between 1 and 9`)],
+);
+
+export const lesson = pgTable(
+  "lesson",
+  {
+    id: id(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => course.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    videoUrl: text("video_url"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("lesson_video_url_https", sql`${t.videoUrl} is null or ${t.videoUrl} like 'https://%'`)],
+);
+
+export const lessonCompletion = pgTable(
+  "lesson_completion",
+  {
+    id: id(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lesson.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [unique("uq_lesson_completion").on(t.lessonId, t.profileId)],
+);
+
+// ─── Referidos ──────────────────────────────────────────────────────────────────────────────────
+// La comisión se devenga sobre ledger_entry.summum_fee_cents de los barcos referidos y solo se reporta.
+
+export const referralLink = pgTable(
+  "referral_link",
+  {
+    id: id(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    code: text("code").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_referral_link_profile_muelle").on(t.profileId, t.muelleOrgId)],
+);
+
+export const referralAttribution = pgTable(
+  "referral_attribution",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    referralLinkId: uuid("referral_link_id")
+      .notNull()
+      .references(() => referralLink.id, { onDelete: "restrict" }),
+    shareBps: integer("share_bps").notNull(),
+    journeyMonths: integer("journey_months").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    proposedBy: uuid("proposed_by")
+      .notNull()
+      .references(() => profile.id),
+    approvedBy: uuid("approved_by").references(() => profile.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("referral_attribution_share_range", sql`${t.shareBps} between 0 and 10000`),
+    check("referral_attribution_journey_range", sql`${t.journeyMonths} between 1 and 60`),
+    check("referral_attribution_otra_firma", sql`${t.approvedBy} is null or ${t.approvedBy} <> ${t.proposedBy}`),
+  ],
+);
+
+export const referralCommission = pgTable(
+  "referral_commission",
+  {
+    id: id(),
+    attributionId: uuid("attribution_id")
+      .notNull()
+      .references(() => referralAttribution.id, { onDelete: "restrict" }),
+    ledgerEntryId: uuid("ledger_entry_id")
+      .notNull()
+      .unique()
+      .references(() => ledgerEntry.id, { onDelete: "restrict" }),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("referral_commission_amount_nonneg", sql`${t.amountCents} >= 0`)],
+);
+
+// ─── Personas: Accountability Chart ─────────────────────────────────────────────────────────────
+// Asientos (no personas): cada uno con sus roles y, si lo hay, su responsable. Sección `equipo`.
+
+export const seat = pgTable(
+  "seat",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    parentSeatId: uuid("parent_seat_id").references((): AnyPgColumn => seat.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    roles: text("roles").array().notNull().default(sql`'{}'::text[]`),
+    holderProfileId: uuid("holder_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_seat_org_parent").on(t.orgId, t.parentSeatId)],
+);
+
+// ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
+// Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
+
+export const oneOnOne = pgTable("one_on_one", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id")
+    .notNull()
+    .references(() => profile.id, { onDelete: "cascade" }),
+  heldBy: uuid("held_by").references(() => profile.id, { onDelete: "set null" }),
+  heldOn: date("held_on").notNull(),
+  sharedNotes: text("shared_notes").notNull().default(""),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const checkin = pgTable(
+  "checkin",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    weekStart: date("week_start").notNull(),
+    mood: integer("mood").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_checkin_week").on(t.orgId, t.profileId, t.weekStart),
+    check("checkin_monday", sql`extract(isodow from ${t.weekStart}) = 1`),
+    check("checkin_mood_range", sql`${t.mood} between 1 and 5`),
+  ],
+);
+
+// ─── Personas: People Analyzer ──────────────────────────────────────────────────────────────────
+// Mismo cuidado que responsibility_level: la persona evaluada y el dueño, nadie más. Nunca un ranking.
+
+export const PEOPLE_RATINGS = ["+", "+/-", "-"] as const;
+
+export const peopleReview = pgTable(
+  "people_review",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    reviewerId: uuid("reviewer_id").references(() => profile.id, { onDelete: "set null" }),
+    periodStart: date("period_start").notNull(),
+    // { [valor central]: "+" | "+/-" | "-" }
+    ratings: jsonb("ratings").$type<Record<string, (typeof PEOPLE_RATINGS)[number]>>().notNull(),
+    gwc: jsonb("gwc").$type<{ entiende: boolean; quiere: boolean; capacidad: boolean }>().notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("uq_people_review_period").on(t.orgId, t.employeeId, t.periodStart)],
+);
+
+// ─── Lealtad ────────────────────────────────────────────────────────────────────────────────────
+// "10 % de retorno" = experiencias, no descuentos. El porcentaje meta es dato (requisito kpi del Sello).
+
+export const LOYALTY_FEATURES = ["vip", "referidos", "cumpleanos", "retos"] as const;
+
+export const loyaltyProgram = pgTable("loyalty_program", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .unique()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  features: jsonb("features").$type<Partial<Record<(typeof LOYALTY_FEATURES)[number], boolean>>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const loyaltyTier = pgTable(
+  "loyalty_tier",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    minPurchases: integer("min_purchases").notNull().default(0),
+    perks: text("perks").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("loyalty_tier_min_purchases_nonneg", sql`${t.minPurchases} >= 0`)],
+);
+
+export const experienceGrant = pgTable(
+  "experience_grant",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => client.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    valueCents: bigint("value_cents", { mode: "number" }).notNull(),
+    grantedOn: date("granted_on").notNull(),
+    grantedBy: uuid("granted_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [check("experience_grant_value_nonneg", sql`${t.valueCents} >= 0`)],
 );

@@ -6,7 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization } from "@jotapuntoce/db/schema";
+import { affiliate, membership, organization } from "@jotapuntoce/db/schema";
 import { env } from "@/lib/env.ts";
 
 export const SESSION_COOKIE = "sum-access-token";
@@ -60,6 +60,45 @@ export async function requireBarcoOwnership(barcoId: string, path?: string) {
   const userId = await getSessionUserId();
   if (!userId) toLogin(path);
   return assertBarcoOwner(userId, barcoId);
+}
+
+/**
+ * El Pacto es de toda la red del muelle: sus dueños, sus afiliadas activas y cualquier miembro (de cualquier
+ * rol) de un barco que cuelga de él. Para todos los demás, 404.
+ */
+export async function assertPactoAccess(userId: string, muelleId: string): Promise<void> {
+  if (!UUID.test(muelleId)) notFound();
+  const [dock, aff, crew] = await Promise.all([
+    ownedOrg(userId, muelleId),
+    db
+      .select({ id: affiliate.id })
+      .from(affiliate)
+      .where(and(eq(affiliate.profileId, userId), eq(affiliate.muelleOrgId, muelleId), eq(affiliate.status, "activa")))
+      .limit(1),
+    db
+      .select({ id: organization.id })
+      .from(organization)
+      .innerJoin(membership, and(eq(membership.orgId, organization.id), eq(membership.userId, userId)))
+      .where(eq(organization.parentOrgId, muelleId))
+      .limit(1),
+  ]);
+  if (dock?.kind === "muelle" || aff.length > 0 || crew.length > 0) return;
+  notFound();
+}
+
+/** La comunidad: dueño del muelle o afiliada `activa` del muelle. Empleados de barco no entran. */
+export async function assertNetworkMember(userId: string, muelleId: string): Promise<void> {
+  if (!UUID.test(muelleId)) notFound();
+  const [dock, aff] = await Promise.all([
+    ownedOrg(userId, muelleId),
+    db
+      .select({ id: affiliate.id })
+      .from(affiliate)
+      .where(and(eq(affiliate.profileId, userId), eq(affiliate.muelleOrgId, muelleId), eq(affiliate.status, "activa")))
+      .limit(1),
+  ]);
+  if (dock?.kind === "muelle" || aff.length > 0) return;
+  notFound();
 }
 
 export async function listMyDocks(userId: string) {

@@ -35,4 +35,11 @@ JS), `apps/improvement` (producto del cliente, TS), `packages/db` (Drizzle/Postg
 - `org_kpi` (Indicadores) no se toca: el Scorecard semanal es `org_measurable` + `measurable_value`.
 - Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
 
+## Summum + Improvement (operación, red y Sello)
+
+- Blueprint: `blueprints/summum-improvement/blueprint.md`; reglas de área: `.claude/rules/summum-improvement.md`.
+- Pruebas de `apps/summum`: `pnpm --filter @jotapuntoce/summum test tests/<archivo>.test.ts` · E2E: `pnpm --filter @jotapuntoce/summum test:e2e`.
+- `org_kpi` solo crece por `KPI_SOURCES` + su check; Pacto, check-ins y People Analyzer los lee solo su dueño.
+- Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
+
 Arquitectura completa, boundaries y sistema de diseño: ver `CLAUDE.md` en este mismo directorio.

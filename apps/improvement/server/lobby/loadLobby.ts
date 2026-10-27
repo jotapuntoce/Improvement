@@ -24,7 +24,8 @@ import type { LobbyZona } from "@jotapuntoce/ui/building/lobbyPlano.ts";
 import { assertMembership } from "../auth/guard.ts";
 import { loadVisibleSections } from "../permissions/loadSections.ts";
 import { DIRECCION_SLUGS } from "../permissions/sections.ts";
-import { listActivePowerups, pointsBalance } from "../powerups/mutations.ts";
+import { listCatalogForOrg } from "../powerups/catalog.ts";
+import { pointsBalance } from "../powerups/mutations.ts";
 import { listProjects } from "../projects/mutations.ts";
 import { loadTeamStatus } from "../employees/loadTeamStatus.ts";
 
@@ -79,7 +80,7 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
     listProjects(userId, orgId),
     db.select({ fullName: profile.fullName }).from(profile).where(eq(profile.id, userId)).limit(1),
     pointsBalance(userId),
-    listActivePowerups(),
+    listCatalogForOrg(orgId),
   ]);
 
   const [metas, cuentas, entregas] = await Promise.all([

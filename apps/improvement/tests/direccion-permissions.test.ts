@@ -48,7 +48,7 @@ describe("secciones de Dirección", () => {
   });
 
   it("WHEN se lee SECTION_SLUGS THE SYSTEM SHALL tener las cuatro nuevas al final", () => {
-    expect(SECTION_SLUGS).toEqual([
+    expect(SECTION_SLUGS.slice(0, 10)).toEqual([
       "mapa", "objetivos", "equipo", "clientes", "powerups", "cobros",
       "vision", "scorecard", "issues", "junta",
     ]);

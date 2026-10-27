@@ -15,6 +15,7 @@
 // server/tasks/loadOwnerTasks.ts.
 import Link from "next/link";
 import { paretoCut, type OwnerTask } from "@/server/tasks/loadOwnerTasks";
+import type { NextMove } from "@/server/ai/nextMove.ts";
 
 const KIND_LABEL: Record<string, string> = {
   pago: "Pago",
@@ -58,11 +59,27 @@ function TaskRow({ task, vital }: { task: OwnerTask; vital?: boolean }) {
   );
 }
 
-export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
+// El siguiente movimiento ocupa uno de los tres lugares: si viene de Pareto, es la primera tarea (ya no se
+// repite en la lista); si viene de la IA, desplaza a la tercera al <details>.
+function NextMoveCard({ move }: { move: NextMove }) {
+  return (
+    <section className="pendiente pendiente--vital" aria-labelledby="siguiente-movimiento">
+      <h2 id="siguiente-movimiento" className="pendientes-title">
+        Siguiente mejor movimiento
+      </h2>
+      <p className="pendiente-title">{move.text}</p>
+      <p className="pendiente-context">{move.fuente === "ia" ? "Sugerido por Improvement" : "Lo más urgente (80/20)"}</p>
+    </section>
+  );
+}
+
+export function PendingList({ tasks, move = null }: { tasks: OwnerTask[]; move?: NextMove | null }) {
   const overdue = tasks.filter((t) => t.overdue).length;
   const vitales = paretoCut(tasks);
-  const arriba = tasks.slice(0, VISIBLE);
-  const resto = tasks.slice(VISIBLE);
+  const start = move?.fuente === "pareto" ? 1 : 0;
+  const end = move?.fuente === "ia" ? VISIBLE - 1 : VISIBLE;
+  const arriba = tasks.slice(start, end);
+  const resto = tasks.slice(end);
 
   return (
     <section className="pendientes" aria-label="Tus pendientes">
@@ -75,6 +92,8 @@ export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
         )}
       </header>
 
+      {move && <NextMoveCard move={move} />}
+
       {tasks.length === 0 ? (
         <p className="pendientes-empty">
           No tienes nada pendiente. En cuanto haya un objetivo abierto o un pago por hacer, aparece
@@ -84,7 +103,7 @@ export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
         <>
           <ol className="pendientes-list">
             {arriba.map((task, i) => (
-              <TaskRow key={task.id} task={task} vital={i < vitales} />
+              <TaskRow key={task.id} task={task} vital={start + i < vitales} />
             ))}
           </ol>
 
@@ -104,7 +123,7 @@ export function PendingList({ tasks }: { tasks: OwnerTask[] }) {
               </summary>
               <ol className="pendientes-list">
                 {resto.map((task, i) => (
-                  <TaskRow key={task.id} task={task} vital={i + VISIBLE < vitales} />
+                  <TaskRow key={task.id} task={task} vital={end + i < vitales} />
                 ))}
               </ol>
             </details>
