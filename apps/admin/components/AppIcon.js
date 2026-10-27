@@ -1,6 +1,6 @@
 // Ícono estilo "app" para representar Improvement (la empresa digital) en el panel.
 // Los detalles son dinámicos de verdad, no solo decorativos:
-// - el degradado usa el color de acento activo (cambia con el AccentPicker)
+// - el degradado usa el acento del panel (ámbar de la marca, ver data-brand en tokens.css)
 // - el punto "en vivo" y el badge reflejan datos reales (conteo de organización vía lib/orgStats.js)
 export default function AppIcon({ size = 44, liveCount, liveLabel = "activo(s)", className = "" }) {
   const hasLive = typeof liveCount === "number" && liveCount > 0;

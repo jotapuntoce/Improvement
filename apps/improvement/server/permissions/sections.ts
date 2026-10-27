@@ -9,7 +9,7 @@ import { z } from "zod";
 export const SCOPES = ["empresa", "area", "propio", "ninguno"] as const;
 export type Scope = (typeof SCOPES)[number];
 
-export const SECTION_SLUGS = ["mapa", "objetivos", "equipo", "clientes", "powerups"] as const;
+export const SECTION_SLUGS = ["mapa", "objetivos", "equipo", "clientes", "powerups", "cobros"] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
 
 export interface Section {
@@ -29,6 +29,7 @@ export const SECTIONS: Section[] = [
   { slug: "equipo", label: "Equipo", hint: "Quién trabaja contigo", scopes: ["empresa", "area"] },
   { slug: "clientes", label: "Clientes", hint: "Tu cartera y cómo va cada cuenta", scopes: ["empresa"] },
   { slug: "powerups", label: "PowerUps", hint: "Canjea los puntos que acumula tu equipo", scopes: ["empresa"] },
+  { slug: "cobros", label: "Cobros", hint: "Lo que cobras y la comisión de Summum", scopes: ["empresa"] },
 ];
 
 export function sectionBySlug(slug: string): Section | undefined {

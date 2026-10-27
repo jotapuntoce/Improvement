@@ -1,0 +1,349 @@
+{
+  "proyecto": "JotaPuntoCe",
+  "pieza": "Panel admin con la marca",
+  "slug": "admin-marca",
+  "fecha": "2026-09-25",
+  "resumen": "El panel administrativo pasó del violeta→cian genérico a la marca JotaPuntoCe v1: azul marino, marfil y ámbar, Inter Tight, el hilo de seis colores y una recepción de agencia. Nueve rondas; la firma final es el isotipo con el wordmark, y los expedientes de proceso viven ahora en Planos, en una carpeta por proyecto.",
+  "antes": [
+    {
+      "archivo": "capturas/00-antes-recepcion.png",
+      "pie": "Antes · commit fbd3cae: degradado violeta→cian, madera y corcho, \"JotaPuntoCe\" en texto vivo."
+    },
+    {
+      "archivo": "capturas/00-antes-planos.png",
+      "pie": "Antes · Planos solo mostraba los ensambles."
+    }
+  ],
+  "despues": [
+    {
+      "archivo": "capturas/99-despues-recepcion.png",
+      "pie": "Después · isotipo + wordmark sin hilo, Recepción a mano, \"Genio\" resaltado."
+    },
+    {
+      "archivo": "capturas/99-despues-planos.png",
+      "pie": "Planos con la carpeta de JotaPuntoCe en su estilo."
+    },
+    {
+      "archivo": "capturas/99-despues-carpeta.png",
+      "pie": "Dentro de la carpeta: el expediente con su antes/después, PDF y bitácora."
+    }
+  ],
+  "rondas": [
+    {
+      "n": 1,
+      "titulo": "Aplicar la marca al panel",
+      "pedido": [
+        "dale el estilo jotapuntoce al panel administrativo de jotapuntoce que ya existe"
+      ],
+      "cambios": [
+        "Tokens del admin remapeados a la marca (70 % marino · 20 % marfil · 7 % ámbar); fuera el degradado violeta→cian.",
+        "Inter Tight 300–600 en todo el panel; 18 pesos de 700–800 bajados a 600.",
+        "Monograma M2 en la barra lateral; hilo de seis colores bajo la barra superior.",
+        "Titular \"Hoy también da para más.\" con frase a mano; fuera el selector de acento y los brillos de fondo."
+      ],
+      "decision": "Versión v1 no capturada: no tenía commit y se reemplazó en la ronda 2.",
+      "capturas": []
+    },
+    {
+      "n": 2,
+      "titulo": "Dos firmas y la recepción de agencia",
+      "pedido": [
+        "quiero ver dos opciones para la firma, primera opción, que unicamente este el punto que es el cerebro del monograma 2 pero que se vea más grande en una escala apreciable. segunda opcion, el isotipo de jotapuntoce en la firma de misma manera en una escala apreciable",
+        "cambia todo que este adoc a las reglas de la marca jotapuntoce, pero que mantenga la esencia de una recepción, quiero ver una recepción de agencia estilo jotapuntoce."
+      ],
+      "cambios": [
+        "v2-a: el cerebro del M2 solo, a 64 px. v2-b: el isotipo sin fondo, a 120 px.",
+        "Pared marino con el hilo arriba; pantalla de marco fino con el monograma en la barbilla.",
+        "Directorio de áreas: cada placa con el contorno de su color de lóbulo.",
+        "Muro de proyectos: notas marfil, tachuela ámbar, avance dibujado con el hilo."
+      ],
+      "capturas": [
+        {
+          "archivo": "capturas/02-v2-a-cerebro.png",
+          "pie": "v2-a · firma: solo el cerebro del monograma (descartada)."
+        },
+        {
+          "archivo": "capturas/02-v2-b-isotipo.png",
+          "pie": "v2-b · firma: isotipo (elegida)."
+        }
+      ]
+    },
+    {
+      "n": 3,
+      "titulo": "Se elige el isotipo",
+      "pedido": [
+        "se queda la opción del isotipo, abajo del isotipo enves de que diga panel administrativo ponle que diga completo JotaPuntoCe.",
+        "donde dice panle cambialo por Recepción, con la letra de firma.",
+        "Hoy tambien da Para Más cambialo por Soy un Genio Incomprendido y eso me hace único",
+        "Excelente detalle de Monograma en la televisión, exactamente en ese tipo de detalles es donde quiero que se vea el Monograma."
+      ],
+      "cambios": [
+        "Isotipo + wordmark W3 (archivo real del kit) en la barra lateral.",
+        "\"Recepción\" en Caveat ámbar en la barra superior; menú \"Dashboard\" → \"Recepción\".",
+        "Titular: \"Soy un Genio Incomprendido y eso me hace único.\"",
+        "Subtítulo sin el nombre en texto vivo: \"Resumen general de la agencia\"."
+      ],
+      "decision": "Firma del admin: isotipo + wordmark (manual v1.1). El monograma vive en los detalles chicos, como la TV.",
+      "capturas": [
+        {
+          "archivo": "capturas/03-v3-recepcion.png",
+          "pie": "v3 · isotipo + wordmark con hilo, Recepción a mano, \"Soy un Genio Incomprendido y eso me hace único.\""
+        }
+      ]
+    },
+    {
+      "n": 4,
+      "titulo": "Expedientes en Planos y ajustes finos",
+      "pedido": [
+        "los expedientes guardalos en el apartado de planos del panel administrativo, dentro de planos siempre crea una carpeta a las carpetas dales su propio estilo para cada proyecto, en este caso literal es un proyecto de jotapuntoce, aqui debe estar guardado todo el proceso. y ese proceso añadelo a la skill.",
+        "cambia la frase de Soy un Genio Incomprendido y eso me hace único. por solo Genio Incomprendido.",
+        "Abajo del isotipo utiliza JotaPuntoCe sin las linea de color que está abajo,",
+        "Recepción dejalo en la letra de texto de la marca y quita la breve descripción de resumen general de la agencia."
+      ],
+      "cambios": [
+        "Planos: sección \"Expedientes por proyecto\" con una carpeta por proyecto, cada una con el estilo de su marca (JotaPuntoCe: marino, pestaña con el hilo, isotipo).",
+        "Página de la carpeta con cada expediente: antes/después, PDF y bitácora, servidos solo a Jose Carlos.",
+        "Los expedientes se mudaron al repo (apps/admin/procesos/<proyecto>/) y la skill documentar-proceso ahora los guarda ahí.",
+        "Titular: \"Genio Incomprendido\". Wordmark sin hilo. \"Recepción\" en Inter Tight y sin subtítulo."
+      ],
+      "decision": "Wordmark sin hilo bajo el isotipo en el admin (manual v1.1).",
+      "capturas": [
+        {
+          "archivo": "capturas/04-v4-recepcion.png",
+          "pie": "v4 · Recepción en Inter Tight, \"Genio Incomprendido\" con \"Incomprendido\" a mano."
+        }
+      ]
+    },
+    {
+      "n": 5,
+      "titulo": "Genio al frente",
+      "pedido": [
+        "en genio incomplrendido se ve mejor resaltado genio que incomprendido y donde dice recepción dejalo con la letra de firma"
+      ],
+      "cambios": [
+        "Titular: \"Genio\" a mano en ámbar, \"Incomprendido\" en Inter Tight.",
+        "\"Recepción\" regresa a la letra de firma (Caveat 700 ámbar)."
+      ],
+      "decision": "\"Recepción\" con letra de firma; los demás títulos en Inter Tight (manual v1.1).",
+      "capturas": []
+    },
+    {
+      "n": 6,
+      "titulo": "Ícono de Recepción",
+      "pedido": [
+        "básaste en la primera imágen para crear el ícono de recepción que va en la segunda imágen envés del rombo claro aplicacle el estilo de la marca jotapuntoce"
+      ],
+      "cambios": [
+        "Nuevo ícono (components/brand/ReceptionIcon.js): mostrador con monitor en trazo fino marfil, tomado de la referencia del dueño.",
+        "El letrero del mostrador lleva el hilo de seis colores en vez de la palabra \"RECEPTION\", ilegible a 22 px.",
+        "Reemplaza el rombo ◈ del menú."
+      ],
+      "decision": "Ícono de Recepción en trazo fino con el hilo en el letrero.",
+      "capturas": [
+        {
+          "archivo": "capturas/06-antes-menu.png",
+          "pie": "Antes · el rombo ◈ en Recepción."
+        },
+        {
+          "archivo": "capturas/06-v6-menu.png",
+          "pie": "Después · el mostrador con el hilo en el letrero."
+        }
+      ]
+    },
+    {
+      "n": 7,
+      "titulo": "Íconos de Planos y Solicitudes",
+      "pedido": [
+        "sí, haz los demás íconos con el mismo estilo",
+        "imagen 1 referencia para planos, imagen 2 referencia para solicitudes"
+      ],
+      "cambios": [
+        "Planos: plano enrollado con la planta de un edificio; el lápiz traza un muro con el hilo.",
+        "Solicitudes: persona con su solicitud y el globo con la palomita dibujada con el hilo.",
+        "Los tres íconos del menú viven en components/brand/NavIcons.js con las mismas reglas: trazo 1.4 marfil y un solo detalle con el hilo."
+      ],
+      "decision": "Familia de íconos del menú en trazo fino con un detalle de hilo por ícono.",
+      "capturas": [
+        {
+          "archivo": "capturas/06-v6-menu.png",
+          "pie": "Antes · Planos (⬡) y Solicitudes (✉) con símbolos de texto."
+        },
+        {
+          "archivo": "capturas/07-v7-menu.png",
+          "pie": "Después · la familia completa de íconos de la marca."
+        }
+      ]
+    },
+    {
+      "n": 8,
+      "titulo": "Firma centrada",
+      "pedido": [
+        "centra el isotipo con JotaPuntoCe Abajo."
+      ],
+      "cambios": [
+        "El isotipo y el wordmark quedan centrados en la barra lateral, uno sobre otro."
+      ],
+      "capturas": [
+        {
+          "archivo": "capturas/07-v7-menu.png",
+          "pie": "Antes · firma alineada a la izquierda."
+        },
+        {
+          "archivo": "capturas/08-v8-barra.png",
+          "pie": "Después · isotipo y wordmark centrados."
+        }
+      ]
+    },
+    {
+      "n": 9,
+      "titulo": "El laboratorio: Soluciones pasa a Sistemas",
+      "pedido": [
+        "el área de soluciones la vamos a cambiar por sistemas. y necesito que estas áreas sean las áreas de jotapuntoce osea aqui es el laboratorio de jotapuntoce practicamente es lo que me destaca, son mis especialidades, es donde trabajo, donde creo cosas para mis clientes pero necesito las áreas esenciales de la empresa para medir como va la empresa osea las tradicionales.  esto de las áreas tradicionales dejalo pendiente lo vamos a hacer en un chat aparte porque te voy a agregar la información de como se debe cosntruir un CRM Y UN ERP etc..."
+      ],
+      "cambios": [
+        "\"Soluciones\" pasa a \"Sistemas\" en el panel, en el token del lóbulo (--dept-sistemas) y en el manual.",
+        "El panel de áreas se llama \"Laboratorio · especialidades\": son las seis especialidades de la agencia, no las áreas administrativas."
+      ],
+      "decision": "Las seis áreas son el laboratorio de JotaPuntoCe. Las áreas tradicionales (CRM/ERP) quedan para otro chat.",
+      "capturas": [
+        {
+          "archivo": "capturas/09-antes-areas.png",
+          "pie": "Antes · \"Áreas de la empresa\" con Soluciones."
+        },
+        {
+          "archivo": "capturas/09-v9-laboratorio.png",
+          "pie": "Después · \"Laboratorio · especialidades\" con Sistemas."
+        }
+      ]
+    }
+  ],
+  "versiones": [
+    {
+      "id": "antes",
+      "que": "Panel original violeta→cian (fbd3cae)",
+      "estado": "reemplazada"
+    },
+    {
+      "id": "v1",
+      "que": "Tokens de marca + Monograma M2 en la barra lateral",
+      "estado": "no capturada"
+    },
+    {
+      "id": "v2-a",
+      "que": "Firma: cerebro del monograma",
+      "estado": "descartada"
+    },
+    {
+      "id": "v2-b",
+      "que": "Firma: isotipo + \"Panel Administrativo\"",
+      "estado": "elegida, ajustada en v3"
+    },
+    {
+      "id": "v3",
+      "que": "Isotipo + wordmark con hilo, Recepción a mano, titular largo",
+      "estado": "ajustada en v4"
+    },
+    {
+      "id": "v4",
+      "que": "Wordmark sin hilo, Recepción en Inter Tight, \"Genio Incomprendido\", expedientes en Planos",
+      "estado": "ajustada en v5"
+    },
+    {
+      "id": "v5",
+      "que": "\"Genio\" resaltado, Recepción a mano",
+      "estado": "ajustada en v6"
+    },
+    {
+      "id": "v6",
+      "que": "Ícono de Recepción: mostrador con el hilo",
+      "estado": "ajustada en v7"
+    },
+    {
+      "id": "v7",
+      "que": "Íconos de Planos y Solicitudes en la misma familia",
+      "estado": "ajustada en v8"
+    },
+    {
+      "id": "v8",
+      "que": "Firma centrada en la barra lateral",
+      "estado": "ajustada en v9"
+    },
+    {
+      "id": "v9",
+      "que": "Laboratorio con Sistemas",
+      "estado": "final"
+    }
+  ],
+  "archivos": [
+    {
+      "ruta": "packages/ui/src/tokens.css",
+      "cambio": "Bloque data-brand del admin; --brand-amber-paper; fuera los presets de acento"
+    },
+    {
+      "ruta": "apps/admin/app/layout.js",
+      "cambio": "Inter Tight 300–600, data-brand, sin Geist ni brillos"
+    },
+    {
+      "ruta": "apps/admin/app/globals.css",
+      "cambio": "Recepción de agencia reescrita; firma; hilo; títulos; pulseRing"
+    },
+    {
+      "ruta": "apps/admin/components/Sidebar.js",
+      "cambio": "Isotipo + wordmark; menú Recepción"
+    },
+    {
+      "ruta": "apps/admin/components/Topbar.js",
+      "cambio": "Recepción a mano; sin selector de acento"
+    },
+    {
+      "ruta": "apps/admin/components/DashboardView.js",
+      "cambio": "Titular nuevo"
+    },
+    {
+      "ruta": "apps/admin/components/reception/*.js",
+      "cambio": "Monograma en la TV; placas con contorno de lóbulo"
+    },
+    {
+      "ruta": "apps/admin/components/AccentPicker.js",
+      "cambio": "Eliminado"
+    },
+    {
+      "ruta": "apps/admin/public/brand/",
+      "cambio": "isotipo.png (sin fondo) y wordmark-w3-marfil.svg"
+    },
+    {
+      "ruta": "apps/admin/lib/procesos.js",
+      "cambio": "Lee carpetas y expedientes del disco; bloquea rutas fuera de procesos/"
+    },
+    {
+      "ruta": "apps/admin/app/planos/**",
+      "cambio": "Carpetas por proyecto, página de carpeta y ruta protegida de archivos"
+    },
+    {
+      "ruta": "apps/admin/components/planos/Carpeta.js",
+      "cambio": "Carpeta con estilo por proyecto"
+    },
+    {
+      "ruta": "apps/admin/next.config.mjs",
+      "cambio": "Empaca procesos/ con las rutas de Planos para producción"
+    },
+    {
+      "ruta": "apps/admin/tests/procesos.test.js",
+      "cambio": "Prueba que no se sirva nada fuera de procesos/"
+    },
+    {
+      "ruta": "apps/admin/components/brand/NavIcons.js",
+      "cambio": "Íconos del menú: Recepción, Planos y Solicitudes"
+    },
+    {
+      "ruta": "packages/ui/src/tokens.css",
+      "cambio": "--dept-soluciones → --dept-sistemas"
+    }
+  ],
+  "pendientes": [
+    "Foto de Jose Carlos en el círculo \"JC\" de la barra superior.",
+    "Presentar los expedientes en estilo planos/blueprint (diseño alternativo, aparte).",
+    "Áreas tradicionales de la empresa para medirla (CRM, ERP…): en un chat aparte, con la información que traerá Jose Carlos.",
+    "Skill \"Conviértete en experto\": en un chat aparte."
+  ]
+}

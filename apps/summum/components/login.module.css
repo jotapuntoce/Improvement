@@ -1,0 +1,110 @@
+/* Login de whop.com medido a 1440x900 — tarjeta centrada de 384px, padding 72/32/32, campos y botón de
+   48px — con la marca Summum: todo hueso, cuadrícula de plano, isotipo navy y radios del manual (≤12px). */
+.login {
+  position: relative;
+  min-height: 100vh;
+  max-width: none; /* globals.css limita <main> a 960px para las pantallas del panel */
+  display: grid;
+  place-items: center;
+  padding: 88px 16px 40px;
+  background-color: var(--summum-hueso);
+  background-image:
+    linear-gradient(var(--summum-linea) 1px, transparent 1px),
+    linear-gradient(90deg, var(--summum-linea) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  color: var(--summum-navy);
+  font: 15px/1.55 var(--summum-texto), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.inicio {
+  position: absolute;
+  top: 28px;
+  left: 32px;
+}
+.inicio img { height: 36px; width: auto; display: block; }
+.diagnostico {
+  position: absolute;
+  top: 28px;
+  right: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--summum-radio, 8px);
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1.5px solid var(--summum-navy);
+  background: var(--summum-hueso);
+  color: var(--summum-navy);
+  text-decoration: none;
+}
+.diagnostico:hover { background: var(--summum-navy); color: var(--summum-hueso); }
+.tarjeta {
+  width: min(384px, 100%);
+  padding: 72px 32px 32px;
+  border-radius: var(--summum-radio-max, 12px);
+  border: 1px solid var(--summum-linea);
+  background: var(--summum-tarjeta);
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+.isotipo { width: 48px; height: 48px; justify-self: center; display: block; }
+.titulo {
+  margin: 0 0 8px;
+  text-align: center;
+  font-family: var(--summum-titulo), system-ui, sans-serif;
+  font-stretch: 75%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  font-size: 28px;
+}
+.etiqueta {
+  text-align: center;
+  font: 500 10.5px/1.2 var(--summum-datos), ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--summum-guia);
+}
+.campo { display: grid; gap: 6px; font-size: 14px; color: var(--summum-nota); }
+.campo input {
+  height: 48px;
+  font: inherit;
+  font-size: 16px;
+  padding: 0 14px;
+  border-radius: var(--summum-radio, 8px);
+  border: 1.5px solid var(--summum-campo-borde);
+  background: var(--summum-campo);
+  color: var(--summum-navy);
+}
+.campo input:focus { outline: 2px solid var(--summum-navy); outline-offset: 1px; }
+.entrar {
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--summum-radio-max, 12px);
+  padding: 0 24px;
+  font-weight: 600;
+  font-size: 18px;
+  border: 0;
+  background: var(--summum-navy);
+  color: var(--summum-hueso);
+  cursor: pointer;
+}
+.entrar { text-decoration: none; gap: 8px; }
+.secundario { justify-self: center; font-size: 14px; color: var(--summum-nota); text-underline-offset: 3px; }
+.secundario:hover { color: var(--summum-navy); }
+.entrar:hover { background: var(--summum-navy); opacity: 0.92; }
+.entrar:disabled { opacity: 0.7; cursor: default; }
+.error { color: var(--danger); font-size: 13px; margin: 0; }
+.nota { font-size: 12.5px; color: var(--summum-nota); border-left: 2px solid var(--summum-guia); padding-left: 10px; margin: 0; }
+@media (max-width: 640px) {
+  .inicio { top: 18px; left: 16px; }
+  .inicio img { height: 30px; }
+  .diagnostico { top: 16px; right: 16px; }
+  .tarjeta { padding: 48px 20px 24px; }
+}

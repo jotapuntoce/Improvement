@@ -62,13 +62,13 @@ export default async function ImprovementPage() {
       <section className="toolbar">
         <div>
           <Link href="/" className="page-back-link">
-            ← Dashboard
+            ← Recepción
           </Link>
           <h2>Cuentas Improvement</h2>
           <p className="topbar-subtitle">Clientes reales usando Improvement, agrupados por persona.</p>
         </div>
-        <Link href="/prospects" className="btn btn-primary">
-          Backlog de prospectos
+        <Link href="/clientes" className="btn btn-primary">
+          Clientes
         </Link>
       </section>
 

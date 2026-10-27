@@ -6,7 +6,7 @@ export default function ProjectsCorkboard({ projects = [] }) {
   return (
     <div className="board-mount">
       <p className="wall-label">
-        <span className="wall-label-dot wall-label-dot-projects" />
+        <span className="wall-label-dot" />
         Proyectos activos
       </p>
 

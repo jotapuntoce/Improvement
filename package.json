@@ -9,6 +9,7 @@
     "dev": "turbo run dev",
     "dev:admin": "turbo run dev --filter=@jotapuntoce/admin",
     "dev:improvement": "turbo run dev --filter=@jotapuntoce/improvement",
+    "dev:summum": "turbo run dev --filter=@jotapuntoce/summum",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -16,7 +17,8 @@
     "db:generate": "pnpm --filter @jotapuntoce/db exec drizzle-kit generate",
     "db:migrate": "pnpm --filter @jotapuntoce/db exec drizzle-kit migrate",
     "db:studio": "pnpm --filter @jotapuntoce/db exec drizzle-kit studio",
-    "db:seed": "node --experimental-strip-types packages/db/src/seed.ts"
+    "db:seed": "node --experimental-strip-types packages/db/src/seed.ts",
+    "db:muelle": "node --experimental-strip-types packages/db/src/muelle.ts"
   },
   "devDependencies": {
     "turbo": "2.10.12",

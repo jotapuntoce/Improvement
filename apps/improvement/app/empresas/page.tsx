@@ -36,7 +36,7 @@ async function solicitarEmpresa(formData: FormData) {
 export default async function EmpresasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ empresa?: string }>;
+  searchParams: Promise<{ empresa?: string; solicitar?: string }>;
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
@@ -60,7 +60,7 @@ export default async function EmpresasPage({
     );
   }
 
-  const [{ profile, companies }, tasks, { empresa }] = await Promise.all([
+  const [{ profile, companies }, tasks, { empresa, solicitar }] = await Promise.all([
     loadOwnerPanel(userId),
     loadOwnerTasks(userId),
     searchParams,
@@ -109,6 +109,7 @@ export default async function EmpresasPage({
       <RequestCompanyDialog
         action={solicitarEmpresa}
         priceLabel={formatMoney(CONSTRUCTION_PRICE.amount, CONSTRUCTION_PRICE.currency)}
+        abrirAlCargar={solicitar === "1"}
       />
 
       <Link href="/empresas/configuracion" className="panel-settings">

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef } from "react";
 
-// Las 6 áreas creativas de JotaPuntoCe (Planeación, Soluciones, Imaginación, Valor agregado,
-// Branding, Presentación). Son la identidad interna fija de la empresa, no datos de una
-// organización cliente, así que viven como constante aquí.
+// El laboratorio de JotaPuntoCe: las 6 especialidades donde se crea para los clientes (Planeación,
+// Sistemas, Imaginación, Valor agregado, Branding, Presentación). Son la identidad fija de la
+// agencia, no datos de una organización cliente, así que viven como constante aquí. Las áreas
+// tradicionales para medir la empresa (CRM/ERP) son otra pieza, pendiente.
 const AREAS = [
   { key: "planeacion", name: "Planeación", tokenVar: "--dept-planeacion", count: 2 },
-  { key: "soluciones", name: "Soluciones", tokenVar: "--dept-soluciones", count: 1 },
+  { key: "sistemas", name: "Sistemas", tokenVar: "--dept-sistemas", count: 1 },
   { key: "imaginacion", name: "Imaginación", tokenVar: "--dept-imaginacion", count: 3 },
   { key: "valor", name: "Valor agregado", tokenVar: "--dept-valor", count: 1 },
   { key: "branding", name: "Branding", tokenVar: "--dept-branding", count: 2 },
@@ -20,7 +21,7 @@ const AREAS = [
 // visible y marcado aquí, hasta que se decida de dónde sale ese dato.
 const ALERT_MESSAGES = [
   "Planeación: 2 planes por revisar antes del viernes",
-  "Soluciones: 1 combinación de producto sin cerrar",
+  "Sistemas: 1 combinación de producto sin cerrar",
   "Imaginación: una idea nueva esperando forma",
   "Valor agregado: 1 detalle pendiente en Improvement",
   "Branding: 2 piezas de esta semana sin publicar",
@@ -55,8 +56,8 @@ export default function AreasPanel() {
   return (
     <div className="areas-mount">
       <p className="wall-label">
-        <span className="wall-label-dot wall-label-dot-areas" />
-        Áreas de la empresa
+        <span className="wall-label-dot" />
+        Laboratorio · especialidades
       </p>
 
       <div className="areas-panel">
@@ -87,8 +88,7 @@ export default function AreasPanel() {
             entrar" (pedido explícito), pero el href queda en # hasta que haya un destino real. */}
         <div className="dept-grid">
           {AREAS.map((area) => (
-            <a href="#" className="dept-item" key={area.key}>
-              <span className="dept-swatch" style={{ "--dc": `var(${area.tokenVar})` }} />
+            <a href="#" className="dept-item" key={area.key} style={{ "--dc": `var(${area.tokenVar})` }}>
               <span className="dept-name">{area.name}</span>
               <span className="dept-enter">→</span>
             </a>

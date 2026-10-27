@@ -28,22 +28,6 @@
   --shadow-glow: 0 0 0 1px var(--border), 0 20px 60px -20px rgba(124, 92, 255, 0.35);
 }
 
-/* Presets de acento seleccionables (AccentPicker, heredado de apps/admin). El preset activo
-   sobreescribe --accent-1/--accent-2 vía una clase en <html>, gestionada por localStorage —
-   ver apps/admin/components/AccentPicker.js, reutilizado tal cual. */
-:root[data-accent="esmeralda"] {
-  --accent-1: #10b981;
-  --accent-2: #a3e635;
-}
-:root[data-accent="solar"] {
-  --accent-1: #fb923c;
-  --accent-2: #f472b6;
-}
-:root[data-accent="indigo"] {
-  --accent-1: #6366f1;
-  --accent-2: #3b82f6;
-}
-
 /* Escena del edificio JotaPuntoCe (login de apps/admin, LoginExperience) — colores de las 6 áreas
    creativas y de la ilustración nocturna/recepción. Fijos, no siguen el AccentPicker: son identidad
    de marca (definidos por Jose Carlos con hex exactos), no un acento seleccionable por el usuario. */
@@ -105,7 +89,7 @@
   --pal-manufactura-glow: #ffeddc;
 
   --dept-planeacion: #d72b2e;
-  --dept-soluciones: #136ecc;
+  --dept-sistemas: #136ecc;
   --dept-imaginacion: #e4bb05;
   --dept-valor: #ff7fbd;
   --dept-branding: #4c9b69;
@@ -127,16 +111,47 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Marca madre JotaPuntoCe — manual de marca v1 (JotaPuntoCe/Branding/jotapuntoce/10-manual.html).
+   Los 6 colores de lóbulo son los --dept-* de arriba. Los productos hijos (Improvement, Summum) no
+   heredan estos tokens: solo la firma "by JotaPuntoCe". */
+:root {
+  --brand-navy: #011124;
+  --brand-ivory: #f5f1e6;
+  --brand-amber: #ffb829;
+  /* Ámbar oscuro: la frase a mano y los acentos sobre papel marfil, donde #ffb829 no se lee. */
+  --brand-amber-paper: #c98a00;
+  --brand-thread: linear-gradient(90deg, var(--dept-planeacion), var(--dept-valor), var(--dept-sistemas),
+    var(--dept-presentacion), var(--dept-branding), var(--dept-imaginacion));
+}
+
+/* Panel admin con la marca madre: <html data-brand="jotapuntoce"> (apps/admin/app/layout.js) remapea
+   los tokens genéricos a la paleta 70 % marino · 20 % marfil · 7 % ámbar. Acento plano ámbar, sin el
+   degradado violeta→cian que el manual prohíbe. apps/improvement no lleva el atributo: no le afecta. */
+:root[data-brand="jotapuntoce"] {
+  --bg: var(--brand-navy);
+  --bg-elevated: color-mix(in srgb, var(--brand-navy) 94%, var(--brand-ivory));
+  --bg-card: color-mix(in srgb, var(--brand-ivory) 4%, transparent);
+  --bg-card-hover: color-mix(in srgb, var(--brand-ivory) 7%, transparent);
+  --border: color-mix(in srgb, var(--brand-ivory) 9%, transparent);
+  --border-strong: color-mix(in srgb, var(--brand-ivory) 18%, transparent);
+  --text-primary: var(--brand-ivory);
+  --text-secondary: color-mix(in srgb, var(--brand-ivory) 74%, var(--brand-navy));
+  --text-muted: color-mix(in srgb, var(--brand-ivory) 55%, var(--brand-navy));
+  --accent-1: var(--brand-amber);
+  --accent-2: var(--brand-amber);
+  --shadow-glow: 0 0 0 1px var(--border), 0 20px 60px -20px color-mix(in srgb, var(--brand-amber) 22%, transparent);
+}
+
 /* Login de JotaPuntoCe (apps/admin/app/login) — estilo Dala (biblioteca de diseño, estilo "dala")
    con el cerebro del logo de JotaPuntoCe. Fijos: son identidad de la pantalla de entrada, no siguen
    el AccentPicker. --brain-* los lee components/login/brainScene.js para pintar el cerebro. */
 :root {
-  --login-bg: #011124;
-  --login-text: #ffffff;
+  --login-bg: var(--brand-navy);
+  --login-text: var(--brand-ivory);
   --login-muted: #9a9a9a;
   --login-action: #8052ff;
   --login-action-hover: #15846e;
-  --login-accent: #ffb829;
+  --login-accent: var(--brand-amber);
   --login-glass: rgba(0, 7, 18, 0.35);
   --login-glass-top: rgba(0, 7, 18, 0.25);
   --login-glass-bottom: rgba(0, 7, 18, 0.6);
@@ -152,4 +167,39 @@
   --brain-amber: #ffb829;
   --brain-green: #3ddc84;
   --brain-white: #ffffff;
+}
+
+/* Summum System — manual v1.1 (Summum System/marca/assets/summum-tokens.css). Tres tintas, ~50/42/8:
+   navy noche dominante, hueso para texto, guia para etiquetas. Oro cenit NO entra: es solo del vertice
+   del sello. <body data-brand="summum"> (apps/summum/app/layout.tsx) remapea los tokens genericos, asi
+   los componentes siguen refiriendo --bg, --text-primary, etc. Acento plano hueso, sin degradado. */
+:root {
+  --summum-hueso: #f2eee2;
+  --summum-navy: #0b1322;
+  --summum-guia: #8b8679;
+  /* Neutros del kit de la web-app (Summum System/marca/20-webapp-kit.html): campos y notas sobre hueso. */
+  --summum-campo: #ffffff;
+  --summum-campo-borde: #d6d0c1;
+  --summum-nota: #5d5a52;
+  --summum-hueso-suave: #cfcabd;
+  --summum-linea: #e1dccf;
+  --summum-tarjeta: #faf8f2;
+}
+
+[data-brand="summum"] {
+  --bg: var(--summum-navy);
+  --bg-elevated: color-mix(in srgb, var(--summum-navy) 94%, var(--summum-hueso));
+  --bg-card: color-mix(in srgb, var(--summum-hueso) 5%, transparent);
+  --bg-card-hover: color-mix(in srgb, var(--summum-hueso) 8%, transparent);
+  --border: color-mix(in srgb, var(--summum-hueso) 14%, transparent);
+  --border-strong: color-mix(in srgb, var(--summum-hueso) 28%, transparent);
+  --text-primary: var(--summum-hueso);
+  --text-secondary: color-mix(in srgb, var(--summum-hueso) 75%, var(--summum-navy));
+  --text-muted: var(--summum-guia);
+  --accent-1: var(--summum-hueso);
+  --accent-2: var(--summum-hueso);
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-glow: 0 0 0 1px var(--border);
 }

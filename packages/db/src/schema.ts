@@ -17,6 +17,9 @@ import {
   uniqueIndex,
   index,
   check,
+  bigint,
+  unique,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // Columnas compartidas por toda tabla (database.md — "Required on every table").
@@ -26,31 +29,47 @@ const createdAt = () =>
 const updatedAt = () =>
   timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`);
 
-export const organization = pgTable("organization", {
-  id: id(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  // Tagline bajo el letrero del edificio (ej. "Eficiencia con Propósito" para JotaPuntoCe). null =
-  // el edificio no muestra segunda línea. Ver Building.tsx (packages/ui).
-  slogan: text("slogan"),
-  // Hex, tono ambiental del edificio/recepción de esta organización (reemplaza --gold ahí). null =
-  // usa el tono neutro por default de packages/ui/src/tokens.css.
-  accentColor: text("accent_color"),
-  // Giro del negocio — uno de los ids de INDUSTRIES (packages/ui/src/building/industries.ts),
-  // validado en el borde por server/companyRequests/*.ts (apps/improvement). null o cualquier valor
-  // fuera de esa lista = AppIconLarge usa su glyph default (la cuadrícula), nunca lanza.
-  industry: text("industry"),
-  // Cómo llama el dueño a cada sección de SU empresa digital, y cuáles apagó:
-  // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
-  // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
-  sectionLabels: jsonb("section_labels").notNull().default(sql`'{}'::jsonb`),
-  // En qué nivel de evolución va ESTE negocio — índice dentro de EVOLUTION_LEVELS
-  // (packages/ui/src/building/evolutionLevels.ts). Los nombres de los niveles son iguales para toda
-  // empresa; el camino para subir no lo es: ese camino son sus filas de org_need, no una columna.
-  evolutionLevel: integer("evolution_level").notNull().default(0),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+export const organization = pgTable(
+  "organization",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    // Tagline bajo el letrero del edificio (ej. "Eficiencia con Propósito" para JotaPuntoCe). null =
+    // el edificio no muestra segunda línea. Ver Building.tsx (packages/ui).
+    slogan: text("slogan"),
+    // Hex, tono ambiental del edificio/recepción de esta organización (reemplaza --gold ahí). null =
+    // usa el tono neutro por default de packages/ui/src/tokens.css.
+    accentColor: text("accent_color"),
+    // Giro del negocio — uno de los ids de INDUSTRIES (packages/ui/src/building/industries.ts),
+    // validado en el borde por server/companyRequests/*.ts (apps/improvement). null o cualquier valor
+    // fuera de esa lista = AppIconLarge usa su glyph default (la cuadrícula), nunca lanza.
+    industry: text("industry"),
+    // Cómo llama el dueño a cada sección de SU empresa digital, y cuáles apagó:
+    // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
+    // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
+    sectionLabels: jsonb("section_labels").notNull().default(sql`'{}'::jsonb`),
+    // En qué nivel de evolución va ESTE negocio — índice dentro de EVOLUTION_LEVELS
+    // (packages/ui/src/building/evolutionLevels.ts). Los nombres de los niveles son iguales para toda
+    // empresa; el camino para subir no lo es: ese camino son sus filas de org_need, no una columna.
+    evolutionLevel: integer("evolution_level").notNull().default(0),
+    // Summum es el muelle; cada Improvement es un barco. Un barco con parent_org_id nulo existe
+    // pero no está colgado de ningún muelle todavía (no cobra). El muelle nunca tiene padre.
+    kind: text("kind", { enum: ["muelle", "barco"] }).notNull().default("barco"),
+    parentOrgId: uuid("parent_org_id").references((): AnyPgColumn => organization.id, { onDelete: "restrict" }),
+    // Nivel de membresía que el barco paga a su muelle. null = sin membresía activa.
+    membershipPlanId: uuid("membership_plan_id").references((): AnyPgColumn => membershipPlan.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_organization_parent_org_id").on(t.parentOrgId),
+    check("organization_kind_check", sql`${t.kind} in ('muelle','barco')`),
+    check("organization_muelle_sin_padre", sql`${t.kind} <> 'muelle' or ${t.parentOrgId} is null`),
+  ],
+);
 
 // Mirror local de auth.users de Supabase — fuente de verdad de credenciales vive en Supabase Auth,
 // no aquí. id = auth.users.id, nunca generado por Postgres.
@@ -731,5 +750,208 @@ export const orgKpi = pgTable(
       sql`${t.source} in ('objetivos','puntos','equipo','areas','clientes','manual')`,
     ),
     check("org_kpi_format_check", sql`${t.format} in ('numero','porcentaje','dinero')`),
+  ],
+);
+
+// Inventario de chequeos (etapa 0 del CRM de JotaPuntoCe): llegan desde la landing o los crea Jose Carlos. FUERA del
+// alcance de RLS multi-tenant, igual que prospect_company: solo apps/admin con la service-role key. RLS activado sin
+// políticas (migración chequeo_rls) para cerrar PostgREST. Spec: docs/superpowers/specs/2026-10-02-inventario-chequeos-design.md
+export const chequeo = pgTable(
+  "chequeo",
+  {
+    id: id(),
+    origen: text("origen").notNull(),
+    tipo: text("tipo").notNull(),
+    nombre: text("nombre"),
+    negocio: text("negocio"),
+    // slug(negocio)|slug(ciudad) — la unicidad "un chequeo por negocio"; null para emprendedores.
+    negocioClave: text("negocio_clave"),
+    giro: text("giro").notNull(),
+    ciudad: text("ciudad").notNull(),
+    correo: text("correo"),
+    telefono: text("telefono"),
+    canal: text("canal").notNull(),
+    canalDetalle: text("canal_detalle"),
+    utm: jsonb("utm"),
+    enlaces: jsonb("enlaces"),
+    sinRedes: boolean("sin_redes").notNull().default(false),
+    // [{pregunta, respuesta}] — la pregunta viaja con la respuesta para que cambiar las preguntas no rompa el pasado.
+    respuestas: jsonb("respuestas"),
+    entrevistaSegundos: integer("entrevista_segundos"),
+    entrevistaAt: timestamp("entrevista_at", { withTimezone: true }),
+    claveHash: text("clave_hash"),
+    etapa: text("etapa").notNull().default("registrado"),
+    abrePuerta: text("abre_puerta"),
+    proximaAccion: text("proxima_accion"),
+    // ISO YYYY-MM-DD como texto: evita el corrimiento de zona horaria de un Date a medianoche UTC.
+    proximaFecha: text("proxima_fecha"),
+    notas: text("notas"),
+    pdfPath: text("pdf_path"),
+    // Motor del Chequeo (spec 2026-10-05-motor-chequeo-design.md). `contenido` es lo que valida
+    // apps/admin/lib/motor/esquema.js sin notas internas ni fuentes, que van aparte.
+    motorEstado: text("motor_estado").notNull().default("sin_empezar"),
+    motorError: text("motor_error"),
+    contenido: jsonb("contenido"),
+    notasInternas: jsonb("notas_internas"),
+    etapaProspecto: text("etapa_prospecto"),
+    fuentes: jsonb("fuentes"),
+    // Lo que juntó el recolector (sitio e Instagram) para el motor; se reusa 7 días al rehacer.
+    expediente: jsonb("expediente"),
+    aceptaAvisoAt: timestamp("acepta_aviso_at", { withTimezone: true }),
+    aceptaCorreos: boolean("acepta_correos").notNull().default(false),
+    aceptaCorreosAt: timestamp("acepta_correos_at", { withTimezone: true }),
+    prospectClientId: uuid("prospect_client_id").references(() => prospectClient.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("uq_chequeo_correo").on(t.correo).where(sql`${t.correo} is not null`),
+    uniqueIndex("uq_chequeo_telefono").on(t.telefono).where(sql`${t.telefono} is not null`),
+    uniqueIndex("uq_chequeo_negocio_clave").on(t.negocioClave).where(sql`${t.negocioClave} is not null`),
+    check("chequeo_origen_check", sql`${t.origen} in ('landing','propio')`),
+    check("chequeo_tipo_check", sql`${t.tipo} in ('negocio','emprendedor')`),
+    check(
+      "chequeo_canal_check",
+      sql`${t.canal} in ('anuncio_meta','referido','summum','tiktok','youtube','anuncio_google','conferencia','webinar','live','reel','otro','directo')`,
+    ),
+    check(
+      "chequeo_etapa_check",
+      sql`${t.etapa} in ('registrado','pedido','entregado','contacto','conversacion','diagnostico','propuesta','cliente','perdido')`,
+    ),
+    check(
+      "chequeo_motor_estado_check",
+      sql`${t.motorEstado} in ('sin_empezar','en_fila','armando','borrador','aprobado','error')`,
+    ),
+    check("chequeo_etapa_prospecto_check", sql`${t.etapaProspecto} in ('idea','arrancando','creciendo','consolidado')`),
+  ],
+);
+
+// Bitácora append-only de cada chequeo: la materia prima de la cadena que diagnostica. Nunca se edita ni se borra.
+export const chequeoEvento = pgTable(
+  "chequeo_evento",
+  {
+    id: id(),
+    chequeoId: uuid("chequeo_id")
+      .notNull()
+      .references(() => chequeo.id, { onDelete: "cascade" }),
+    tipo: text("tipo").notNull(),
+    autor: text("autor").notNull(),
+    detalle: jsonb("detalle"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_chequeo_evento_chequeo_id").on(t.chequeoId),
+    check(
+      "chequeo_evento_tipo_check",
+      sql`${t.tipo} in ('registro','entrevista','etapa','correo','mensaje','llamada','nota','compra','motor')`,
+    ),
+    check("chequeo_evento_autor_check", sql`${t.autor} in ('prospecto','jose_carlos','improvement')`),
+  ],
+);
+
+// ── El casco del muelle (spec 2026-10-19). Dinero en centavos enteros, tasas en puntos base. ──
+export const CHARGE_KINDS = ["membresia", "venta_propia", "proyecto_summum"] as const;
+export const FEE_CHARGE_KINDS = ["venta_propia", "proyecto_summum"] as const;
+
+export const membershipPlan = pgTable(
+  "membership_plan",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    monthlyAmountCents: integer("monthly_amount_cents").notNull(),
+    currency: text("currency").notNull().default("mxn"),
+    stripePriceId: text("stripe_price_id").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_membership_plan_muelle").on(t.muelleOrgId),
+    check("membership_plan_amount_positive", sql`${t.monthlyAmountCents} > 0`),
+  ],
+);
+
+// La cuenta conectada del barco (cobra a sus clientes) y su cliente en la plataforma (paga su
+// membresía). Las tres banderas solo las escribe el webhook account.updated.
+export const stripeAccount = pgTable("stripe_account", {
+  id: id(),
+  orgId: uuid("org_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  stripeAccountId: text("stripe_account_id").unique(),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  chargesEnabled: boolean("charges_enabled").notNull().default(false),
+  payoutsEnabled: boolean("payouts_enabled").notNull().default(false),
+  detailsSubmitted: boolean("details_submitted").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+// barco_org_id null = tasa de fábrica del muelle; lleno = personalizada de ese barco.
+export const feeRate = pgTable(
+  "fee_rate",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    chargeKind: text("charge_kind", { enum: FEE_CHARGE_KINDS }).notNull(),
+    percentBps: integer("percent_bps").notNull(),
+    fixedCents: integer("fixed_cents").notNull().default(0),
+    currency: text("currency").notNull().default("mxn"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_fee_rate_scope").on(t.muelleOrgId, t.barcoOrgId, t.chargeKind).nullsNotDistinct(),
+    check("fee_rate_kind_check", sql`${t.chargeKind} in ('venta_propia','proyecto_summum')`),
+    check("fee_rate_bps_range", sql`${t.percentBps} between 0 and 10000`),
+    check("fee_rate_fixed_nonneg", sql`${t.fixedCents} >= 0`),
+  ],
+);
+
+// Firma de los dos: un dueño propone, OTRO decide. Nunca se borra; queda como bitácora.
+export const feeRateChange = pgTable(
+  "fee_rate_change",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    barcoOrgId: uuid("barco_org_id").references(() => organization.id, { onDelete: "cascade" }),
+    chargeKind: text("charge_kind", { enum: FEE_CHARGE_KINDS }).notNull(),
+    percentBps: integer("percent_bps").notNull(),
+    fixedCents: integer("fixed_cents").notNull().default(0),
+    proposedBy: uuid("proposed_by").notNull().references(() => profile.id),
+    proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull().default(sql`now()`),
+    decidedBy: uuid("decided_by").references(() => profile.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decision: text("decision", { enum: ["aprobado", "rechazado"] }),
+  },
+  (t) => [
+    index("idx_fee_rate_change_muelle").on(t.muelleOrgId),
+    check("fee_rate_change_kind_check", sql`${t.chargeKind} in ('venta_propia','proyecto_summum')`),
+    check("fee_rate_change_bps_range", sql`${t.percentBps} between 0 and 10000`),
+    check("fee_rate_change_otra_firma", sql`${t.decidedBy} is null or ${t.decidedBy} <> ${t.proposedBy}`),
+    check("fee_rate_change_decision_check", sql`${t.decision} is null or ${t.decision} in ('aprobado','rechazado')`),
+  ],
+);
+
+// Solo se insertan filas, y solo desde el webhook de Stripe. stripe_object_id único = idempotencia.
+export const ledgerEntry = pgTable(
+  "ledger_entry",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id").notNull().references(() => organization.id, { onDelete: "restrict" }),
+    barcoOrgId: uuid("barco_org_id").notNull().references(() => organization.id, { onDelete: "restrict" }),
+    chargeKind: text("charge_kind", { enum: CHARGE_KINDS }).notNull(),
+    grossCents: bigint("gross_cents", { mode: "number" }).notNull(),
+    summumFeeCents: bigint("summum_fee_cents", { mode: "number" }).notNull(),
+    appliedPercentBps: integer("applied_percent_bps"),
+    appliedFixedCents: integer("applied_fixed_cents"),
+    currency: text("currency").notNull(),
+    stripeObjectId: text("stripe_object_id").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_ledger_entry_muelle_created").on(t.muelleOrgId, t.createdAt),
+    index("idx_ledger_entry_barco_created").on(t.barcoOrgId, t.createdAt),
+    check("ledger_entry_kind_check", sql`${t.chargeKind} in ('membresia','venta_propia','proyecto_summum')`),
+    check("ledger_entry_fee_le_gross", sql`${t.summumFeeCents} between 0 and ${t.grossCents}`),
   ],
 );

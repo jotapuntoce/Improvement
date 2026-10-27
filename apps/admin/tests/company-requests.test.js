@@ -103,3 +103,29 @@ describe("rejectCompanyRequest", () => {
     expect(updated.status).toBe("rejected");
   });
 });
+
+describe("approveCompanyRequest — muelle", () => {
+  it("WHEN quien aprueba es dueño de exactamente un muelle THE SYSTEM SHALL colgar el barco nuevo de él", async () => {
+    const adminId = await makeRequester();
+    const [dock] = await db
+      .insert(organization)
+      .values({ name: "muelle-t", slug: `muelle-t-${crypto.randomUUID().slice(0, 8)}`, kind: "muelle" })
+      .returning();
+    createdOrgIds.push(dock.id);
+    await db.insert(membership).values({ userId: adminId, orgId: dock.id, role: "owner", acceptedAt: new Date() });
+    const request = await makeRequest(await makeRequester());
+    const newOrg = await approveCompanyRequest(request.id, adminId);
+    // el barco hijo se borra antes que el muelle (FK restrict): afterEach respeta el orden del arreglo
+    createdOrgIds.unshift(newOrg.id);
+    expect(newOrg.kind).toBe("barco");
+    expect(newOrg.parentOrgId).toBe(dock.id);
+  });
+
+  it("WHEN quien aprueba no es dueño de ningún muelle THE SYSTEM SHALL dejar el barco sin muelle", async () => {
+    const adminId = await makeRequester();
+    const request = await makeRequest(await makeRequester());
+    const newOrg = await approveCompanyRequest(request.id, adminId);
+    createdOrgIds.push(newOrg.id);
+    expect(newOrg.parentOrgId).toBeNull();
+  });
+});

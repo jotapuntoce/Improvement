@@ -1,0 +1,1 @@
+ALTER TABLE "chequeo" ADD COLUMN "expediente" jsonb;
