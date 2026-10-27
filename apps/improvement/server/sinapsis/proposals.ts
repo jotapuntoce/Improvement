@@ -43,6 +43,20 @@ export async function listNetworkSpecialties(userId: string, orgId: string) {
     .orderBy(asc(specialty.label));
 }
 
+/** Las áreas del org con su especialidad y si el org cuelga de un muelle (pantalla "Tu perfil y tu red"). */
+export async function listAreaSpecialties(userId: string, orgId: string) {
+  if (!(await findOwnerMembership(userId, orgId))) return { inNetwork: false, areas: [] };
+  const [muelleId, areas] = await Promise.all([
+    parentMuelle(orgId),
+    db
+      .select({ id: area.id, name: area.name, specialtyKey: area.specialtyKey })
+      .from(area)
+      .where(eq(area.orgId, orgId))
+      .orderBy(asc(area.name)),
+  ]);
+  return { inNetwork: muelleId !== null, areas };
+}
+
 export async function setAreaSpecialty(userId: string, orgId: string, areaId: string, key: string | null): Promise<Result<true>> {
   if (!(await findOwnerMembership(userId, orgId))) return FORBIDDEN();
   const notFound = fail("NOT_FOUND", "Esa área o esa especialidad no existe.");

@@ -20,6 +20,7 @@ import {
 } from "@/server/needs/mutations";
 import { listAreasByOrg } from "@/server/areas/listAreas.ts";
 import { getEvolution } from "@/server/evolution/mutations";
+import { decideProposalAsOwner, listOwnerProposals } from "@/server/sinapsis/proposals.ts";
 
 const ESTADO_LABEL: Record<string, string> = {
   abierta: "Abierta",
@@ -42,10 +43,11 @@ export default async function NecesidadesPage({
   if (!userId) notFound();
   if (!(await findOwnerMembership(userId, orgId))) notFound();
 
-  const [necesidades, areasPorOrg, nivel] = await Promise.all([
+  const [necesidades, areasPorOrg, nivel, propuestas] = await Promise.all([
     listNeeds(userId, orgId),
     listAreasByOrg([orgId]),
     getEvolution(userId, orgId),
+    listOwnerProposals(userId, orgId),
   ]);
   const areas = areasPorOrg.get(orgId) ?? [];
   if (!nivel) notFound();
@@ -91,6 +93,21 @@ export default async function NecesidadesPage({
       orgId,
       formData.get("needId")?.toString() ?? "",
       formData.get("note")?.toString() || null,
+    );
+    if (!result.ok) redirect(`${pagina}?error=${encodeURIComponent(result.error.message)}`);
+    revalidatePath(pagina);
+    redirect(pagina);
+  }
+
+  async function decidirEspecialista(formData: FormData) {
+    "use server";
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    const result = await decideProposalAsOwner(
+      actor,
+      orgId,
+      formData.get("proposalId")?.toString() ?? "",
+      formData.get("decision")?.toString(),
     );
     if (!result.ok) redirect(`${pagina}?error=${encodeURIComponent(result.error.message)}`);
     revalidatePath(pagina);
@@ -160,6 +177,39 @@ export default async function NecesidadesPage({
           </p>
         )}
       </ul>
+
+      {propuestas.length > 0 && (
+        <section className="config-card" aria-labelledby="especialistas">
+          <h2 id="especialistas" className="config-card-title">
+            Especialistas propuestos
+          </h2>
+          <p className="config-hint">
+            Los socios de tu red Summum ya firmaron. Si aceptas, la necesidad se deriva a la especialista.
+          </p>
+          <ul className="equipo-list">
+            {propuestas.map((p) => (
+              <li key={p.id}>
+                <p className="objetivo-title">{p.displayName}</p>
+                <p className="config-hint">
+                  Para: {p.needTitle} · Sello {p.sealScore ?? "sin Sello"} · Afinidad contigo {p.matchScore} %
+                  {p.status === "activa" && " · En curso"}
+                </p>
+                {p.status === "aprobada_socios" && (
+                  <form action={decidirEspecialista} className="permiso-actions">
+                    <input type="hidden" name="proposalId" value={p.id} />
+                    <button type="submit" name="decision" value="aprobada" className="panel-cta">
+                      Aceptar especialista
+                    </button>
+                    <button type="submit" name="decision" value="rechazada" className="panel-btn-ghost">
+                      No por ahora
+                    </button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <form action={registrar} className="config-card">
         <h2 className="config-card-title">Registrar una necesidad</h2>
