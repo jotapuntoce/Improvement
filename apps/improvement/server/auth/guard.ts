@@ -4,7 +4,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
@@ -194,4 +194,16 @@ export async function getPreviewGrants(orgId: string): Promise<Record<string, st
     .from(permissionType)
     .where(and(eq(permissionType.id, typeId), eq(permissionType.orgId, orgId)));
   return (type?.grants as Record<string, string> | undefined) ?? null;
+}
+
+/** La primera empresa (por nombre) donde la persona ya aceptó su membresía; null si no tiene ninguna. */
+export async function firstOrgOf(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ orgId: membership.orgId })
+    .from(membership)
+    .innerJoin(organization, eq(organization.id, membership.orgId))
+    .where(and(eq(membership.userId, userId), isNotNull(membership.acceptedAt)))
+    .orderBy(asc(organization.name))
+    .limit(1);
+  return row?.orgId ?? null;
 }
