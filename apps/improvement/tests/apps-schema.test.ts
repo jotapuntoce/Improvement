@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { appModel, appStage, client, membership, orgBrand, organization, profile } from "@jotapuntoce/db/schema";
+import { appModel, appStage, client, membership, orgBrand, organization, permissionType, profile, recordActivity } from "@jotapuntoce/db/schema";
 
 const orgIds: string[] = [];
 const profileIds: string[] = [];
@@ -17,11 +17,11 @@ async function org() {
   orgIds.push(row!.id);
   return row!.id;
 }
-async function person(orgId: string, role: "owner" | "employee") {
+async function person(orgId: string, role: "owner" | "employee", permissionTypeId?: string) {
   const id = crypto.randomUUID();
   await db.insert(profile).values({ id, email: `${id}@example.com` });
   profileIds.push(id);
-  await db.insert(membership).values({ userId: id, orgId, role, acceptedAt: new Date() });
+  await db.insert(membership).values({ userId: id, orgId, role, acceptedAt: new Date(), permissionTypeId });
   return id;
 }
 async function asUser<T>(userId: string, query: string): Promise<T[]> {
@@ -61,5 +61,32 @@ describe("esquema de apps", () => {
       expect(await asUser(member, `select 1 from ${table} where org_id = '${o}'`)).toHaveLength(1);
       expect(await asUser(outsider, `select 1 from ${table} where org_id = '${o}'`)).toHaveLength(0);
     }
+  });
+
+  it("WHEN se lee record_activity THE SYSTEM SHALL aplicar la sección: dueño y permiso sí; sin permiso, 'ninguno' y ajeno no", async () => {
+    const o = await org();
+    const other = await org();
+    const [pt] = await db.insert(permissionType).values({ orgId: o, name: "con clientes", grants: { clientes: "empresa" } }).returning();
+    const [ptNone] = await db.insert(permissionType).values({ orgId: o, name: "sin clientes", grants: { clientes: "ninguno" } }).returning();
+    const owner = await person(o, "owner");
+    const granted = await person(o, "employee", pt!.id);
+    const denied = await person(o, "employee", ptNone!.id);
+    const noType = await person(o, "employee");
+    const outsider = await person(other, "owner");
+    await db.insert(recordActivity).values({ orgId: o, appKey: "ventas", section: "clientes", recordId: crypto.randomUUID(), kind: "nota", body: "hola" });
+    const q = `select 1 from record_activity where org_id = '${o}'`;
+    expect(await asUser(owner, q)).toHaveLength(1);
+    expect(await asUser(granted, q)).toHaveLength(1);
+    expect(await asUser(denied, q)).toHaveLength(0);
+    expect(await asUser(noType, q)).toHaveLength(0);
+    expect(await asUser(outsider, q)).toHaveLength(0);
+  });
+
+  it("WHEN un authenticated inserta en app_model THE SYSTEM SHALL rechazarlo (sin política de escritura)", async () => {
+    const o = await org();
+    const owner = await person(o, "owner");
+    await expect(
+      asUser(owner, `insert into app_model (org_id, key, name, kind, section) values ('${o}', 'x', 'X', 'base', 'clientes')`),
+    ).rejects.toThrow();
   });
 });
