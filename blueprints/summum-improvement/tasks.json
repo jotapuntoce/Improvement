@@ -1183,7 +1183,7 @@
       "apps/improvement/server/people/checkins.ts",
       "apps/improvement/tests/checkins.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T3",

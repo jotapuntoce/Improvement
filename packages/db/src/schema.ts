@@ -1883,3 +1883,44 @@ export const seat = pgTable(
   },
   (t) => [index("idx_seat_org_parent").on(t.orgId, t.parentSeatId)],
 );
+
+// ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
+// Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
+
+export const oneOnOne = pgTable("one_on_one", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id")
+    .notNull()
+    .references(() => profile.id, { onDelete: "cascade" }),
+  heldBy: uuid("held_by").references(() => profile.id, { onDelete: "set null" }),
+  heldOn: date("held_on").notNull(),
+  sharedNotes: text("shared_notes").notNull().default(""),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const checkin = pgTable(
+  "checkin",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    weekStart: date("week_start").notNull(),
+    mood: integer("mood").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("uq_checkin_week").on(t.orgId, t.profileId, t.weekStart),
+    check("checkin_monday", sql`extract(isodow from ${t.weekStart}) = 1`),
+    check("checkin_mood_range", sql`${t.mood} between 1 and 5`),
+  ],
+);
