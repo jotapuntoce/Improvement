@@ -88,3 +88,15 @@ test("WHEN el empleado sin tipo de permiso abre el check-in THE SYSTEM SHALL ofr
   await expect(page.getByLabel("Muy bien")).toBeVisible();
   expect((await page.goto(`/${orgId}/equipo/organigrama`))?.status()).toBe(404);
 });
+
+test("WHEN el dueño abre Cultura THE SYSTEM SHALL responder 200 con h1 Cultura y 0 serious o critical", async ({ page, context, baseURL }) => {
+  await as(context, ownerToken, baseURL);
+  expect((await page.goto(`/${orgId}/equipo/cultura`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Cultura" })).toBeVisible();
+  await expectNoSeriousA11y(page);
+});
+
+test("WHEN el empleado sin tipo de permiso abre Cultura THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
+  await as(context, employeeToken, baseURL);
+  expect((await page.goto(`/${orgId}/equipo/cultura`))?.status()).toBe(404);
+});

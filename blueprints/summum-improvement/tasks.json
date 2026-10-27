@@ -1276,7 +1276,7 @@
       "apps/improvement/tests/culture.test.ts",
       "apps/improvement/tests/e2e/personas.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T6",
