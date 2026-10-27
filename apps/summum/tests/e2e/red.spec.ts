@@ -158,3 +158,13 @@ test("WHEN se descarga el HTML de /directorio THE SYSTEM SHALL no contener el id
   const html = await (await request.get("/directorio")).text();
   for (const id of [barcoId, ...affiliateIds]) expect(html).not.toContain(id);
 });
+
+test("WHEN un dueño del muelle abre /muelle/[muelleId]/sinapsis THE SYSTEM SHALL responder 200 con h1 Sinapsis; el perfil sin relación recibe 404", async ({ page, context, baseURL }) => {
+  await as(context, people.owner.token, baseURL);
+  const response = await page.goto(`/muelle/${muelleId}/sinapsis`);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "Sinapsis" })).toBeVisible();
+  await expect(page.getByText("El dueño del negocio decide al final.")).toBeVisible();
+  await as(context, people.ajeno.token, baseURL);
+  expect((await page.goto(`/muelle/${muelleId}/sinapsis`))?.status()).toBe(404);
+});

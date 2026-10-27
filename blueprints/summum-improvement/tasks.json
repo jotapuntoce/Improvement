@@ -695,7 +695,7 @@
       "apps/summum/tests/sinapsis-approvals.test.ts",
       "apps/summum/tests/e2e/red.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T3",
