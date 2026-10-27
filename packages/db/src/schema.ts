@@ -1684,3 +1684,113 @@ export const challengeParticipant = pgTable(
   },
   (t) => [unique("uq_challenge_participant").on(t.challengeId, t.profileId)],
 );
+
+// ─── Comunidad de la red ────────────────────────────────────────────────────────────────────────
+// Feed, calendario y aula de la red de afiliadas: la leen los dueños del muelle y las afiliadas activas.
+
+export const post = pgTable(
+  "post",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_post_muelle_created").on(t.muelleOrgId, t.createdAt),
+    check("post_body_length", sql`length(${t.body}) between 1 and 4000`),
+  ],
+);
+
+export const comment = pgTable(
+  "comment",
+  {
+    id: id(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("comment_body_length", sql`length(${t.body}) between 1 and 2000`)],
+);
+
+export const communityEvent = pgTable(
+  "community_event",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    liveUrl: text("live_url"),
+    description: text("description").notNull().default(""),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("community_event_range", sql`${t.endsAt} is null or ${t.endsAt} >= ${t.startsAt}`),
+    check("community_event_live_url_https", sql`${t.liveUrl} is null or ${t.liveUrl} like 'https://%'`),
+  ],
+);
+
+export const course = pgTable(
+  "course",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    minLevel: integer("min_level").notNull().default(1),
+    position: integer("position").notNull().default(0),
+    published: boolean("published").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("course_min_level_range", sql`${t.minLevel} between 1 and 9`)],
+);
+
+export const lesson = pgTable(
+  "lesson",
+  {
+    id: id(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => course.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    videoUrl: text("video_url"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("lesson_video_url_https", sql`${t.videoUrl} is null or ${t.videoUrl} like 'https://%'`)],
+);
+
+export const lessonCompletion = pgTable(
+  "lesson_completion",
+  {
+    id: id(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lesson.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [unique("uq_lesson_completion").on(t.lessonId, t.profileId)],
+);

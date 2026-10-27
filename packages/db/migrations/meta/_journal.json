@@ -323,6 +323,20 @@
       "when": 1793118241962,
       "tag": "0045_escuadras_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793118988900,
+      "tag": "0046_loud_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793118992374,
+      "tag": "0047_comunidad_rls",
+      "breakpoints": true
     }
   ]
 }

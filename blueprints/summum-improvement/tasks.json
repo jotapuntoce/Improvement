@@ -956,7 +956,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/comunidad-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T2",
