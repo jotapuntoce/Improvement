@@ -596,7 +596,7 @@
       "apps/improvement/vercel.json",
       "apps/improvement/tests/seal-vigencia.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T10",
