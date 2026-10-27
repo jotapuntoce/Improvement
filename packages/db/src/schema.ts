@@ -1623,3 +1623,64 @@ export const pactoPause = pgTable(
   },
   (t) => [check("pacto_pause_range", sql`${t.endsOn} >= ${t.startsOn}`)],
 );
+
+// ─── Escuadras y retos del Pacto ────────────────────────────────────────────────────────────────
+// La escuadra ve a sus miembros y un estado de apoyo (bien / apoyo), nunca registros, notas ni pilares.
+
+export const squad = pgTable("squad", {
+  id: id(),
+  muelleOrgId: uuid("muelle_org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
+
+export const squadMember = pgTable(
+  "squad_member",
+  {
+    id: id(),
+    squadId: uuid("squad_id")
+      .notNull()
+      .references(() => squad.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique("uq_squad_member").on(t.squadId, t.profileId)],
+);
+
+export const challenge = pgTable(
+  "challenge",
+  {
+    id: id(),
+    muelleOrgId: uuid("muelle_org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    squadId: uuid("squad_id").references(() => squad.id, { onDelete: "cascade" }),
+    pillarId: uuid("pillar_id").references(() => pactoPillar.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [check("challenge_range", sql`${t.endsOn} >= ${t.startsOn}`)],
+);
+
+export const challengeParticipant = pgTable(
+  "challenge_participant",
+  {
+    id: id(),
+    challengeId: uuid("challenge_id")
+      .notNull()
+      .references(() => challenge.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [unique("uq_challenge_participant").on(t.challengeId, t.profileId)],
+);

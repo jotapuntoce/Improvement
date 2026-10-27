@@ -13,7 +13,8 @@ const INVALIDO = "Revisa los datos del formulario.";
 const SIN_CONSENTIMIENTO = "Primero acepta el Pacto.";
 const MAX_PAUSE_DAYS = 30;
 
-async function activeConsent(userId: string) {
+/** Uso interno de server/pacto: el llamador ya pasó su guard. */
+export async function activeConsent(userId: string) {
   const [row] = await db
     .select()
     .from(pactoConsent)
@@ -83,6 +84,14 @@ const laterOf = (a: string, b: string) => (a > b ? a : b);
 
 export async function myPacto(userId: string, muelleId: string, now = new Date()) {
   await assertPactoAccess(userId, muelleId);
+  return pactoStatusOf(userId, muelleId, now);
+}
+
+/**
+ * El estado del Pacto de una persona en un muelle. Uso interno de server/pacto (myPacto, squadBoard): el
+ * llamador ya pasó su guard y decide qué parte enseña — la escuadra, solo el estado de apoyo.
+ */
+export async function pactoStatusOf(userId: string, muelleId: string, now: Date) {
   const today = mxDate(now);
   const [consent, pillars] = await Promise.all([
     activeConsent(userId),
