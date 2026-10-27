@@ -628,7 +628,7 @@
       "apps/summum/app/barco/[orgId]/page.tsx",
       "apps/summum/tests/e2e/red.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T1",
