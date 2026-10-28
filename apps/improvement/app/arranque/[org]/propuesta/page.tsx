@@ -1,4 +1,4 @@
-// Arranque, paso 3 de 3: la propuesta. Las apps sugeridas para su giro, que el dueño elige y renombra
+// Arranque, paso 3 de 4: la propuesta. Las apps sugeridas para su giro, que el dueño elige y renombra
 // antes de crear nada.
 import { notFound, redirect } from "next/navigation";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
@@ -26,12 +26,12 @@ export default async function ArranquePropuesta({ params, searchParams }: { para
       .map((i) => ({ ...fresh.data.apps[i]!, name: formData.get(`name-${i}`)?.toString().trim().slice(0, 40) || fresh.data.apps[i]!.name }));
     const r = await finishOnboarding(actor, orgId, picks);
     if (!r.ok) redirect(`/arranque/${orgId}/propuesta?error=${encodeURIComponent(r.error.message)}`);
-    redirect(`/${orgId}`);
+    redirect(`/arranque/${orgId}/importar`);
   }
 
   return (
     <main className="config-page auth-page">
-      <p className="config-hint">Paso 3 de 3</p>
+      <p className="config-hint">Paso 3 de 4</p>
       <h1 className="config-title">Así armamos tu Improvement</h1>
       <p className="config-hint">Ya traes Clientes, Ventas, Proyectos y Postventa. Para tu giro te sugerimos además:</p>
       {error && <p className="invite-error" role="alert">{error}</p>}

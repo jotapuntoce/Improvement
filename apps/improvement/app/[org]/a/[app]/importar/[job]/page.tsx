@@ -64,8 +64,9 @@ export default async function RevisarImportacion({
       <form action={mapear} className="config-form config-form-stack config-card" aria-label="A qué campo va cada columna">
         {job.headers.map((h, i) => (
           <label key={i} className="permiso-field">
-            <span>{h}</span>
-            <select name={`col-${i}`} defaultValue={job.mapping[String(i)] ?? "ignorar"} className="config-input">
+            <span id={`col-${i}-label`}>{h}</span>
+            {/* aria-labelledby: si no, el nombre accesible del select incluye la opción elegida. */}
+            <select name={`col-${i}`} aria-labelledby={`col-${i}-label`} defaultValue={job.mapping[String(i)] ?? "ignorar"} className="config-input">
               <option value="titulo">Nombre del registro</option>
               {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
               <option value="nuevo">Campo nuevo de texto: {h}</option>

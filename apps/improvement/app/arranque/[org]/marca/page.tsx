@@ -1,4 +1,4 @@
-// Arranque, paso 2 de 3: la marca. El logo se sube a Storage y sus colores pintan todo su Improvement.
+// Arranque, paso 2 de 4: la marca. El logo se sube a Storage y sus colores pintan todo su Improvement.
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { findOwnerMembership, getSessionAccessToken, getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
@@ -37,7 +37,7 @@ export default async function ArranqueMarca({ params, searchParams }: { params: 
 
   return (
     <main className="config-page auth-page">
-      <p className="config-hint">Paso 2 de 3</p>
+      <p className="config-hint">Paso 2 de 4</p>
       <h1 className="config-title">Tu marca</h1>
       <p className="config-hint">Sube tu logo y tomamos sus colores para pintar tu Improvement.</p>
       {error && <p className="invite-error" role="alert">{error}</p>}

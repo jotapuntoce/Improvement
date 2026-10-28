@@ -8,7 +8,7 @@ import type { SuggestionCompletion, SuggestionProvider } from "../server/ai/gate
 import { createCustomApp } from "../server/apps/custom.ts";
 import { addField } from "../server/apps/fields.ts";
 import { listRecords } from "../server/apps/records.ts";
-import { confirmImport, createImportJob, getImportJob, listImports, previewImport, undoImport } from "../server/import/jobs.ts";
+import { confirmImport, createImportJob, getImportJob, listImportableApps, listImports, previewImport, undoImport } from "../server/import/jobs.ts";
 import { mapByName } from "../server/import/mapping.ts";
 
 const orgIds: string[] = [];
@@ -139,5 +139,13 @@ describe("importaciones", () => {
     const otra = await setup();
     expect(await getImportJob(otra.owner, otra.orgId, jobId)).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
     expect(await getImportJob(owner, orgId, "no-es-uuid")).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+  });
+
+  it("WHEN el dueño elige a dónde importar THE SYSTEM SHALL ofrecer Clientes y sus apps propias; a un empleado, nada", async () => {
+    const { orgId, owner, emp } = await setup();
+    await createCustomApp(owner, orgId, { name: "Pacientes", groupName: "Operación", stages: ["Nuevo"] });
+    const r = await listImportableApps(owner, orgId);
+    expect(r.ok && r.data.map((a) => a.name).sort()).toEqual(["Clientes", "Pacientes"]);
+    expect(await listImportableApps(emp, orgId)).toMatchObject({ ok: false, error: { code: "FORBIDDEN" } });
   });
 });

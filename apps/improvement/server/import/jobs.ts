@@ -10,6 +10,7 @@ import { appModel, appRecord, client, clientPreference, deal, experienceGrant, i
 import { findOwnerMembership } from "../auth/guard.ts";
 import { extractStructured, type Attachment, type SuggestionProvider } from "../ai/gateway.ts";
 import { READ_TABLE_SYSTEM, readTablePrompt, readTableSchema } from "../ai/prompts/import.ts";
+import { ensureOrgApps } from "../apps/catalog.ts";
 import { firstStage } from "../apps/custom.ts";
 import { listFields, schemaFor, type FieldDef } from "../apps/fields.ts";
 import { getAppMeta, type AppMeta } from "../apps/records.ts";
@@ -227,4 +228,17 @@ export async function listImports(
     .orderBy(desc(importJob.createdAt))
     .limit(50);
   return { ok: true, data: rows };
+}
+
+/** A dónde puede importar el dueño (Clientes y sus apps propias), para el paso del arranque. */
+export async function listImportableApps(userId: string, orgId: string): Promise<Result<{ key: string; name: string }[]>> {
+  const denied = await ownerGate(userId, orgId);
+  if (denied) return denied;
+  await ensureOrgApps(orgId);
+  const rows = await db
+    .select({ key: appModel.key, name: appModel.name, kind: appModel.kind })
+    .from(appModel)
+    .where(and(eq(appModel.orgId, orgId), eq(appModel.enabled, true)))
+    .orderBy(appModel.position, appModel.createdAt);
+  return { ok: true, data: rows.filter((a) => a.kind === "custom" || a.key === "clientes").map(({ key, name }) => ({ key, name })) };
 }
