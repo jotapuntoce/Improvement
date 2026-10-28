@@ -4,6 +4,10 @@ import { notFound, redirect } from "next/navigation";
 import { findOwnerMembership, getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
 import { getAppMeta } from "@/server/apps/records.ts";
 import { createImportJob, IMPORTABLE, listImports, undoImport } from "@/server/import/jobs.ts";
+import { fetchDriveFile } from "@/server/import/drive.ts";
+import { DrivePicker } from "@/components/import/DrivePicker.tsx";
+import { env } from "@/lib/env.ts";
+import { z } from "zod";
 
 const ESTADO = { borrador: "Sin terminar", importado: "Importado", deshecho: "Deshecho" } as const;
 
@@ -21,6 +25,8 @@ export default async function Importar({
   if (!meta || !IMPORTABLE(meta) || !(await findOwnerMembership(me.userId, orgId))) notFound();
   const history = await listImports(me.userId, orgId, app);
   const base = `/${orgId}/a/${app}/importar`;
+  const { NEXT_PUBLIC_GOOGLE_CLIENT_ID: clientId, NEXT_PUBLIC_GOOGLE_API_KEY: apiKey, NEXT_PUBLIC_GOOGLE_APP_ID: appId } = env;
+  const drive = clientId && apiKey && appId ? { clientId, apiKey, appId } : null;
 
   async function leer(formData: FormData) {
     "use server";
@@ -29,6 +35,20 @@ export default async function Importar({
     const file = formData.get("archivo");
     if (!(file instanceof File) || file.size === 0) redirect(`${base}?error=${encodeURIComponent("Elige un archivo.")}`);
     const r = await createImportJob(actor, orgId, app, { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) });
+    if (!r.ok) redirect(`${base}?error=${encodeURIComponent(r.error.message)}`);
+    redirect(`${base}/${r.data.jobId}`);
+  }
+
+  async function desdeDrive(formData: FormData) {
+    "use server";
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    const input = z.object({ fileId: z.string(), token: z.string() }).safeParse(Object.fromEntries(formData));
+    if (!input.success) redirect(`${base}?error=${encodeURIComponent("Vuelve a elegir el archivo de Drive.")}`);
+    const file = await fetchDriveFile(input.data.fileId, input.data.token);
+    if (!file.ok) redirect(`${base}?error=${encodeURIComponent(file.error.message)}`);
+    const { source, ...uploaded } = file.data;
+    const r = await createImportJob(actor, orgId, app, uploaded, source ? { source } : {});
     if (!r.ok) redirect(`${base}?error=${encodeURIComponent(r.error.message)}`);
     redirect(`${base}/${r.data.jobId}`);
   }
@@ -59,6 +79,11 @@ export default async function Importar({
         <p id="archivo-ayuda" className="config-hint">Hasta 5 MB y 5,000 filas.</p>
         <button type="submit" className="panel-cta">Leer archivo</button>
       </form>
+      {drive && (
+        <form action={desdeDrive} className="config-form config-card" aria-label="Elegir de Google Drive">
+          <DrivePicker {...drive} />
+        </form>
+      )}
 
       <h2 className="config-title">Tus importaciones</h2>
       {history.ok && history.data.length > 0 ? (
