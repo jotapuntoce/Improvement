@@ -592,6 +592,11 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   gap: 10px;
 }
 .permiso-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+/* En columna, el flex-basis de .config-input se volvería alto: el campo toma su alto natural. */
+.permiso-field .config-input { flex: none; }
+/* Formulario de un campo por renglón (ficha, bitácora, marca): los campos a todo lo ancho. */
+.config-form-stack { flex-direction: column; align-items: stretch; }
+.config-form-stack > button { align-self: flex-start; }
 .permiso-actions { display: flex; gap: 10px; }
 
 /* --- Enlace de invitación (/[org]/equipo/invitar) — se muestra una sola vez. --- */
@@ -660,3 +665,37 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .scorecard-scroll { overflow-x: auto; }
 .scorecard-ok { color: var(--success); font-weight: 600; }
 .scorecard-off { color: var(--danger); font-weight: 600; }
+
+/* Shell estilo Whop (blueprint improvement-odoo, fase 1). Solo tokens. */
+.shell { display: grid; grid-template-columns: 17rem 1fr; min-height: 100dvh; background: var(--bg); }
+.shell-sidebar { position: sticky; top: 0; height: 100dvh; overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg-elevated); padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.shell-sidebar a { display: block; padding: 0.45rem 0.6rem; border-radius: var(--radius-sm); color: var(--text-secondary); text-decoration: none; transition: background 0.15s ease, color 0.15s ease; }
+.shell-sidebar a:hover, .shell-sidebar a:focus-visible, .shell-sidebar a[aria-current="page"] { background: var(--bg-card-hover); color: var(--text-primary); }
+.shell-group > summary { cursor: pointer; padding: 0.3rem 0.6rem; font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.shell-fixed, .shell-group ul, .shell-org ul { list-style: none; margin: 0; padding: 0; }
+.shell-org > summary { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; padding: 0.5rem; border-bottom: 1px solid var(--border); color: var(--text-primary); font-weight: 600; }
+.shell-org-logo { width: 2.25rem; height: 2.25rem; flex: none; border-radius: var(--radius-sm); object-fit: cover; background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); }
+.shell-preview { margin-top: auto; display: flex; gap: 0.5rem; align-items: end; color: var(--text-secondary); font-size: 0.875rem; }
+.shell-preview label { display: grid; gap: 0.25rem; }
+.shell-main { min-width: 0; }
+@media (max-width: 767px) {
+  .shell { grid-template-columns: 1fr; }
+  .shell-sidebar { position: static; height: auto; }
+}
+
+/* Vistas genéricas lista, kanban y ficha (blueprint improvement-odoo, fase 1). Solo tokens. */
+.view-page { max-width: none; }
+.view-control { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.view-switch { display: flex; gap: 0.25rem; }
+.view-switch a { padding: 0.4rem 0.75rem; border-radius: var(--radius-sm); color: var(--text-secondary); }
+.view-switch a[aria-current="page"], .view-stagebar li[aria-current="step"] { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: var(--bg); }
+.view-table { width: 100%; border-collapse: collapse; }
+.view-table th, .view-table td { text-align: left; padding: 0.6rem; border-bottom: 1px solid var(--border); }
+.view-kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(16rem, 1fr); gap: 0.75rem; overflow-x: auto; }
+.view-column { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; }
+.view-column ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.view-card { display: grid; gap: 0.35rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem; cursor: grab; }
+.view-stagebar { display: flex; flex-wrap: wrap; gap: 0.25rem; list-style: none; padding: 0; margin: 0.75rem 0; }
+.view-stagebar li { padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); }
+.home-cover { position: relative; height: 12rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); background-size: cover; background-position: center; margin-bottom: 3rem; }
+.home-logo { position: absolute; left: 1.5rem; bottom: -2.5rem; width: 5.5rem; height: 5.5rem; border-radius: var(--radius-md); border: 3px solid var(--bg); object-fit: cover; background: var(--bg-elevated); }

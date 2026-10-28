@@ -1,35 +1,51 @@
-// Un layout para las 6 rutas de [org] (mapa, objetivos, equipo, powerups, clientes,
-// planos) en vez de repetir el enlace en cada page.tsx. No autentica: cada página ya llama a
-// requireOrgMembership() y ese sigue siendo el único guard — esto solo arma un href.
-// El enlace a Dirección sale de loadDireccionNav, que nunca lanza: sin sesión, sin membresía (un
-// platform admin en /planos) o sin ninguna de las cuatro secciones, simplemente no se dibuja.
-import Link from "next/link";
-import { BackLink } from "@/components/BackLink.tsx";
-import { getSessionUserId } from "@/server/auth/guard.ts";
+// El shell de todo el negocio: barra izquierda con empresas, apps visibles, Dirección y vista previa,
+// y el centro con la marca del negocio. No autentica: cada página sigue llamando su guard. Sin
+// sesión o sin membresía (un platform admin en /planos) se dibuja solo el contenido.
+import { notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { findMembership, getPreviewGrants, getSessionUserId } from "@/server/auth/guard.ts";
+import { setPreview } from "@/server/auth/preview.ts";
+import { loadSidebar } from "@/server/apps/sidebar.ts";
+import { brandStyle, getBrand } from "@/server/brand/brand.ts";
 import { loadDireccionNav } from "@/server/direccion/nav.ts";
+import { AppShell } from "@/components/shell/AppShell.tsx";
+import { Sidebar } from "@/components/shell/Sidebar.tsx";
+import { OrgSwitcher } from "@/components/shell/OrgSwitcher.tsx";
+import { PreviewAs } from "@/components/shell/PreviewAs.tsx";
 
-export default async function OrgLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ org: string }>;
-}) {
+const UUID = /^[0-9a-f-]{36}$/i;
+
+export default async function OrgLayout({ children, params }: { children: React.ReactNode; params: Promise<{ org: string }> }) {
   const { org } = await params;
   const userId = await getSessionUserId();
-  const direccion = userId ? await loadDireccionNav(userId, org) : [];
+  if (!userId || !UUID.test(org) || !(await findMembership(userId, org))) return <>{children}</>;
+
+  const [sidebar, brand, direccion] = await Promise.all([
+    loadSidebar(userId, org, await getPreviewGrants(org)),
+    getBrand(userId, org),
+    loadDireccionNav(userId, org),
+  ]);
+
+  async function verComo(formData: FormData) {
+    "use server";
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    await setPreview(actor, org, formData.get("permissionTypeId")?.toString() || null);
+    revalidatePath(`/${org}`, "layout");
+  }
 
   return (
-    <>
-      <BackLink href={`/empresas/${org}`} label="Volver al edificio" />
-      {direccion.length > 0 && (
-        <nav aria-label="Dirección" className="direccion-nav">
-          <Link href={`/${org}/direccion`} className="jpc-back-link jpc-back-link--fixed">
-            Dirección
-          </Link>
-        </nav>
-      )}
+    <AppShell
+      style={brandStyle(brand)}
+      sidebar={
+        <Sidebar
+          data={{ orgId: org, direccion: direccion.length > 0, groups: sidebar.groups }}
+          header={<OrgSwitcher current={org} orgs={sidebar.orgs} logoUrl={brand.logoUrl} />}
+          footer={sidebar.permissionTypes && sidebar.permissionTypes.length > 0 ? <PreviewAs types={sidebar.permissionTypes} action={verComo} /> : undefined}
+        />
+      }
+    >
       {children}
-    </>
+    </AppShell>
   );
 }

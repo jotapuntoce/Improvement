@@ -327,6 +327,7 @@ export const project = pgTable(
     authorizedBy: uuid("authorized_by").references(() => profile.id, { onDelete: "set null" }),
     authorizedAt: timestamp("authorized_at", { withTimezone: true }),
     ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -487,6 +488,7 @@ export const client = pgTable(
     notes: text("notes"),
     // La llave del monedero público del cliente (lealtad). Única: es la que viaja en el enlace.
     walletToken: text("wallet_token").unique(),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -541,6 +543,7 @@ export const deal = pgTable(
     stage: text("stage", { enum: DEAL_STAGES }).notNull().default("prospecto"),
     ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -575,6 +578,7 @@ export const ticket = pgTable(
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     satisfaction: integer("satisfaction"),
     createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -2005,3 +2009,106 @@ export const experienceGrant = pgTable(
   },
   (t) => [check("experience_grant_value_nonneg", sql`${t.valueCents} >= 0`)],
 );
+
+// ─── Motor de apps (blueprint improvement-odoo, fase 1) ───────────────────────────────────────────
+// Lo que el dueño personaliza son filas: apps, grupos, etapas, campos extra y vistas. Las apps base
+// apuntan a su tabla real (`kind = 'base'`); las del dueño (`custom`) llegan en la fase 2.
+
+export const APP_FIELD_TYPES = ["texto", "numero", "dinero", "fecha", "opcion", "si_no"] as const;
+export const APP_VIEW_KINDS = ["lista", "kanban", "ficha"] as const;
+
+export const orgBrand = pgTable("org_brand", {
+  id: id(),
+  orgId: uuid("org_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),
+  primaryColor: text("primary_color"),
+  secondaryColor: text("secondary_color"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("org_brand_primary_hex", sql`${t.primaryColor} is null or ${t.primaryColor} ~ '^#[0-9a-fA-F]{6}$'`),
+  check("org_brand_secondary_hex", sql`${t.secondaryColor} is null or ${t.secondaryColor} ~ '^#[0-9a-fA-F]{6}$'`),
+]);
+
+export const appGroup = pgTable("app_group", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index("idx_app_group_org").on(t.orgId)]);
+
+export const appModel = pgTable("app_model", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  kind: text("kind", { enum: ["base", "custom"] }).notNull(),
+  // La sección de permisos que la abre (SECTION_SLUGS). Las custom de la fase 2 traerán la suya.
+  section: text("section").notNull(),
+  icon: text("icon"),
+  groupId: uuid("group_id").references(() => appGroup.id, { onDelete: "set null" }),
+  position: integer("position").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_app_model_org_key").on(t.orgId, t.key),
+  check("app_model_kind_check", sql`${t.kind} in ('base','custom')`),
+]);
+
+export const appStage = pgTable("app_stage", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  // En apps base, el valor real de la columna de etapa (p. ej. 'ganado'). Nunca cambia; el nombre sí.
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [unique("uq_app_stage_app_key").on(t.appId, t.key)]);
+
+export const appField = pgTable("app_field", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  type: text("type", { enum: APP_FIELD_TYPES }).notNull(),
+  options: jsonb("options").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  required: boolean("required").notNull().default(false),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_app_field_app_key").on(t.appId, t.key),
+  check("app_field_key_format", sql`${t.key} ~ '^[a-z][a-z0-9_]{1,39}$'`),
+]);
+
+export const appView = pgTable("app_view", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: APP_VIEW_KINDS }).notNull(),
+  // Llaves de campo visibles, en orden. Las de la tabla base usan su nombre ('title', 'amount').
+  columns: jsonb("columns").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const recordActivity = pgTable("record_activity", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appKey: text("app_key").notNull(),
+  // La sección que permite leerla: la RLS la usa sin unir con app_model.
+  section: text("section").notNull(),
+  recordId: uuid("record_id").notNull(),
+  kind: text("kind", { enum: ["nota", "cambio"] }).notNull(),
+  body: text("body").notNull(),
+  actorId: uuid("actor_id").references(() => profile.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [index("idx_record_activity_record").on(t.orgId, t.recordId)]);

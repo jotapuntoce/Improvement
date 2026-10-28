@@ -120,13 +120,16 @@
   --brand-amber: #ffb829;
   /* Ámbar oscuro: la frase a mano y los acentos sobre papel marfil, donde #ffb829 no se lee. */
   --brand-amber-paper: #c98a00;
+  /* Improvement: degradado verde sobre negro (login, registro, burbuja). */
+  --brand-improvement-1: #1fbe79;
+  --brand-improvement-2: #98e33b;
   --brand-thread: linear-gradient(90deg, var(--dept-planeacion), var(--dept-valor), var(--dept-sistemas),
     var(--dept-presentacion), var(--dept-branding), var(--dept-imaginacion));
 }
 
 /* Panel admin con la marca madre: <html data-brand="jotapuntoce"> (apps/admin/app/layout.js) remapea
    los tokens genéricos a la paleta 70 % marino · 20 % marfil · 7 % ámbar. Acento plano ámbar, sin el
-   degradado violeta→cian que el manual prohíbe. apps/improvement no lleva el atributo: no le afecta. */
+   degradado violeta→cian que el manual prohíbe. apps/improvement lleva data-brand="improvement" (abajo). */
 :root[data-brand="jotapuntoce"] {
   --bg: var(--brand-navy);
   --bg-elevated: color-mix(in srgb, var(--brand-navy) 94%, var(--brand-ivory));
@@ -202,4 +205,13 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-glow: 0 0 0 1px var(--border);
+}
+
+/* Improvement: <html data-brand="improvement"> (apps/improvement/app/layout.tsx). Negro con el
+   degradado verde. Dentro de un negocio, el shell pisa --accent-1/2 con los colores de org_brand. */
+:root[data-brand="improvement"] {
+  --bg: #000000;
+  --accent-1: var(--brand-improvement-1);
+  --accent-2: var(--brand-improvement-2);
+  --shadow-glow: 0 0 0 1px var(--border), 0 20px 60px -20px color-mix(in srgb, var(--brand-improvement-1) 35%, transparent);
 }
