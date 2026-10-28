@@ -435,6 +435,20 @@
       "when": 1793151680220,
       "tag": "0061_registro_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793156009030,
+      "tag": "0062_burly_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793156011908,
+      "tag": "0063_importacion_rls",
+      "breakpoints": true
     }
   ]
 }

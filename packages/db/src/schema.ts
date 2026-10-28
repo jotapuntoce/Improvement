@@ -20,6 +20,7 @@ import {
   check,
   bigint,
   unique,
+  primaryKey,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -2148,4 +2149,49 @@ export const appRecord = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("idx_app_record_app").on(t.appId, t.updatedAt)],
+);
+
+// ── Importación (spec improvement-odoo §5, Fase 3) ───────────────────────────────────────────────
+export const IMPORT_SOURCES = ["csv", "xlsx", "sheets", "pdf", "imagen"] as const;
+export const IMPORT_STATUSES = ["borrador", "importado", "deshecho"] as const;
+
+// Una importación de archivo a una app. rows guarda la tabla leída solo mientras es borrador; al
+// importar se vacía (los datos ya viven en sus registros) y record_origin queda para deshacer.
+export const importJob = pgTable(
+  "import_job",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+    source: text("source", { enum: IMPORT_SOURCES }).notNull(),
+    fileName: text("file_name").notNull(),
+    status: text("status", { enum: IMPORT_STATUSES }).notNull().default("borrador"),
+    headers: jsonb("headers").$type<string[]>().notNull(),
+    rows: jsonb("rows").$type<string[][]>().notNull(),
+    mapping: jsonb("mapping").$type<Record<string, string>>().notNull().default({}),
+    mappedBy: text("mapped_by"),
+    errors: jsonb("errors").$type<{ row: number; message: string }[]>().notNull().default([]),
+    importedCount: integer("imported_count").notNull().default(0),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    importedAt: timestamp("imported_at", { withTimezone: true }),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_import_job_app").on(t.appId, t.createdAt),
+    check("import_job_source_check", sql`${t.source} in ('csv','xlsx','sheets','pdf','imagen')`),
+    check("import_job_status_check", sql`${t.status} in ('borrador','importado','deshecho')`),
+    check("import_job_mapped_by_check", sql`${t.mappedBy} is null or ${t.mappedBy} in ('ia','nombre')`),
+  ],
+);
+
+// Qué registro nació de qué importación (client o app_record, según la app del job).
+export const recordOrigin = pgTable(
+  "record_origin",
+  {
+    importJobId: uuid("import_job_id").notNull().references(() => importJob.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.importJobId, t.recordId] })],
 );
