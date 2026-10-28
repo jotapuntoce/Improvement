@@ -2112,3 +2112,40 @@ export const recordActivity = pgTable("record_activity", {
   actorId: uuid("actor_id").references(() => profile.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 }, (t) => [index("idx_record_activity_record").on(t.orgId, t.recordId)]);
+
+// ─── Registro y apps propias (Fase 2 de improvement-odoo) ────────────────────────────────────────
+
+export const TEAM_SIZES = ["solo", "2-5", "6-20", "21+"] as const;
+
+// Lo que el dueño cuenta de su negocio al registrarse. El giro vive en organization.industry (ya
+// existe); aquí lo demás. onboarded_at = terminó el arranque guiado (null = mandarlo a /arranque).
+export const orgProfile = pgTable(
+  "org_profile",
+  {
+    orgId: uuid("org_id").primaryKey().references(() => organization.id, { onDelete: "cascade" }),
+    teamSize: text("team_size"),
+    city: text("city"),
+    templateKey: text("template_key"),
+    onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("org_profile_team_size_check", sql`${t.teamSize} is null or ${t.teamSize} in ('solo','2-5','6-20','21+')`)],
+);
+
+// Registros de las apps que crea el dueño (app_model.kind = 'custom'). Los valores de sus campos
+// (app_field) van en data; title y stage son columnas porque toda vista los usa.
+export const appRecord = pgTable(
+  "app_record",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    stage: text("stage").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_app_record_app").on(t.appId, t.updatedAt)],
+);

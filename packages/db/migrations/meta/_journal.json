@@ -421,6 +421,20 @@
       "when": 1793127661057,
       "tag": "0059_apps_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793151668547,
+      "tag": "0060_previous_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793151680220,
+      "tag": "0061_registro_rls",
+      "breakpoints": true
     }
   ]
 }

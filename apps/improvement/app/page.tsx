@@ -3,11 +3,11 @@ import { firstOrgOf, getSessionUserId, isPlatformAdmin } from "@/server/auth/gua
 
 // `/` nunca es una página en sí — reparte: sin sesión, a /login; el platform admin, a su cartera
 // (/empresas); el dueño o el empleado, al inicio de su primera empresa. Quien aún no tiene empresa
-// va a /empresas, donde puede solicitarla (hasta que llegue el registro de la fase 2).
+// va a /arranque a registrar la suya.
 export default async function Page() {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
   if (await isPlatformAdmin(userId)) redirect("/empresas");
   const orgId = await firstOrgOf(userId);
-  redirect(orgId ? `/${orgId}` : "/empresas");
+  redirect(orgId ? `/${orgId}` : "/arranque");
 }

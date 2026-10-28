@@ -2,9 +2,11 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { appModel, appStage, profile, recordActivity } from "@jotapuntoce/db/schema";
+import { appModel, appRecord, appStage, profile, recordActivity } from "@jotapuntoce/db/schema";
 import { resolveSection } from "../auth/guard.ts";
-import { BASE_APPS, ensureOrgApps } from "./catalog.ts";
+import { ensureOrgApps, type BaseAppKey } from "./catalog.ts";
+import { customAdapter, firstStage } from "./custom.ts";
+import type { SectionSlug } from "../permissions/sections.ts";
 import { ADAPTERS, type AppRecord } from "./adapters.ts";
 import { listFields, schemaFor } from "./fields.ts";
 
@@ -14,13 +16,25 @@ const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: {
 export type { AppRecord };
 export interface ActivityItem { kind: "nota" | "cambio"; body: string; actorName: string | null; createdAt: Date }
 
+export interface AppMeta { id: string; key: string; name: string; section: SectionSlug; kind: "base" | "custom" }
+
+/** La app prendida del org por su llave (base o propia), o null. Sin guard: la llaman gate() y las páginas después de requireSection. */
+export async function getAppMeta(orgId: string, appKey: string): Promise<AppMeta | null> {
+  await ensureOrgApps(orgId);
+  const [row] = await db
+    .select({ id: appModel.id, key: appModel.key, name: appModel.name, section: appModel.section, kind: appModel.kind })
+    .from(appModel)
+    .where(and(eq(appModel.orgId, orgId), eq(appModel.key, appKey), eq(appModel.enabled, true)));
+  return row ? { ...row, section: row.section as SectionSlug, kind: row.kind === "custom" ? "custom" : "base" } : null;
+}
+
 /** Lectura: cualquier alcance distinto de "ninguno". Escritura: solo "empresa", igual que las apps base. */
 async function gate(userId: string, orgId: string, appKey: string, write: boolean) {
-  const app = BASE_APPS.find((a) => a.key === appKey);
+  const app = await getAppMeta(orgId, appKey);
   if (!app) return { error: fail("Esa app no existe.", "NOT_FOUND") };
   const { scope } = await resolveSection(userId, orgId, app.section);
   if (scope === "ninguno" || (write && scope !== "empresa")) return { error: fail("No tienes acceso a esta app.", "FORBIDDEN") };
-  return { app, adapter: ADAPTERS[app.key] };
+  return { app, adapter: app.kind === "custom" ? customAdapter(app.id) : ADAPTERS[app.key as BaseAppKey] };
 }
 
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
@@ -34,7 +48,6 @@ export async function listRecords(
   const g = await gate(userId, orgId, appKey, false);
   if (g.error) return g.error;
   const q = z.string().trim().max(80).safeParse(opts.q ?? "");
-  await ensureOrgApps(orgId);
   const [records, stages] = await Promise.all([
     g.adapter.list(orgId, q.success && q.data ? q.data : undefined),
     db
@@ -101,4 +114,18 @@ export async function listActivity(userId: string, orgId: string, appKey: string
     .where(and(eq(recordActivity.orgId, orgId), eq(recordActivity.appKey, appKey), eq(recordActivity.recordId, id)))
     .orderBy(desc(recordActivity.createdAt));
   return { ok: true, data: rows };
+}
+
+/** Registro nuevo en una app propia; nace en su primera etapa. Las base se crean desde sus pantallas de siempre. */
+export async function createRecord(userId: string, orgId: string, appKey: string, title: string): Promise<Result<{ id: string }>> {
+  const g = await gate(userId, orgId, appKey, true);
+  if (g.error) return g.error;
+  if (g.app.kind !== "custom") return fail("En esta app los registros se crean desde su pantalla de siempre.");
+  const t = z.string().trim().min(1).max(120).safeParse(title);
+  if (!t.success) return fail("Ponle un nombre.");
+  const stage = await firstStage(g.app.id);
+  if (!stage) return fail("Esta app no tiene etapas.");
+  const [row] = await db.insert(appRecord).values({ orgId, appId: g.app.id, title: t.data, stage, createdBy: userId }).returning({ id: appRecord.id });
+  await log(orgId, appKey, g.app.section, row!.id, "cambio", "Registro creado", userId);
+  return { ok: true, data: { id: row!.id } };
 }

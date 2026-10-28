@@ -7,6 +7,7 @@ import { getBrand } from "@/server/brand/brand.ts";
 import { loadOwnerTasks } from "@/server/tasks/loadOwnerTasks.ts";
 import { isMeetingPending } from "@/server/direccion/meetings/meetings.ts";
 import { refreshNextMove } from "@/server/ai/nextMove.ts";
+import { needsOnboarding } from "@/server/registro/onboarding.ts";
 
 const NEXT_MOVE_ERROR = "Improvement no pudo pensar la jugada ahora; ves la más urgente.";
 
@@ -15,6 +16,8 @@ export default async function OrgHome({ params, searchParams }: { params: Promis
   const { error } = await searchParams;
   const memberRow = await requireOrgMembership(orgId);
   const isOwner = memberRow.role === "owner";
+  // El dueño que se registró y no cerró su arranque lo retoma donde lo dejó.
+  if (isOwner && (await needsOnboarding(memberRow.userId, orgId))) redirect(`/arranque/${orgId}/marca`);
   const [brand, tasks, juntaPendiente] = await Promise.all([
     getBrand(memberRow.userId, orgId),
     isOwner ? loadOwnerTasks(memberRow.userId) : Promise.resolve([]),

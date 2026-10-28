@@ -84,6 +84,7 @@ const ROUTES: { label: string; path: () => string }[] = [
   { label: "/[org] (inicio)", path: () => `/${orgId}` },
   { label: "/[org]/a/ventas (lista)", path: () => `/${orgId}/a/ventas` },
   { label: "/[org]/a/ventas (kanban)", path: () => `/${orgId}/a/ventas?vista=kanban` },
+  { label: "/[org]/aplicaciones/nueva", path: () => `/${orgId}/aplicaciones/nueva` },
   { label: "/[org]/objetivos", path: () => `/${orgId}/objetivos` },
   { label: "/[org]/mapa", path: () => `/${orgId}/mapa` },
 ];

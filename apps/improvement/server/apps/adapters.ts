@@ -22,7 +22,7 @@ export interface AppRecord {
   updatedAt: Date;
 }
 
-interface Adapter {
+export interface Adapter {
   list(orgId: string, q?: string): Promise<AppRecord[]>;
   get(orgId: string, id: string): Promise<AppRecord | undefined>;
   move(userId: string, orgId: string, id: string, stage: string): Promise<Result<true>>;

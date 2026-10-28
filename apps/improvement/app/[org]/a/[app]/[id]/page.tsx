@@ -3,9 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
-import { addNote, getRecord, listActivity, listRecords, saveCustomValues } from "@/server/apps/records.ts";
+import { addNote, getAppMeta, getRecord, listActivity, listRecords, saveCustomValues } from "@/server/apps/records.ts";
 import { listFields } from "@/server/apps/fields.ts";
-import { BASE_APPS } from "@/server/apps/catalog.ts";
 import { RecordForm } from "@/components/views/RecordForm.tsx";
 import { ActivityLog } from "@/components/views/ActivityLog.tsx";
 
@@ -18,7 +17,7 @@ export default async function RecordPage({
 }) {
   const { org: orgId, app, id } = await params;
   const { error } = await searchParams;
-  const meta = BASE_APPS.find((a) => a.key === app);
+  const meta = await getAppMeta(orgId, app);
   if (!meta) notFound();
   const { membership } = await requireSection(orgId, meta.section);
   const userId = membership.userId;
