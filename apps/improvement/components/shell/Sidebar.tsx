@@ -1,5 +1,5 @@
 // Barra izquierda al estilo Whop: empresa arriba, los fijos y los grupos de apps con sus enlaces.
-import Link from "next/link";
+import { NavLink } from "./NavLink.tsx";
 import type { ReactNode } from "react";
 
 export interface SidebarData {
@@ -13,16 +13,16 @@ export function Sidebar({ data, header, footer }: { data: SidebarData; header: R
     <nav className="shell-sidebar" aria-label="Aplicaciones">
       {header}
       <ul className="shell-fixed">
-        <li><Link href={`/${data.orgId}`}>Inicio</Link></li>
-        {data.direccion && <li><Link href={`/${data.orgId}/direccion`}>Dirección</Link></li>}
-        <li><Link href={`/${data.orgId}/configuracion/marca`}>Tu marca</Link></li>
+        <li><NavLink href={`/${data.orgId}`} exact>Inicio</NavLink></li>
+        {data.direccion && <li><NavLink href={`/${data.orgId}/direccion`}>Dirección</NavLink></li>}
+        <li><NavLink href={`/${data.orgId}/configuracion/marca`}>Tu marca</NavLink></li>
       </ul>
       {data.groups.map((g) => (
         <details key={g.name} open className="shell-group">
           <summary>{g.name}</summary>
           <ul>
             {g.apps.map((a) => (
-              <li key={a.key}><Link href={a.href}>{a.name}</Link></li>
+              <li key={a.key}><NavLink href={a.href}>{a.name}</NavLink></li>
             ))}
           </ul>
         </details>

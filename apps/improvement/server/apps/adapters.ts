@@ -40,7 +40,7 @@ const HEALTH = ["healthy", "neutral", "at_risk"] as const;
 
 async function listClients(orgId: string, q?: string): Promise<AppRecord[]> {
   const rows = await db.select().from(client).where(and(eq(client.orgId, orgId), like(q, client.name))).orderBy(desc(client.updatedAt)).limit(200);
-  return rows.map((r) => ({ id: r.id, title: r.name, subtitle: r.notes, stage: r.healthStatus, amountCents: null, custom: r.custom, updatedAt: r.updatedAt }));
+  return rows.map((r) => ({ id: r.id, title: r.name, subtitle: null, stage: r.healthStatus, amountCents: null, custom: r.custom, updatedAt: r.updatedAt }));
 }
 
 async function listDeals(orgId: string, q?: string): Promise<AppRecord[]> {
