@@ -14,6 +14,7 @@
 // refresco automático se vuelve necesario, ese es el momento de agregar @supabase/ssr (con su propio
 // pin verificado vía stack-researcher), no de inventar más cookies a mano.
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
@@ -155,6 +156,9 @@ export function LoginForm() {
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
+        <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+          ¿Nuevo? <Link href="/registro">Crea tu cuenta</Link>
+        </p>
       </form>
     </main>
   );

@@ -685,6 +685,8 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 
 /* Vistas genéricas lista, kanban y ficha (blueprint improvement-odoo, fase 1). Solo tokens. */
 .view-page { max-width: none; }
+/* Registro y arranque: una columna angosta, centrada, fuera del shell del negocio. */
+.auth-page { padding-inline: max(24px, calc((100% - 28rem) / 2)); }
 .view-control { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .view-new { display: flex; gap: 0.5rem; }
 .view-switch { display: flex; gap: 0.25rem; }
