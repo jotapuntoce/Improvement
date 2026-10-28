@@ -592,6 +592,11 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
   gap: 10px;
 }
 .permiso-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+/* En columna, el flex-basis de .config-input se volvería alto: el campo toma su alto natural. */
+.permiso-field .config-input { flex: none; }
+/* Formulario de un campo por renglón (ficha, bitácora, marca): los campos a todo lo ancho. */
+.config-form-stack { flex-direction: column; align-items: stretch; }
+.config-form-stack > button { align-self: flex-start; }
 .permiso-actions { display: flex; gap: 10px; }
 
 /* --- Enlace de invitación (/[org]/equipo/invitar) — se muestra una sola vez. --- */

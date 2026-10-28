@@ -6,7 +6,7 @@ const INPUT_TYPE: Record<string, string> = { texto: "text", numero: "number", di
 export function RecordForm({ fields, values, action }: { fields: FormField[]; values: Record<string, unknown>; action: (formData: FormData) => Promise<void> }) {
   if (fields.length === 0) return <p className="config-hint">Esta app todavía no tiene campos extra.</p>;
   return (
-    <form action={action} className="config-form" aria-label="Campos">
+    <form action={action} className="config-form config-form-stack" aria-label="Campos">
       {fields.map((f) => {
         const raw = values[f.key];
         const value = f.type === "dinero" && typeof raw === "number" ? String(raw / 100) : raw == null ? "" : String(raw);

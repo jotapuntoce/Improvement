@@ -11,7 +11,7 @@ export function ActivityLog({
   return (
     <section className="config-card" aria-labelledby="bitacora">
       <h2 id="bitacora" className="config-card-title">Bitácora</h2>
-      <form action={action} className="config-form" aria-label="Nueva nota">
+      <form action={action} className="config-form config-form-stack" aria-label="Nueva nota">
         <label className="permiso-field">
           <span>Nota</span>
           <textarea name="body" required maxLength={2000} className="config-input" />

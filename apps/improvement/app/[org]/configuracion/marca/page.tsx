@@ -50,7 +50,7 @@ export default async function MarcaPage({
       {error && <p className="invite-error" role="alert">{error}</p>}
       {!isOwner && <p className="config-hint">Solo el dueño cambia la marca.</p>}
       {isOwner && (
-        <form action={guardar} className="config-form config-card" aria-label="Marca del negocio">
+        <form action={guardar} className="config-form config-form-stack config-card" aria-label="Marca del negocio">
           <label className="permiso-field">
             <span>Logo (dirección de la imagen)</span>
             <input name="logoUrl" type="url" defaultValue={brand.logoUrl ?? ""} className="config-input" />
