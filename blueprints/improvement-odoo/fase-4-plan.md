@@ -28,7 +28,7 @@
 - Gate: `pnpm lint && pnpm typecheck && pnpm test` en verde antes de dar una tarea por hecha.
 - Commits con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`; nunca `git add -A`.
 
-## Decisiones (por aprobar por Jose Carlos)
+## Decisiones (aprobadas por Jose Carlos el 2026-10-27)
 
 | # | Spec | Este plan |
 |---|---|---|
