@@ -28,12 +28,13 @@ export default async function AppPage({
   const base = `/${orgId}/a/${app}`;
   const stageName = Object.fromEntries(result.data.stages.map((s) => [s.key, s.name]));
 
-  async function move(id: string, stage: string) {
+  async function move(id: string, stage: string): Promise<string | null> {
     "use server";
     const actor = await getSessionUserId();
     if (!actor) notFound();
-    await moveRecord(actor, orgId, app, id, stage);
+    const r = await moveRecord(actor, orgId, app, id, stage);
     revalidatePath(base);
+    return r.ok ? null : r.error.message;
   }
 
   return (

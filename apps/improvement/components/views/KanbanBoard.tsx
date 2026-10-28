@@ -2,7 +2,7 @@
 // Kanban: arrastrar una tarjeta a otra columna llama la Server Action de mover. Con teclado, cada
 // tarjeta trae un select de etapa (arrastrar no es la única forma).
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import type { ViewRecord } from "./ListView.tsx";
 
 export function KanbanBoard({
@@ -14,16 +14,21 @@ export function KanbanBoard({
   base: string;
   records: ViewRecord[];
   stages: { key: string; name: string }[];
-  move: (id: string, stage: string) => Promise<void>;
+  /** Devuelve el mensaje de error, o null si se movió. */
+  move: (id: string, stage: string) => Promise<string | null>;
 }) {
   const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const go = (id: string, stage: string) => start(async () => setError(await move(id, stage)));
   const drop = (stage: string) => (e: React.DragEvent) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
-    if (id) start(() => move(id, stage));
+    if (id) go(id, stage);
   };
   return (
-    // Desplaza en horizontal: tabIndex y nombre para que se recorra con teclado (axe scrollable-region-focusable).
+    <>
+    {error && <p className="invite-error" role="alert">{error}</p>}
+    {/* Desplaza en horizontal: tabIndex y nombre para que se recorra con teclado (axe scrollable-region-focusable). */}
     <div className="view-kanban" aria-busy={pending} role="region" aria-label="Tablero por etapa" tabIndex={0}>
       {stages.map((s) => (
         <section key={s.key} className="view-column" aria-labelledby={`col-${s.key}`} onDragOver={(e) => e.preventDefault()} onDrop={drop(s.key)}>
@@ -39,8 +44,7 @@ export function KanbanBoard({
                   value={r.stage}
                   disabled={pending}
                   onChange={(e) => {
-                    const next = e.target.value;
-                    start(() => move(r.id, next));
+                    go(r.id, e.target.value);
                   }}
                 >
                   {stages.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
@@ -51,5 +55,6 @@ export function KanbanBoard({
         </section>
       ))}
     </div>
+    </>
   );
 }
