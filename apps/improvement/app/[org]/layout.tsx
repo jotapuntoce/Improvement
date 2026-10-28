@@ -39,7 +39,7 @@ export default async function OrgLayout({ children, params }: { children: React.
       style={brandStyle(brand)}
       sidebar={
         <Sidebar
-          data={{ orgId: org, direccion: direccion.length > 0, groups: sidebar.groups }}
+          data={{ orgId: org, direccion: direccion.length > 0, canAddApps: sidebar.permissionTypes !== null, groups: sidebar.groups }}
           header={<OrgSwitcher current={org} orgs={sidebar.orgs} logoUrl={brand.logoUrl} />}
           footer={sidebar.permissionTypes && sidebar.permissionTypes.length > 0 ? <PreviewAs types={sidebar.permissionTypes} action={verComo} /> : undefined}
         />
