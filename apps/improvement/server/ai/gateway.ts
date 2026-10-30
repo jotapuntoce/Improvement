@@ -380,8 +380,8 @@ export type StructuredResult<T> = { ok: true; data: { suggestion: AiSuggestionRo
 
 export async function generateStructured<T>(args: {
   orgId: string;
-  purpose: "atencion_cliente" | "siguiente_movimiento";
-  category: "servicio_cliente" | "siguiente_movimiento";
+  purpose: "atencion_cliente" | "siguiente_movimiento" | "alerta";
+  category: "servicio_cliente" | "siguiente_movimiento" | "alerta";
   system: string;
   prompt: string;
   schema: z.ZodType<T>;

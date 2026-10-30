@@ -12,6 +12,7 @@ import { loadSidebar } from "../apps/sidebar.ts";
 import { listInbox, type InboxItem } from "../tasks/inbox.ts";
 import { celebrations, type Celebration } from "../people/culture.ts";
 import { computeKpiValues } from "../kpis/sources.ts";
+import { listAlerts, type Alert } from "../insights/alerts.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: { code: string; message: string } } => ({ ok: false, error: { code, message } });
@@ -143,7 +144,8 @@ export type CardData =
   | { kind: "barras" | "embudo"; bars: { label: string; count: number; amountCents: number }[] }
   | { kind: "lista"; items: { title: string; href: string }[]; more: number }
   | { kind: "hoy"; items: InboxItem[] }
-  | { kind: "momentos"; items: Celebration[] };
+  | { kind: "momentos"; items: Celebration[] }
+  | { kind: "alertas"; items: Alert[]; more: number };
 
 const NO_ACCESS = () => fail("Ya no tienes acceso a esta app.", "NO_ACCESS");
 const numeric = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0);
@@ -159,6 +161,10 @@ export async function cardData(userId: string, orgId: string, card: Card): Promi
     }
     case "momentos":
       return { ok: true, data: { kind: "momentos", items: await celebrations(userId, orgId) } };
+    case "alertas": {
+      const r = await listAlerts(userId, orgId);
+      return r.ok ? { ok: true, data: { kind: "alertas", items: r.data.slice(0, 5), more: Math.max(0, r.data.length - 5) } } : r;
+    }
     case "numero": {
       if (typeof cfg.kpiId === "string") {
         if (!(await findOwnerMembership(userId, orgId))) return NO_ACCESS();
@@ -198,7 +204,7 @@ export async function cardData(userId: string, orgId: string, card: Card): Promi
       return { ok: true, data: { kind: "lista", items: recs.slice(0, 5).map((x) => ({ title: x.title, href: `/${orgId}/a/${cfg.app as string}/${x.id}` })), more: Math.max(0, recs.length - 5) } };
     }
     default:
-      // alertas, ingresos_meta, pronostico y que_falta llegan en T4–T7.
+      // ingresos_meta, pronostico y que_falta llegan en T5–T7.
       return fail("Esta tarjeta todavía no está lista.", "PENDIENTE");
   }
 }

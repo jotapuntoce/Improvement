@@ -13,6 +13,7 @@ export type CardBodyData =
   | { kind: "barras" | "embudo"; bars: Bar[] }
   | { kind: "lista"; items: Item[]; more: number }
   | { kind: "hoy"; items: { kind: string; id: string; title: string; overdue: boolean; href: string }[] }
+  | { kind: "alertas"; items: { key: string; title: string; href: string; amountCents: number | null }[]; more: number }
   | { kind: "momentos"; items: ({ kind: "objetivo"; title: string; personName: string | null } | { kind: "aniversario"; personName: string | null; years: number; on: string })[] };
 
 function Bars({ bars }: { bars: Bar[] }) {
@@ -62,6 +63,19 @@ export function CardBody({ data, error, orgId }: { data: CardBodyData | null; er
             {data.items.length === 0 && <li className="config-hint">Nada pendiente por ahora.</li>}
           </ul>
           <Link href={`/${orgId}/tareas`}>Ver toda mi bandeja</Link>
+        </>
+      );
+    case "alertas":
+      return (
+        <>
+          <ul className="equipo-list">
+            {data.items.map((a) => (
+              <li key={a.key}><Link href={a.href}>{a.title}</Link>{a.amountCents ? <span className="dash-figure"> · {money(a.amountCents)}</span> : null}</li>
+            ))}
+            {data.items.length === 0 && <li className="config-hint">Nada se está cayendo.</li>}
+            {data.more > 0 && <li className="config-hint">y {data.more} más</li>}
+          </ul>
+          <Link href={`/${orgId}/alertas`}>Ver todas y que Improvement las explique</Link>
         </>
       );
     case "momentos":

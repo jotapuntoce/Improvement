@@ -104,6 +104,7 @@ const ROUTES: { label: string; path: () => string }[] = [
   { label: "/[org]/automatizaciones", path: () => `/${orgId}/automatizaciones` },
   { label: "/[org]/automatizaciones/nueva", path: () => `/${orgId}/automatizaciones/nueva?app=ventas` },
   { label: "/[org]/tablero/agregar", path: () => `/${orgId}/tablero/agregar?tipo=numero&app=ventas` },
+  { label: "/[org]/alertas", path: () => `/${orgId}/alertas` },
   { label: "/[org]/automatizaciones/[id]", path: () => `/${orgId}/automatizaciones/${ruleId}?probar=1` },
   { label: "/[org]/tareas/[id]", path: () => `/${orgId}/tareas/${taskId}` },
   { label: "/[org]/mapa", path: () => `/${orgId}/mapa` },

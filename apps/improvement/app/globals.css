@@ -727,3 +727,4 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .dash-bars li { display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
 .dash-bar { display: block; height: 0.75rem; min-width: 2px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); }
 .dash-figure { font-family: var(--font-geist-mono), monospace; }
+.dash-explained { white-space: pre-line; margin: 0; }
