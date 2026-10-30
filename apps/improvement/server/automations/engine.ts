@@ -3,11 +3,11 @@
 // que habría hecho; en "activa" lo hace COMO EL DUEÑO que creó la regla (si ya no es dueño, la regla
 // se pausa). Interno: lo llaman records.ts y el cron, que ya autorizaron. Nunca lanza: lo que falla
 // queda en automation_run y el guardado que lo disparó sigue hecho.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, max, ne, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { automationRule, automationRun, type AutomationAction, type AutomationCondition, type AutomationTrigger } from "@jotapuntoce/db/schema";
+import { automationRule, automationRun, recordActivity, type AutomationAction, type AutomationCondition, type AutomationTrigger } from "@jotapuntoce/db/schema";
 import { findMembership } from "../auth/guard.ts";
-import { addNote, createRecord, loadRecord, moveRecord, saveCustomValues, type AppRecord } from "../apps/records.ts";
+import { addNote, createRecord, loadRecord, loadRecords, moveRecord, saveCustomValues, type AppRecord } from "../apps/records.ts";
 import { grantExperience } from "../crm/loyalty.ts";
 import { createObjective } from "../objectives/mutations.ts";
 import { createTask } from "../tasks/inbox.ts";
@@ -60,7 +60,7 @@ export function matches(
       const raw = rec.custom[t.field];
       if (typeof raw !== "string" || !raw) return false;
       // Por día de CDMX: "hoy" + días del disparador es la fecha del campo.
-      fires = cdmxDay(new Date(Date.parse(cdmxDay(now)) - t.days * DAY_MS)) === raw.slice(0, 10);
+      fires = new Date(Date.parse(cdmxDay(now)) - t.days * DAY_MS).toISOString().slice(0, 10) === raw.slice(0, 10);
     } else if (t.type === "sin_actividad") {
       fires = now.getTime() - rec.updatedAt.getTime() >= t.days * DAY_MS;
     } else return false;
@@ -162,4 +162,48 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
   } catch {
     // El motor nunca hace fallar el guardado que lo disparó.
   }
+}
+
+/**
+ * Los disparadores de tiempo ("fecha" y "sin_actividad") de todas las empresas. Lo corre el cron una
+ * vez al día; no corre en nombre de nadie. Una regla actúa a lo más una vez por día sobre cada
+ * registro: lo que ya tiene corrida de hoy se salta.
+ */
+export async function runTimeTriggers(now = new Date()): Promise<{ rules: number; runs: number }> {
+  const rules = await db
+    .select()
+    .from(automationRule)
+    .where(and(inArray(automationRule.status, ["prueba", "activa"]), sql`${automationRule.trigger}->>'type' in ('fecha','sin_actividad')`));
+  const day = cdmxDay(now);
+  let runs = 0;
+  for (const rule of rules) {
+    const [records, done, activity] = await Promise.all([
+      loadRecords(rule.orgId, rule.appKey),
+      db
+        .select({ recordId: automationRun.recordId })
+        .from(automationRun)
+        .where(and(eq(automationRun.ruleId, rule.id), eq(automationRun.day, day), eq(automationRun.depth, 0), ne(automationRun.outcome, "error"))),
+      rule.trigger.type === "sin_actividad"
+        ? db
+            .select({ recordId: recordActivity.recordId, last: max(recordActivity.createdAt) })
+            .from(recordActivity)
+            .where(and(eq(recordActivity.orgId, rule.orgId), eq(recordActivity.appKey, rule.appKey)))
+            .groupBy(recordActivity.recordId)
+        : Promise.resolve([]),
+    ]);
+    const skip = new Set(done.map((d) => d.recordId));
+    const lastActivity = new Map(activity.map((a) => [a.recordId, a.last]));
+    for (const rec of records) {
+      if (skip.has(rec.id)) continue;
+      // La última actividad cuenta como "tocado": una nota de ayer reinicia la cuenta.
+      const last = lastActivity.get(rec.id);
+      const seen = last && last > rec.updatedAt ? { ...rec, updatedAt: last } : rec;
+      if (!matches(rule, { type: "tiempo" }, seen, now)) continue;
+      // ponytail: el salto de arriba más onConflictDoNothing cubren un cron al día; dos corridas
+      // simultáneas podrían actuar dos veces antes de escribir. Reclamar la fila primero si pasa.
+      await runRule(rule, rec, 0, day, now);
+      runs++;
+    }
+  }
+  return { rules: rules.length, runs };
 }

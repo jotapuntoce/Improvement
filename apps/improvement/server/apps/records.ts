@@ -48,12 +48,19 @@ async function fire(event: AutomationEvent) {
   await runAutomations(event).catch(() => {});
 }
 
+const adapterOf = (app: AppMeta) => (app.kind === "custom" ? customAdapter(app.id) : ADAPTERS[app.key as BaseAppKey]);
+
 /** El registro sin guard. Interna: la llaman el motor y el cron, que ya autorizaron. */
 export async function loadRecord(orgId: string, appKey: string, id: string): Promise<AppRecord | null> {
   const app = await getAppMeta(orgId, appKey);
   if (!app || !isUuid(id)) return null;
-  const adapter = app.kind === "custom" ? customAdapter(app.id) : ADAPTERS[app.key as BaseAppKey];
-  return (await adapter.get(orgId, id)) ?? null;
+  return (await adapterOf(app).get(orgId, id)) ?? null;
+}
+
+/** Todos los registros de una app, sin guard. Interna: la llama el cron de automatizaciones. */
+export async function loadRecords(orgId: string, appKey: string): Promise<AppRecord[]> {
+  const app = await getAppMeta(orgId, appKey);
+  return app ? adapterOf(app).list(orgId) : [];
 }
 
 export async function listRecords(
