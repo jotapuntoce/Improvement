@@ -99,11 +99,11 @@ export const dashboardCard = pgTable("dashboard_card", {
 }, (t) => [index("idx_dashboard_card_user").on(t.orgId, t.userId, t.position), check("dashboard_card_kind_check", sql`...`)]);
 ```
 
-**RLS:** cada quien lee y escribe solo sus filas (`user_id = auth.uid()` y miembro aceptado del org), y nadie lee el tablero de otro, ni siquiera el dueño. `ai_suggestion_category_check` suma `'alerta'`.
+**RLS:** cada quien lee sus filas y el dueño lee las de toda su empresa (pedido por Jose Carlos el 2026-10-30). Se escribe solo desde el servidor. `ai_suggestion_category_check` suma `'alerta'`.
 
 **Acceptance:**
 1. WHEN un empleado lee `dashboard_card` como `authenticated` THE SYSTEM SHALL devolverle solo sus filas.
-2. WHEN el dueño lee como `authenticated` THE SYSTEM SHALL no devolverle las tarjetas de sus empleados.
+2. WHEN el dueño lee como `authenticated` THE SYSTEM SHALL devolverle también las tarjetas de sus empleados, y un empleado no las del dueño.
 3. WHEN se inserta una fila con `user_id` de otra persona THE SYSTEM SHALL rechazarla.
 
 - [ ] Esquema, `pnpm db:generate`, `pnpm db:generate --custom` con la RLS. **Mostrar el SQL a Jose Carlos y esperar "sí"** antes de `pnpm db:migrate`.
