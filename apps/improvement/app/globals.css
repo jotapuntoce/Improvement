@@ -716,3 +716,14 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 @media (max-width: 767px) {
   .task-workspace { grid-template-columns: 1fr; }
 }
+
+/* Tablero (fase 5): rejilla de tarjetas del inicio y barras CSS. La barra usa el acento de la marca
+   del negocio; su valor siempre va en texto junto a ella. */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1rem; margin: 1rem 0; }
+.dash-card { display: grid; gap: 0.75rem; align-content: start; }
+.dash-tools { justify-content: flex-end; }
+.dash-number { font-family: var(--font-geist-mono), monospace; font-size: 2rem; margin: 0; }
+.dash-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.dash-bars li { display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
+.dash-bar { display: block; height: 0.75rem; min-width: 2px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); }
+.dash-figure { font-family: var(--font-geist-mono), monospace; }
