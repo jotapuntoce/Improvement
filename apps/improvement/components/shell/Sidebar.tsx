@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export interface SidebarData {
   orgId: string;
   direccion: boolean;
-  /** Solo el dueño ve "Agregar aplicación". */
+  /** Solo el dueño ve "Agregar aplicación" y "Automatizaciones". */
   canAddApps: boolean;
   groups: { name: string; apps: { key: string; name: string; href: string }[] }[];
 }
@@ -20,6 +20,7 @@ export function Sidebar({ data, header, footer }: { data: SidebarData; header: R
         {data.direccion && <li><NavLink href={`/${data.orgId}/direccion`}>Dirección</NavLink></li>}
         <li><NavLink href={`/${data.orgId}/configuracion/marca`}>Tu marca</NavLink></li>
         {data.canAddApps && <li><NavLink href={`/${data.orgId}/aplicaciones/nueva`}>Agregar aplicación</NavLink></li>}
+        {data.canAddApps && <li><NavLink href={`/${data.orgId}/automatizaciones`}>Automatizaciones</NavLink></li>}
       </ul>
       {data.groups.map((g) => (
         <details key={g.name} open className="shell-group">

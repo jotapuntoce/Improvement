@@ -12,6 +12,19 @@ import { addStep, approveStep, completeStep, rejectStep } from "@/server/tasks/s
 const ESTADO: Record<string, string> = { pendiente: "Pendiente", propuesto: "Esperando tu visto bueno", hecho: "Hecho", rechazado: "No se hizo" };
 type Outcome = { ok: true } | { ok: false; error: { message: string } };
 
+// Fuera del componente: una Server Action solo puede cerrar sobre valores serializables, no sobre
+// funciones del render.
+/** Corre la acción como quien está en sesión y vuelve, con el error si lo hubo. */
+async function act(pagina: string, fn: (actor: string) => Promise<Outcome>, next = pagina) {
+  const actor = await getSessionUserId();
+  if (!actor) notFound();
+  const r = await fn(actor);
+  if (!r.ok) redirect(`${pagina}?error=${encodeURIComponent(r.error.message)}`);
+  revalidatePath(pagina);
+  redirect(next);
+}
+const field = (f: FormData, k: string) => f.get(k)?.toString() ?? "";
+
 export default async function Tarea({ params, searchParams }: { params: Promise<{ org: string; id: string }>; searchParams: Promise<{ error?: string }> }) {
   const { org: orgId, id } = await params;
   const { error } = await searchParams;
@@ -25,44 +38,34 @@ export default async function Tarea({ params, searchParams }: { params: Promise<
   const pagina = `/${orgId}/tareas/${id}`;
   const bandeja = `/${orgId}/tareas`;
 
-  /** Corre la acción como quien está en sesión y vuelve, con el error si lo hubo. */
-  async function act(fn: (actor: string) => Promise<Outcome>, next = pagina) {
-    const actor = await getSessionUserId();
-    if (!actor) notFound();
-    const r = await fn(actor);
-    if (!r.ok) redirect(`${pagina}?error=${encodeURIComponent(r.error.message)}`);
-    revalidatePath(pagina);
-    redirect(next);
-  }
-  const field = (f: FormData, k: string) => f.get(k)?.toString() ?? "";
 
   async function listo(f: FormData) {
     "use server";
-    await act((a) => completeStep(a, orgId, field(f, "step"), field(f, "result")));
+    await act(pagina, (a) => completeStep(a, orgId, field(f, "step"), field(f, "result")));
   }
   async function agregar(f: FormData) {
     "use server";
-    await act((a) => addStep(a, orgId, id, { title: field(f, "title") }));
+    await act(pagina, (a) => addStep(a, orgId, id, { title: field(f, "title") }));
   }
   async function hazlo(f: FormData) {
     "use server";
-    await act((a) => approveStep(a, orgId, field(f, "step")));
+    await act(pagina, (a) => approveStep(a, orgId, field(f, "step")));
   }
   async function no(f: FormData) {
     "use server";
-    await act((a) => rejectStep(a, orgId, field(f, "step")));
+    await act(pagina, (a) => rejectStep(a, orgId, field(f, "step")));
   }
   async function preparar() {
     "use server";
-    await act((a) => planTask(a, orgId, id));
+    await act(pagina, (a) => planTask(a, orgId, id));
   }
   async function cerrar(f: FormData) {
     "use server";
-    await act((a) => closeTask(a, orgId, id, field(f, "evidence") || undefined), bandeja);
+    await act(pagina, (a) => closeTask(a, orgId, id, field(f, "evidence") || undefined), bandeja);
   }
   async function descartar() {
     "use server";
-    await act((a) => discardTask(a, orgId, id), bandeja);
+    await act(pagina, (a) => discardTask(a, orgId, id), bandeja);
   }
 
   const pideEvidencia = task.objective && task.objective.evidenceType !== "ninguna";

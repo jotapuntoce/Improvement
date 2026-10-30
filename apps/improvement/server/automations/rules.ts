@@ -119,9 +119,33 @@ export async function setRuleStatus(userId: string, orgId: string, ruleId: strin
   return { ok: true, data: true };
 }
 
-export async function listRules(userId: string, orgId: string): Promise<Result<RuleRow[]>> {
+export async function listRules(userId: string, orgId: string): Promise<Result<(RuleRow & { lastRun: RunRow | null })[]>> {
   if (!(await findOwnerMembership(userId, orgId))) return fail("Solo el dueño ve las automatizaciones.", "FORBIDDEN");
-  return { ok: true, data: await db.select().from(automationRule).where(eq(automationRule.orgId, orgId)).orderBy(desc(automationRule.createdAt)) };
+  const [rules, runs] = await Promise.all([
+    db.select().from(automationRule).where(eq(automationRule.orgId, orgId)).orderBy(desc(automationRule.createdAt)),
+    // ponytail: las últimas 500 corridas del org bastan para "la última de cada regla"; DISTINCT ON si crece.
+    db.select().from(automationRun).where(eq(automationRun.orgId, orgId)).orderBy(desc(automationRun.createdAt)).limit(500),
+  ]);
+  const last = new Map<string, RunRow>();
+  for (const r of runs) if (!last.has(r.ruleId)) last.set(r.ruleId, r);
+  return { ok: true, data: rules.map((r) => ({ ...r, lastRun: last.get(r.id) ?? null })) };
+}
+
+const OPS: Record<AutomationCondition["op"], string> = { es: "es", no_es: "no es", mayor: "es mayor que", menor: "es menor que", vacio: "está vacío", no_vacio: "no está vacío" };
+
+/** "Cuando…" en una frase, para la lista y el detalle. */
+export function describeTrigger(t: AutomationTrigger): string {
+  switch (t.type) {
+    case "creado": return "Cuando se crea un registro";
+    case "etapa": return t.to ? `Cuando un registro pasa a ${t.to}` : "Cuando un registro cambia de etapa";
+    case "campo": return `Cuando cambia ${t.field}`;
+    case "fecha": return t.days === 0 ? `El día de ${t.field}` : t.days < 0 ? `${-t.days} días antes de ${t.field}` : `${t.days} días después de ${t.field}`;
+    case "sin_actividad": return `Cuando un registro lleva ${t.days} días sin actividad`;
+  }
+}
+
+export function describeCondition(c: AutomationCondition): string {
+  return `${c.field} ${OPS[c.op]}${c.value === undefined || c.op === "vacio" || c.op === "no_vacio" ? "" : ` ${String(c.value)}`}`;
 }
 
 export async function getRule(userId: string, orgId: string, ruleId: string): Promise<Result<RuleRow & { runs: RunRow[] }>> {
