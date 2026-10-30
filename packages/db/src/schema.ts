@@ -2195,3 +2195,152 @@ export const recordOrigin = pgTable(
   },
   (t) => [primaryKey({ columns: [t.importJobId, t.recordId] })],
 );
+
+// ── Tareas con Improvement y automatizaciones (spec improvement-odoo §6 y §7, Fase 4) ─────────────
+export const TASK_SOURCES = ["dueno", "propia", "improvement", "automatizacion"] as const;
+export const TASK_STATUSES = ["abierta", "hecha", "descartada"] as const;
+export const STEP_KINDS = ["persona", "improvement"] as const;
+export const STEP_STATUSES = ["pendiente", "propuesto", "hecho", "rechazado"] as const;
+// El catálogo cerrado de lo que el copiloto puede ejecutar. Nada sale hacia clientes finales ni mueve dinero.
+export const AGENT_ACTIONS = ["crear_registro", "mover_etapa", "actualizar_campos", "nota", "borrador_mensaje", "recordatorio"] as const;
+export const AGENT_MODES = ["siempre", "primera_vez", "solo"] as const;
+export const AUTOMATION_TRIGGERS = ["creado", "etapa", "campo", "fecha", "sin_actividad"] as const;
+export const AUTOMATION_STATUSES = ["prueba", "activa", "pausada"] as const;
+export const AUTOMATION_OUTCOMES = ["hecho", "prueba", "error", "tope"] as const;
+
+export type TaskSource = (typeof TASK_SOURCES)[number];
+export type AgentAction = (typeof AGENT_ACTIONS)[number];
+export type AgentMode = (typeof AGENT_MODES)[number];
+export type AutomationStatus = (typeof AUTOMATION_STATUSES)[number];
+
+// fecha: days < 0 = N días antes de la fecha del campo; 0 = el día; > 0 = vencida hace N días.
+export type AutomationTrigger =
+  | { type: "creado" }
+  | { type: "etapa"; to?: string }
+  | { type: "campo"; field: string }
+  | { type: "fecha"; field: string; days: number }
+  | { type: "sin_actividad"; days: number };
+export interface AutomationCondition { field: string; op: "es" | "no_es" | "mayor" | "menor" | "vacio" | "no_vacio"; value?: string | number | boolean }
+export type AutomationAction =
+  | { type: "crear_registro"; app: string; title: string }
+  | { type: "mover_etapa"; stage: string }
+  | { type: "actualizar_campos"; values: Record<string, unknown> }
+  | { type: "crear_tarea"; assigneeId: string; title: string; dueInDays?: number }
+  | { type: "crear_objetivo"; assigneeId: string; title: string; impactWeight: number; dueInDays: number }
+  | { type: "avisar"; userId: string; text: string; channel: "in_app" | "email" }
+  | { type: "experiencia_lealtad"; title: string };
+
+// Lo que le toca a una persona. Puede apuntar a un registro de cualquier app y a un objetivo: cerrar
+// la tarea completa el objetivo, que es lo único que paga puntos.
+export const task = pgTable(
+  "task",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    assigneeId: uuid("assignee_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    source: text("source", { enum: TASK_SOURCES }).notNull(),
+    status: text("status", { enum: TASK_STATUSES }).notNull().default("abierta"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    appKey: text("app_key"),
+    recordId: uuid("record_id"),
+    objectiveId: uuid("objective_id").references(() => objective.id, { onDelete: "set null" }),
+    ruleId: uuid("rule_id"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_task_assignee").on(t.orgId, t.assigneeId, t.status),
+    check("task_source_check", sql`${t.source} in ('dueno','propia','improvement','automatizacion')`),
+    check("task_status_check", sql`${t.status} in ('abierta','hecha','descartada')`),
+  ],
+);
+
+// Los pasos de una tarea: de la persona o de Improvement (con una acción del catálogo y su payload).
+// result es la evidencia: qué se hizo, o el borrador que quedó.
+export const taskStep = pgTable(
+  "task_step",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull().references(() => task.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    kind: text("kind", { enum: STEP_KINDS }).notNull(),
+    action: text("action", { enum: AGENT_ACTIONS }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    status: text("status", { enum: STEP_STATUSES }).notNull().default("pendiente"),
+    result: text("result"),
+    doneBy: text("done_by", { enum: STEP_KINDS }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_task_step_task").on(t.taskId, t.position),
+    check("task_step_kind_check", sql`${t.kind} in ('persona','improvement')`),
+    check("task_step_status_check", sql`${t.status} in ('pendiente','propuesto','hecho','rechazado')`),
+    check("task_step_action_check", sql`${t.action} is null or ${t.action} in ('crear_registro','mover_etapa','actualizar_campos','nota','borrador_mensaje','recordatorio')`),
+  ],
+);
+
+// Qué puede hacer Improvement sin preguntarle a esta persona, por tipo de acción. Sin fila = "siempre".
+export const agentPermission = pgTable(
+  "agent_permission",
+  {
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    action: text("action", { enum: AGENT_ACTIONS }).notNull(),
+    mode: text("mode", { enum: AGENT_MODES }).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId, t.action] }),
+    check("agent_permission_mode_check", sql`${t.mode} in ('siempre','primera_vez','solo')`),
+  ],
+);
+
+// Reglas del dueño: cuando pasa algo en una app (y se cumplen las condiciones), hacer estas acciones.
+// Nacen en 'prueba': se evalúan y registran lo que harían, sin hacerlo.
+export const automationRule = pgTable(
+  "automation_rule",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appKey: text("app_key").notNull(),
+    name: text("name").notNull(),
+    trigger: jsonb("trigger").$type<AutomationTrigger>().notNull(),
+    conditions: jsonb("conditions").$type<AutomationCondition[]>().notNull().default([]),
+    actions: jsonb("actions").$type<AutomationAction[]>().notNull(),
+    status: text("status", { enum: AUTOMATION_STATUSES }).notNull().default("prueba"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_automation_rule_app").on(t.orgId, t.appKey, t.status),
+    check("automation_rule_status_check", sql`${t.status} in ('prueba','activa','pausada')`),
+  ],
+);
+
+// Cada vez que una regla se evaluó y actuó (o habría actuado) sobre un registro. day + el índice
+// único parcial hacen idempotente al cron: una regla no actúa dos veces el mismo día sobre lo mismo.
+export const automationRun = pgTable(
+  "automation_run",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id").notNull().references(() => automationRule.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id").notNull(),
+    depth: integer("depth").notNull(),
+    outcome: text("outcome", { enum: AUTOMATION_OUTCOMES }).notNull(),
+    detail: text("detail").notNull(),
+    day: text("day").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_automation_run_rule").on(t.ruleId, t.createdAt),
+    uniqueIndex("uq_automation_run_daily").on(t.ruleId, t.recordId, t.day).where(sql`${t.depth} = 0 and ${t.outcome} <> 'error'`),
+    check("automation_run_outcome_check", sql`${t.outcome} in ('hecho','prueba','error','tope')`),
+  ],
+);

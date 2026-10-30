@@ -1,10 +1,10 @@
 // Inicio del negocio: portada y logo de su marca, y lo que le importa hoy. El tablero que elige el
-// dueño llega en la fase 5; aquí van las tarjetas fijas (junta, siguiente movimiento, pendientes).
+// dueño llega en la fase 5; aquí van las tarjetas fijas (junta, siguiente movimiento, su bandeja).
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
 import { getBrand } from "@/server/brand/brand.ts";
-import { loadOwnerTasks } from "@/server/tasks/loadOwnerTasks.ts";
+import { listInbox } from "@/server/tasks/inbox.ts";
 import { isMeetingPending } from "@/server/direccion/meetings/meetings.ts";
 import { refreshNextMove } from "@/server/ai/nextMove.ts";
 import { needsOnboarding } from "@/server/registro/onboarding.ts";
@@ -18,13 +18,12 @@ export default async function OrgHome({ params, searchParams }: { params: Promis
   const isOwner = memberRow.role === "owner";
   // El dueño que se registró y no cerró su arranque lo retoma donde lo dejó.
   if (isOwner && (await needsOnboarding(memberRow.userId, orgId))) redirect(`/arranque/${orgId}/marca`);
-  const [brand, tasks, juntaPendiente] = await Promise.all([
+  const [brand, inbox, juntaPendiente] = await Promise.all([
     getBrand(memberRow.userId, orgId),
-    isOwner ? loadOwnerTasks(memberRow.userId) : Promise.resolve([]),
+    listInbox(memberRow.userId, orgId),
     isMeetingPending(memberRow.userId, orgId),
   ]);
-  // Los pendientes del dueño son de todas sus empresas; aquí solo los que abren dentro de esta.
-  const mine = tasks.filter((t) => t.href?.startsWith(`/${orgId}/`)).slice(0, 8);
+  const mine = inbox.ok ? inbox.data.slice(0, 8) : [];
 
   async function pedirMovimiento() {
     "use server";
@@ -63,10 +62,11 @@ export default async function OrgHome({ params, searchParams }: { params: Promis
         <h2 id="hoy" className="config-card-title">Pendientes</h2>
         <ul className="equipo-list">
           {mine.map((t) => (
-            <li key={t.id}>{t.href ? <Link href={t.href}>{t.title}</Link> : t.title}</li>
+            <li key={`${t.kind}-${t.id}`}><Link href={t.href}>{t.title}</Link>{t.overdue && <span className="task-overdue"> · Vencida</span>}</li>
           ))}
           {mine.length === 0 && <li className="config-hint">Nada pendiente por ahora.</li>}
         </ul>
+        <Link href={`/${orgId}/tareas`}>Ver toda mi bandeja</Link>
       </section>
     </main>
   );
