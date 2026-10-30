@@ -87,6 +87,9 @@ const ROUTES: { label: string; path: () => string }[] = [
   { label: "/[org]/aplicaciones/nueva", path: () => `/${orgId}/aplicaciones/nueva` },
   { label: "/[org]/a/clientes/importar", path: () => `/${orgId}/a/clientes/importar` },
   { label: "/[org]/objetivos", path: () => `/${orgId}/objetivos` },
+  { label: "/[org]/tareas", path: () => `/${orgId}/tareas` },
+  { label: "/[org]/tareas/nueva", path: () => `/${orgId}/tareas/nueva` },
+  { label: "/[org]/tareas/permisos", path: () => `/${orgId}/tareas/permisos` },
   { label: "/[org]/mapa", path: () => `/${orgId}/mapa` },
 ];
 

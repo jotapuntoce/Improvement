@@ -703,3 +703,16 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .view-stagebar li { padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); }
 .home-cover { position: relative; height: 12rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); background-size: cover; background-position: center; margin-bottom: 3rem; }
 .home-logo { position: absolute; left: 1.5rem; bottom: -2.5rem; width: 5.5rem; height: 5.5rem; border-radius: var(--radius-md); border: 3px solid var(--bg); object-fit: cover; background: var(--bg-elevated); }
+
+/* Tareas (fase 4): bandeja y espacio de trabajo. Reusa .config-* y .panel-*; lo nuevo es la rejilla
+   de dos columnas, la fila de un paso y la marca de vencida. */
+.task-item { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; justify-content: space-between; }
+.task-overdue { color: var(--danger); font-weight: 600; }
+.task-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; align-items: start; margin-bottom: 1rem; }
+.task-steps { display: grid; gap: 0.75rem; padding-left: 1.25rem; margin: 0.5rem 0 1rem; }
+.task-steps li { display: grid; gap: 0.35rem; }
+.task-inline { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.task-inline .config-input { flex: 1 1 12rem; }
+@media (max-width: 767px) {
+  .task-workspace { grid-template-columns: 1fr; }
+}
