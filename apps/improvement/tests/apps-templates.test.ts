@@ -47,7 +47,7 @@ describe("plantillas por giro", () => {
     if (!r.ok) throw new Error(r.error.message);
     const fields = await listFields(owner, orgId, "reservaciones");
     expect(fields.map((f) => f.label)).toEqual(["Fecha", "Personas"]);
-  });
+  }, 60_000); // crea varias apps con campos contra el Supabase remoto
 
   it("WHEN el dueño aplica dos veces la misma plantilla THE SYSTEM SHALL crear las apps una sola vez", async () => {
     const { orgId, owner } = await setup();
@@ -56,7 +56,7 @@ describe("plantillas por giro", () => {
     expect(first.ok && first.data.created).toEqual(["pacientes", "citas", "tareas-del-equipo"]);
     const again = await applyTemplate(owner, orgId, picks);
     expect(again.ok && again.data.created).toEqual([]);
-  });
+  }, 60_000);
 
   it("WHEN lo intenta un empleado THE SYSTEM SHALL negarlo", async () => {
     const { orgId } = await setup();

@@ -271,7 +271,7 @@ export async function completeStep(userId: string, orgId: string, stepId: string
 ```
 
 Reglas:
-- `executeAction` actúa **como la persona** (`userId`), así que hereda sus permisos de sección: usa `createRecord`, `moveRecord`, `saveCustomValues` y `addNote` de `server/apps/records.ts` sobre el registro de la tarea. `borrador_mensaje` no envía nada: guarda el texto en `result`. `recordatorio` inserta un `reminder` (canal `in_app` o `email`) a la propia persona, con un `objectiveId` solo si la tarea lo tiene.
+- `executeAction` actúa **como la persona** (`userId`), así que hereda sus permisos de sección: usa `createRecord`, `moveRecord`, `saveCustomValues` y `addNote` de `server/apps/records.ts` sobre el registro de la tarea. `borrador_mensaje` no envía nada: guarda el texto en `result`. `recordatorio` pone la fecha de la tarea (`dueAt`) para que la bandeja la suba a tiempo. (Cambio al ejecutar: un `reminder` sin objetivo no le llega a nadie.)
 - `runImprovementStep`: si el modo es `solo`, ejecuta y marca `hecho` con `doneBy: "improvement"`. Con `siempre` o `primera_vez`, deja `propuesto`. `approveStep` ejecuta; si el modo era `primera_vez`, lo pasa a `solo` y anota en la bitácora del registro (o en `result`) "Desde ahora Improvement hace «<label>» sin preguntar".
 - Cada paso hecho escribe en la bitácora del registro relacionado "Paso: <título> — <result>" (la evidencia que pide §7).
 - Solo la persona asignada mueve los pasos de su tarea.
