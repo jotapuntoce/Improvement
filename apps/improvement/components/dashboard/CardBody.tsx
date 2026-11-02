@@ -16,7 +16,8 @@ export type CardBodyData =
   | { kind: "alertas"; items: { key: string; title: string; href: string; amountCents: number | null }[]; more: number }
   | { kind: "momentos"; items: ({ kind: "objetivo"; title: string; personName: string | null } | { kind: "aniversario"; personName: string | null; years: number; on: string })[] }
   | { kind: "pronostico"; forecast: { sinHistoria: true } | { sinHistoria: false; byStage: { stage: string; openCents: number; rate: number; source: "etapa" | "global" }[]; totalCents: number } }
-  | { kind: "ingresos_meta"; rows: { label: string; wonCents: number; goalCents: number }[] };
+  | { kind: "ingresos_meta"; rows: { label: string; wonCents: number; goalCents: number }[] }
+  | { kind: "que_falta"; items: string[]; more: number };
 
 const STAGE: Record<string, string> = { prospecto: "Prospecto", propuesta: "Propuesta", negociacion: "Negociación" };
 const PCT = new Intl.NumberFormat("es-MX", { style: "percent", maximumFractionDigits: 0 });
@@ -114,6 +115,17 @@ export function CardBody({ data, error, orgId }: { data: CardBodyData | null; er
         </>
       );
     }
+    case "que_falta":
+      return (
+        <>
+          <ul className="equipo-list">
+            {data.items.map((t) => <li key={t}>{t}</li>)}
+            {data.items.length === 0 && <li className="config-hint">Tu proceso ya tiene todo lo que trae tu giro.</li>}
+            {data.more > 0 && <li className="config-hint">y {data.more} más</li>}
+          </ul>
+          <Link href={`/${orgId}/proceso`}>Ver y agregar lo que falta</Link>
+        </>
+      );
     case "ingresos_meta":
       return (
         <>

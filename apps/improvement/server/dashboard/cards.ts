@@ -14,6 +14,7 @@ import { celebrations, type Celebration } from "../people/culture.ts";
 import { computeKpiValues } from "../kpis/sources.ts";
 import { listAlerts, type Alert } from "../insights/alerts.ts";
 import { forecast, revenueVsGoal, type Forecast, type RevenueRow } from "../insights/forecast.ts";
+import { processGaps } from "../insights/gaps.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: { code: string; message: string } } => ({ ok: false, error: { code, message } });
@@ -148,7 +149,8 @@ export type CardData =
   | { kind: "momentos"; items: Celebration[] }
   | { kind: "alertas"; items: Alert[]; more: number }
   | { kind: "pronostico"; forecast: Forecast }
-  | { kind: "ingresos_meta"; rows: RevenueRow[] };
+  | { kind: "ingresos_meta"; rows: RevenueRow[] }
+  | { kind: "que_falta"; items: string[]; more: number };
 
 const NO_ACCESS = () => fail("Ya no tienes acceso a esta app.", "NO_ACCESS");
 const numeric = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0);
@@ -214,8 +216,9 @@ export async function cardData(userId: string, orgId: string, card: Card): Promi
       const r = await revenueVsGoal(userId, orgId, { field: cfg.field as string | undefined, goals: (cfg.goals as Record<string, number> | undefined) ?? {} });
       return r.ok ? { ok: true, data: { kind: "ingresos_meta", rows: r.data } } : r;
     }
-    default:
-      // que_falta llega en T7.
-      return fail("Esta tarjeta todavía no está lista.", "PENDIENTE");
+    case "que_falta": {
+      const r = await processGaps(userId, orgId);
+      return r.ok ? { ok: true, data: { kind: "que_falta", items: r.data.slice(0, 5).map((g) => g.title), more: Math.max(0, r.data.length - 5) } } : r;
+    }
   }
 }
