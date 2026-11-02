@@ -477,6 +477,20 @@
       "when": 1793382455958,
       "tag": "0067_tableros_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1793621038316,
+      "tag": "0068_flawless_harpoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793621044426,
+      "tag": "0069_conversacion_rls",
+      "breakpoints": true
     }
   ]
 }

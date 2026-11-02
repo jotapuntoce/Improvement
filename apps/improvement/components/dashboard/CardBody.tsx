@@ -17,7 +17,29 @@ export type CardBodyData =
   | { kind: "momentos"; items: ({ kind: "objetivo"; title: string; personName: string | null } | { kind: "aniversario"; personName: string | null; years: number; on: string })[] }
   | { kind: "pronostico"; forecast: { sinHistoria: true } | { sinHistoria: false; byStage: { stage: string; openCents: number; rate: number; source: "etapa" | "global" }[]; totalCents: number } }
   | { kind: "ingresos_meta"; rows: { label: string; wonCents: number; goalCents: number }[] }
-  | { kind: "que_falta"; items: string[]; more: number };
+  | { kind: "que_falta"; items: string[]; more: number }
+  | { kind: "calendario"; days: AgendaDay[] };
+
+type AgendaDay = { day: string; items: { kind: string; title: string; href: string }[] };
+const DIA = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+/** "2026-11-04" → "miércoles, 4 de noviembre" (la fecha ya viene en el día de CDMX). */
+export const dayLabel = (day: string) => DIA.format(new Date(`${day}T12:00:00Z`));
+
+export function Agenda({ days }: { days: AgendaDay[] }) {
+  return (
+    <ul className="equipo-list">
+      {days.map((d) => (
+        <li key={d.day}>
+          <strong>{dayLabel(d.day)}</strong>
+          <ul className="equipo-list">
+            {d.items.map((i) => <li key={`${i.href}-${i.title}`}><Link href={i.href}>{i.title}</Link></li>)}
+          </ul>
+        </li>
+      ))}
+      {days.length === 0 && <li className="config-hint">Nada con fecha por ahora.</li>}
+    </ul>
+  );
+}
 
 const STAGE: Record<string, string> = { prospecto: "Prospecto", propuesta: "Propuesta", negociacion: "Negociación" };
 const PCT = new Intl.NumberFormat("es-MX", { style: "percent", maximumFractionDigits: 0 });
@@ -115,6 +137,13 @@ export function CardBody({ data, error, orgId }: { data: CardBodyData | null; er
         </>
       );
     }
+    case "calendario":
+      return (
+        <>
+          <Agenda days={data.days} />
+          <Link href={`/${orgId}/calendario`}>Ver el calendario</Link>
+        </>
+      );
     case "que_falta":
       return (
         <>

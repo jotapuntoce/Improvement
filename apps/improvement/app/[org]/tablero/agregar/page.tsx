@@ -16,6 +16,7 @@ const TIPOS: Record<string, { label: string; app: boolean; owner?: boolean }> = 
   hoy: { label: "Lo que toca hoy", app: false },
   alertas: { label: "Alertas", app: false },
   momentos: { label: "Momentos importantes", app: false },
+  calendario: { label: "Próximos 7 días", app: false },
   ingresos_meta: { label: "Ingresos del mes contra meta", app: false, owner: true },
   pronostico: { label: "Pronóstico de ventas", app: false, owner: true },
   que_falta: { label: "Qué falta en tu proceso", app: false, owner: true },
