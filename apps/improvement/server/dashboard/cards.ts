@@ -13,6 +13,7 @@ import { listInbox, type InboxItem } from "../tasks/inbox.ts";
 import { celebrations, type Celebration } from "../people/culture.ts";
 import { computeKpiValues } from "../kpis/sources.ts";
 import { listAlerts, type Alert } from "../insights/alerts.ts";
+import { forecast, revenueVsGoal, type Forecast, type RevenueRow } from "../insights/forecast.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: { code: string; message: string } } => ({ ok: false, error: { code, message } });
@@ -145,7 +146,9 @@ export type CardData =
   | { kind: "lista"; items: { title: string; href: string }[]; more: number }
   | { kind: "hoy"; items: InboxItem[] }
   | { kind: "momentos"; items: Celebration[] }
-  | { kind: "alertas"; items: Alert[]; more: number };
+  | { kind: "alertas"; items: Alert[]; more: number }
+  | { kind: "pronostico"; forecast: Forecast }
+  | { kind: "ingresos_meta"; rows: RevenueRow[] };
 
 const NO_ACCESS = () => fail("Ya no tienes acceso a esta app.", "NO_ACCESS");
 const numeric = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0);
@@ -203,8 +206,16 @@ export async function cardData(userId: string, orgId: string, card: Card): Promi
       const recs = cfg.stage ? r.data.records.filter((x) => x.stage === cfg.stage) : r.data.records;
       return { ok: true, data: { kind: "lista", items: recs.slice(0, 5).map((x) => ({ title: x.title, href: `/${orgId}/a/${cfg.app as string}/${x.id}` })), more: Math.max(0, recs.length - 5) } };
     }
+    case "pronostico": {
+      const r = await forecast(userId, orgId);
+      return r.ok ? { ok: true, data: { kind: "pronostico", forecast: r.data } } : r;
+    }
+    case "ingresos_meta": {
+      const r = await revenueVsGoal(userId, orgId, { field: cfg.field as string | undefined, goals: (cfg.goals as Record<string, number> | undefined) ?? {} });
+      return r.ok ? { ok: true, data: { kind: "ingresos_meta", rows: r.data } } : r;
+    }
     default:
-      // ingresos_meta, pronostico y que_falta llegan en T5–T7.
+      // que_falta llega en T7.
       return fail("Esta tarjeta todavía no está lista.", "PENDIENTE");
   }
 }

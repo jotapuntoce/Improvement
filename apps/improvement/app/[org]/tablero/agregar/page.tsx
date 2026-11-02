@@ -34,7 +34,14 @@ function build(f: FormData) {
     case "barras": return { kind, title, config: { app, by: v("by") || "etapa" } };
     case "embudo": return { kind, title, config: { app } };
     case "lista": return { kind, title, config: { app, stage: opt("stage") } };
-    case "ingresos_meta": return { kind, title, config: { goals: v("goal") ? { total: Math.round(Number(v("goal")) * 100) } : {} } };
+    case "ingresos_meta": {
+      // Metas en pesos, una por opción del campo elegido (goal:<opción>) o una sola "total".
+      const goals: Record<string, number> = {};
+      for (const [k, val] of f.entries()) {
+        if (k.startsWith("goal:") && val.toString().trim() !== "") goals[k.slice(5)] = Math.round(Number(val) * 100);
+      }
+      return { kind, title, config: { field: opt("field"), goals } };
+    }
     default: return { kind, title, config: {} };
   }
 }
@@ -44,10 +51,10 @@ export default async function AgregarTarjeta({
   searchParams,
 }: {
   params: Promise<{ org: string }>;
-  searchParams: Promise<{ tipo?: string; app?: string; error?: string }>;
+  searchParams: Promise<{ tipo?: string; app?: string; campo?: string; error?: string }>;
 }) {
   const { org: orgId } = await params;
-  const { tipo, app, error } = await searchParams;
+  const { tipo, app, campo, error } = await searchParams;
   const me = await requireOrgMembership(orgId);
   const isOwner = me.role === "owner";
   const tipos = Object.entries(TIPOS).filter(([, t]) => isOwner || !t.owner);
@@ -61,6 +68,9 @@ export default async function AgregarTarjeta({
   const stages = records?.ok ? records.data.stages : [];
   const numericos = fields.filter((f) => f.type === "numero" || f.type === "dinero");
   const opciones = fields.filter((f) => f.type === "opcion");
+  // Ingresos contra meta agrupa por un campo de opción de Ventas (G5).
+  const opcionesVentas = isOwner && tipo === "ingresos_meta" ? (await listFields(me.userId, orgId, "ventas")).filter((f) => f.type === "opcion") : [];
+  const campoVentas = opcionesVentas.find((f) => f.key === campo);
 
   async function guardar(formData: FormData) {
     "use server";
@@ -93,6 +103,19 @@ export default async function AgregarTarjeta({
         <button type="submit" className="panel-btn-ghost">Elegir</button>
       </form>
       {elegido && !listo && <p className="config-hint">Esta tarjeta es de una app: elige cuál.</p>}
+      {opcionesVentas.length > 0 && (
+        <form method="get" className="config-form task-inline config-card" aria-label="Agrupar ingresos">
+          <input type="hidden" name="tipo" value="ingresos_meta" />
+          <label className="permiso-field">
+            <span>Agrupar por un campo de Ventas</span>
+            <select name="campo" defaultValue={campoVentas?.key ?? ""} className="config-input">
+              <option value="">Sin agrupar (total)</option>
+              {opcionesVentas.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="panel-btn-ghost">Elegir</button>
+        </form>
+      )}
       {listo && (
         <form action={guardar} className="config-form config-form-stack config-card" aria-label="Opciones de la tarjeta">
           <input type="hidden" name="kind" value={elegido[0]} />
@@ -146,11 +169,22 @@ export default async function AgregarTarjeta({
               </select>
             </label>
           )}
-          {tipo === "ingresos_meta" && (
+          {tipo === "ingresos_meta" && !campoVentas && (
             <label className="permiso-field">
               <span>Meta del mes (pesos)</span>
-              <input name="goal" type="number" min={0} step="0.01" className="config-input" />
+              <input name="goal:total" type="number" min={0} step="0.01" className="config-input" />
             </label>
+          )}
+          {campoVentas && (
+            <>
+              <input type="hidden" name="field" value={campoVentas.key} />
+              {campoVentas.options.map((o) => (
+                <label key={o} className="permiso-field">
+                  <span>Meta del mes para {o} (pesos)</span>
+                  <input name={`goal:${o}`} type="number" min={0} step="0.01" className="config-input" />
+                </label>
+              ))}
+            </>
           )}
           <button type="submit" className="panel-cta">Agregar</button>
         </form>

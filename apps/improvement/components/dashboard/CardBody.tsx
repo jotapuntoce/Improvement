@@ -14,7 +14,12 @@ export type CardBodyData =
   | { kind: "lista"; items: Item[]; more: number }
   | { kind: "hoy"; items: { kind: string; id: string; title: string; overdue: boolean; href: string }[] }
   | { kind: "alertas"; items: { key: string; title: string; href: string; amountCents: number | null }[]; more: number }
-  | { kind: "momentos"; items: ({ kind: "objetivo"; title: string; personName: string | null } | { kind: "aniversario"; personName: string | null; years: number; on: string })[] };
+  | { kind: "momentos"; items: ({ kind: "objetivo"; title: string; personName: string | null } | { kind: "aniversario"; personName: string | null; years: number; on: string })[] }
+  | { kind: "pronostico"; forecast: { sinHistoria: true } | { sinHistoria: false; byStage: { stage: string; openCents: number; rate: number; source: "etapa" | "global" }[]; totalCents: number } }
+  | { kind: "ingresos_meta"; rows: { label: string; wonCents: number; goalCents: number }[] };
+
+const STAGE: Record<string, string> = { prospecto: "Prospecto", propuesta: "Propuesta", negociacion: "Negociación" };
+const PCT = new Intl.NumberFormat("es-MX", { style: "percent", maximumFractionDigits: 0 });
 
 function Bars({ bars }: { bars: Bar[] }) {
   // Con monto, la barra mide dinero; sin monto, cuántos registros. El valor va siempre en texto.
@@ -90,6 +95,39 @@ export function CardBody({ data, error, orgId }: { data: CardBodyData | null; er
           ))}
           {data.items.length === 0 && <li className="config-hint">Nada que celebrar esta semana.</li>}
         </ul>
+      );
+    case "pronostico": {
+      const f = data.forecast;
+      if (f.sinHistoria) return <p className="config-hint">Sin tratos cerrados en 6 meses: todavía no hay con qué pronosticar.</p>;
+      return (
+        <>
+          <p className="dash-number">{money(f.totalCents)}</p>
+          <ul className="equipo-list">
+            {f.byStage.map((s) => (
+              <li key={s.stage}>
+                {STAGE[s.stage] ?? s.stage}: <span className="dash-figure">{money(s.openCents)} × {PCT.format(s.rate)}</span>
+                {s.source === "global" && <span className="config-hint"> (tasa general: pocos casos)</span>}
+              </li>
+            ))}
+          </ul>
+          <Link href={`/${orgId}/que-pasa-si`}>¿Qué pasa si…?</Link>
+        </>
+      );
+    }
+    case "ingresos_meta":
+      return (
+        <>
+          <ul className="dash-bars">
+            {data.rows.map((r) => (
+              <li key={r.label}>
+                <span>{r.label}</span>
+                <span className="dash-bar" style={{ width: `${r.goalCents ? Math.min(100, (r.wonCents / r.goalCents) * 100) : 0}%` }} aria-hidden="true" />
+                <span className="dash-figure">{money(r.wonCents)}{r.goalCents ? ` de ${money(r.goalCents)}` : " · sin meta"}</span>
+              </li>
+            ))}
+          </ul>
+          <Link href={`/${orgId}/que-pasa-si`}>¿Qué pasa si…?</Link>
+        </>
       );
   }
 }
