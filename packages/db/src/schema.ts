@@ -610,7 +610,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento','alerta')`),
   ],
 );
 
@@ -2342,5 +2342,47 @@ export const automationRun = pgTable(
     index("idx_automation_run_rule").on(t.ruleId, t.createdAt),
     uniqueIndex("uq_automation_run_daily").on(t.ruleId, t.recordId, t.day).where(sql`${t.depth} = 0 and ${t.outcome} <> 'error'`),
     check("automation_run_outcome_check", sql`${t.outcome} in ('hecho','prueba','error','tope')`),
+  ],
+);
+
+// El tablero de cada persona en el inicio: una fila por tarjeta, en el orden de `position`. Lo lee
+// quien lo armó y el dueño de la empresa. Los datos de cada tarjeta se calculan al verla, con
+// los permisos de esa persona (server/dashboard/cards.ts).
+export const DASHBOARD_CARD_KINDS = ["numero", "barras", "embudo", "lista", "hoy", "alertas", "momentos", "ingresos_meta", "pronostico", "que_falta", "calendario"] as const;
+export const dashboardCard = pgTable(
+  "dashboard_card",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: DASHBOARD_CARD_KINDS }).notNull(),
+    title: text("title").notNull(),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_dashboard_card_user").on(t.orgId, t.userId, t.position),
+    check("dashboard_card_kind_check", sql`${t.kind} in ('numero','barras','embudo','lista','hoy','alertas','momentos','ingresos_meta','pronostico','que_falta','calendario')`),
+  ],
+);
+
+// La conversación de cada persona con Improvement (el dueño) o con el agente de su rol (un empleado),
+// desde la burbuja. Es solo suya: nadie más la lee, ni el dueño (server/conversation/agent.ts).
+export const AGENT_MESSAGE_ROLES = ["persona", "improvement"] as const;
+export const agentMessage = pgTable(
+  "agent_message",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    role: text("role", { enum: AGENT_MESSAGE_ROLES }).notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_agent_message_user").on(t.orgId, t.userId, t.createdAt),
+    check("agent_message_role_check", sql`${t.role} in ('persona','improvement')`),
   ],
 );

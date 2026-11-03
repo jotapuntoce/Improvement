@@ -716,3 +716,36 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 @media (max-width: 767px) {
   .task-workspace { grid-template-columns: 1fr; }
 }
+
+/* Tablero (fase 5): rejilla de tarjetas del inicio y barras CSS. La barra usa el acento de la marca
+   del negocio; su valor siempre va en texto junto a ella. */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 1rem; margin: 1rem 0; }
+.dash-card { display: grid; gap: 0.75rem; align-content: start; }
+.dash-tools { justify-content: flex-end; }
+.dash-number { font-family: var(--font-geist-mono), monospace; font-size: 2rem; margin: 0; }
+.dash-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.dash-bars li { display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
+.dash-bar { display: block; height: 0.75rem; min-width: 2px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); }
+.dash-figure { font-family: var(--font-geist-mono), monospace; }
+.dash-explained { white-space: pre-line; margin: 0; }
+
+/* Burbuja de Improvement: siempre su verde, encima de cualquier pantalla del negocio. */
+.bubble { position: fixed; right: 20px; bottom: 20px; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.bubble-button {
+  border: 0; border-radius: 999px; padding: 12px 18px; font-weight: 600; cursor: pointer; color: var(--bg);
+  background: linear-gradient(135deg, var(--brand-improvement-1), var(--brand-improvement-2));
+  transition: transform 0.15s ease;
+}
+.bubble-button:hover, .bubble-button:focus-visible { transform: scale(1.04); }
+.bubble-panel {
+  width: min(380px, calc(100vw - 40px)); max-height: 70vh; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); color: var(--text-primary);
+}
+.bubble-head { display: flex; justify-content: space-between; align-items: center; }
+.bubble-messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bubble-messages li { padding: 8px 12px; border-radius: var(--radius-sm); white-space: pre-line; max-width: 90%; }
+.bubble-messages p { margin: 4px 0 0; }
+.bubble-me { align-self: flex-end; background: var(--bg-card); border: 1px solid var(--border); }
+.bubble-them { align-self: flex-start; border: 1px solid var(--brand-improvement-1); }
+.bubble-page { margin-bottom: 16px; }
+@media (prefers-reduced-motion: reduce) { .bubble-button { transition: none; } .bubble-button:hover { transform: none; } }
