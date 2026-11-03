@@ -15,6 +15,7 @@ import { computeKpiValues } from "../kpis/sources.ts";
 import { listAlerts, type Alert } from "../insights/alerts.ts";
 import { forecast, revenueVsGoal, type Forecast, type RevenueRow } from "../insights/forecast.ts";
 import { processGaps } from "../insights/gaps.ts";
+import { agenda, type AgendaDay } from "../calendar/agenda.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: { code: string; message: string } } => ({ ok: false, error: { code, message } });
@@ -37,7 +38,7 @@ export const cardInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("lista"), title, config: z.object({ app: appKey, stage: z.string().max(60).optional() }) }),
   // Metas en centavos por opción del campo; sin campo, la llave "total".
   z.object({ kind: z.literal("ingresos_meta"), title, config: z.object({ field: z.string().max(40).optional(), goals: z.record(z.string().max(60), z.number().int().min(0)).default({}) }) }),
-  ...(["hoy", "alertas", "momentos", "pronostico", "que_falta"] as const).map((k) => z.object({ kind: z.literal(k), title, config: z.object({}).default({}) })),
+  ...(["hoy", "alertas", "momentos", "pronostico", "que_falta", "calendario"] as const).map((k) => z.object({ kind: z.literal(k), title, config: z.object({}).default({}) })),
 ]);
 export type CardInput = z.input<typeof cardInput>;
 
@@ -46,6 +47,7 @@ const OWNER_ONLY = new Set<CardKind>(["ingresos_meta", "pronostico", "que_falta"
 const DEFAULT_TITLE: Record<CardKind, string> = {
   numero: "Número", barras: "Por etapa", embudo: "Embudo", lista: "Lista", hoy: "Lo que toca hoy", alertas: "Alertas",
   momentos: "Momentos importantes", ingresos_meta: "Ingresos del mes contra meta", pronostico: "Pronóstico de ventas", que_falta: "Qué falta en tu proceso",
+  calendario: "Próximos 7 días",
 };
 
 export async function listCards(userId: string, orgId: string): Promise<Result<Card[]>> {
@@ -150,7 +152,8 @@ export type CardData =
   | { kind: "alertas"; items: Alert[]; more: number }
   | { kind: "pronostico"; forecast: Forecast }
   | { kind: "ingresos_meta"; rows: RevenueRow[] }
-  | { kind: "que_falta"; items: string[]; more: number };
+  | { kind: "que_falta"; items: string[]; more: number }
+  | { kind: "calendario"; days: AgendaDay[] };
 
 const NO_ACCESS = () => fail("Ya no tienes acceso a esta app.", "NO_ACCESS");
 const numeric = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0);
@@ -216,6 +219,8 @@ export async function cardData(userId: string, orgId: string, card: Card): Promi
       const r = await revenueVsGoal(userId, orgId, { field: cfg.field as string | undefined, goals: (cfg.goals as Record<string, number> | undefined) ?? {} });
       return r.ok ? { ok: true, data: { kind: "ingresos_meta", rows: r.data } } : r;
     }
+    case "calendario":
+      return { ok: true, data: { kind: "calendario", days: await agenda(userId, orgId, new Date(), 7) } };
     case "que_falta": {
       const r = await processGaps(userId, orgId);
       return r.ok ? { ok: true, data: { kind: "que_falta", items: r.data.slice(0, 5).map((g) => g.title), more: Math.max(0, r.data.length - 5) } } : r;

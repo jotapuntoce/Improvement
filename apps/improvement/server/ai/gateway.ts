@@ -362,7 +362,7 @@ async function logCall(orgId: string, purpose: string, completion: SuggestionCom
  */
 export async function extractStructured<T>(args: {
   orgId: string;
-  purpose: "importacion_lectura" | "importacion_mapeo" | "tarea_plan";
+  purpose: "importacion_lectura" | "importacion_mapeo" | "tarea_plan" | "conversacion";
   system: string;
   prompt: string;
   schema: z.ZodType<T>;

@@ -2348,7 +2348,7 @@ export const automationRun = pgTable(
 // El tablero de cada persona en el inicio: una fila por tarjeta, en el orden de `position`. Lo lee
 // quien lo armó y el dueño de la empresa. Los datos de cada tarjeta se calculan al verla, con
 // los permisos de esa persona (server/dashboard/cards.ts).
-export const DASHBOARD_CARD_KINDS = ["numero", "barras", "embudo", "lista", "hoy", "alertas", "momentos", "ingresos_meta", "pronostico", "que_falta"] as const;
+export const DASHBOARD_CARD_KINDS = ["numero", "barras", "embudo", "lista", "hoy", "alertas", "momentos", "ingresos_meta", "pronostico", "que_falta", "calendario"] as const;
 export const dashboardCard = pgTable(
   "dashboard_card",
   {
@@ -2364,6 +2364,25 @@ export const dashboardCard = pgTable(
   },
   (t) => [
     index("idx_dashboard_card_user").on(t.orgId, t.userId, t.position),
-    check("dashboard_card_kind_check", sql`${t.kind} in ('numero','barras','embudo','lista','hoy','alertas','momentos','ingresos_meta','pronostico','que_falta')`),
+    check("dashboard_card_kind_check", sql`${t.kind} in ('numero','barras','embudo','lista','hoy','alertas','momentos','ingresos_meta','pronostico','que_falta','calendario')`),
+  ],
+);
+
+// La conversación de cada persona con Improvement (el dueño) o con el agente de su rol (un empleado),
+// desde la burbuja. Es solo suya: nadie más la lee, ni el dueño (server/conversation/agent.ts).
+export const AGENT_MESSAGE_ROLES = ["persona", "improvement"] as const;
+export const agentMessage = pgTable(
+  "agent_message",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    role: text("role", { enum: AGENT_MESSAGE_ROLES }).notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_agent_message_user").on(t.orgId, t.userId, t.createdAt),
+    check("agent_message_role_check", sql`${t.role} in ('persona','improvement')`),
   ],
 );
