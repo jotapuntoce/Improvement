@@ -78,3 +78,18 @@ test("WHEN abre la ruta vieja del edificio THE SYSTEM SHALL llevarlo a su inicio
   await page.goto(`/empresas/${orgId}`);
   await expect(page).toHaveURL(new RegExp(`/${orgId}$`));
 });
+
+test("WHEN el dueño agrega una aplicación THE SYSTEM SHALL mostrarla en la barra y dejar crear registros", async ({ page, context, baseURL }) => {
+  await as(context, baseURL);
+  await page.goto(`/${orgId}/aplicaciones/nueva`);
+  await page.getByLabel("Nombre").fill("Mascotas");
+  await page.getByLabel("Grupo").fill("Operación");
+  await page.getByLabel("Etapas (una por renglón)").fill("Nuevo\nAlta");
+  await page.getByRole("button", { name: "Crear aplicación" }).click();
+  await expect(page).toHaveURL(new RegExp(`/${orgId}/a/mascotas$`));
+  await expect(page.getByRole("navigation", { name: "Aplicaciones" }).getByRole("link", { name: "Mascotas" })).toBeVisible();
+  await page.getByLabel("Nombre del registro nuevo").fill("Firulais");
+  await page.getByRole("button", { name: "Nuevo", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Firulais" })).toBeVisible();
+  await noSerious(page);
+});

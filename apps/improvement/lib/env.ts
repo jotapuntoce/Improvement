@@ -25,6 +25,10 @@ const schema = z.object({
   CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — bearer del cron de Vercel
   NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   NEXT_PUBLIC_SUMMUM_URL: z.preprocess(emptyToUndefined, z.string().url().optional()), // enlace "Cobros" a apps/summum
+  // Importar desde Google Drive (Fase 3 de improvement-odoo). Sin las tres, el botón de Drive no aparece.
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  NEXT_PUBLIC_GOOGLE_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  NEXT_PUBLIC_GOOGLE_APP_ID: z.preprocess(emptyToUndefined, z.string().regex(/^\d+$/).optional()),
 });
 
 export const env = schema.parse(process.env);

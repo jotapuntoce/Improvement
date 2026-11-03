@@ -2,11 +2,14 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { appModel, appStage, profile, recordActivity } from "@jotapuntoce/db/schema";
+import { appModel, appRecord, appStage, profile, recordActivity } from "@jotapuntoce/db/schema";
 import { resolveSection } from "../auth/guard.ts";
-import { BASE_APPS, ensureOrgApps } from "./catalog.ts";
+import { ensureOrgApps, type BaseAppKey } from "./catalog.ts";
+import { customAdapter, firstStage } from "./custom.ts";
+import type { SectionSlug } from "../permissions/sections.ts";
 import { ADAPTERS, type AppRecord } from "./adapters.ts";
 import { listFields, schemaFor } from "./fields.ts";
+import { runAutomations, type AutomationEvent } from "../automations/engine.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: { code: string; message: string } } => ({ ok: false, error: { code, message } });
@@ -14,16 +17,51 @@ const fail = (message: string, code = "VALIDATION_ERROR"): { ok: false; error: {
 export type { AppRecord };
 export interface ActivityItem { kind: "nota" | "cambio"; body: string; actorName: string | null; createdAt: Date }
 
+export interface AppMeta { id: string; key: string; name: string; section: SectionSlug; kind: "base" | "custom" }
+
+/** La app prendida del org por su llave (base o propia), o null. Sin guard: la llaman gate() y las páginas después de requireSection. */
+export async function getAppMeta(orgId: string, appKey: string): Promise<AppMeta | null> {
+  await ensureOrgApps(orgId);
+  const [row] = await db
+    .select({ id: appModel.id, key: appModel.key, name: appModel.name, section: appModel.section, kind: appModel.kind })
+    .from(appModel)
+    .where(and(eq(appModel.orgId, orgId), eq(appModel.key, appKey), eq(appModel.enabled, true)));
+  return row ? { ...row, section: row.section as SectionSlug, kind: row.kind === "custom" ? "custom" : "base" } : null;
+}
+
 /** Lectura: cualquier alcance distinto de "ninguno". Escritura: solo "empresa", igual que las apps base. */
 async function gate(userId: string, orgId: string, appKey: string, write: boolean) {
-  const app = BASE_APPS.find((a) => a.key === appKey);
+  const app = await getAppMeta(orgId, appKey);
   if (!app) return { error: fail("Esa app no existe.", "NOT_FOUND") };
   const { scope } = await resolveSection(userId, orgId, app.section);
   if (scope === "ninguno" || (write && scope !== "empresa")) return { error: fail("No tienes acceso a esta app.", "FORBIDDEN") };
-  return { app, adapter: ADAPTERS[app.key] };
+  return { app, adapter: app.kind === "custom" ? customAdapter(app.id) : ADAPTERS[app.key as BaseAppKey] };
 }
 
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
+
+/** Lo usan las automatizaciones (opts.depth) para saber cuántas reglas encadenadas van. */
+interface ChainOpts { depth?: number }
+
+/** Dispara las automatizaciones después de un guardado exitoso; su error nunca tumba el guardado. */
+async function fire(event: AutomationEvent) {
+  await runAutomations(event).catch(() => {});
+}
+
+const adapterOf = (app: AppMeta) => (app.kind === "custom" ? customAdapter(app.id) : ADAPTERS[app.key as BaseAppKey]);
+
+/** El registro sin guard. Interna: la llaman el motor y el cron, que ya autorizaron. */
+export async function loadRecord(orgId: string, appKey: string, id: string): Promise<AppRecord | null> {
+  const app = await getAppMeta(orgId, appKey);
+  if (!app || !isUuid(id)) return null;
+  return (await adapterOf(app).get(orgId, id)) ?? null;
+}
+
+/** Todos los registros de una app, sin guard. Interna: la llama el cron de automatizaciones. */
+export async function loadRecords(orgId: string, appKey: string): Promise<AppRecord[]> {
+  const app = await getAppMeta(orgId, appKey);
+  return app ? adapterOf(app).list(orgId) : [];
+}
 
 export async function listRecords(
   userId: string,
@@ -34,7 +72,6 @@ export async function listRecords(
   const g = await gate(userId, orgId, appKey, false);
   if (g.error) return g.error;
   const q = z.string().trim().max(80).safeParse(opts.q ?? "");
-  await ensureOrgApps(orgId);
   const [records, stages] = await Promise.all([
     g.adapter.list(orgId, q.success && q.data ? q.data : undefined),
     db
@@ -58,25 +95,32 @@ async function log(orgId: string, appKey: string, section: string, recordId: str
   await db.insert(recordActivity).values({ orgId, appKey, section, recordId, kind, body, actorId });
 }
 
-export async function moveRecord(userId: string, orgId: string, appKey: string, id: string, stage: string): Promise<Result<true>> {
+export async function moveRecord(userId: string, orgId: string, appKey: string, id: string, stage: string, opts: ChainOpts = {}): Promise<Result<true>> {
   const g = await gate(userId, orgId, appKey, true);
   if (g.error) return g.error;
   const before = isUuid(id) ? await g.adapter.get(orgId, id) : undefined;
   if (!before) return fail("No existe.", "NOT_FOUND");
   const r = await g.adapter.move(userId, orgId, id, stage);
-  if (r.ok && before.stage !== stage) await log(orgId, appKey, g.app.section, id, "cambio", `Etapa: ${before.stage} → ${stage}`, userId);
+  if (r.ok && before.stage !== stage) {
+    await log(orgId, appKey, g.app.section, id, "cambio", `Etapa: ${before.stage} → ${stage}`, userId);
+    await fire({ orgId, actorId: userId, appKey, recordId: id, type: "etapa", stage, depth: opts.depth });
+  }
   return r;
 }
 
-export async function saveCustomValues(userId: string, orgId: string, appKey: string, id: string, values: unknown): Promise<Result<Record<string, unknown>>> {
+export async function saveCustomValues(userId: string, orgId: string, appKey: string, id: string, values: unknown, opts: ChainOpts = {}): Promise<Result<Record<string, unknown>>> {
   const g = await gate(userId, orgId, appKey, true);
   if (g.error) return g.error;
   if (!isUuid(id)) return fail("No existe.", "NOT_FOUND");
   const parsed = schemaFor(await listFields(userId, orgId, appKey)).safeParse(values);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos.");
+  const before = await g.adapter.get(orgId, id);
+  if (!before) return fail("No existe.", "NOT_FOUND");
   const saved = await g.adapter.saveCustom(orgId, id, parsed.data);
   if (!saved) return fail("No existe.", "NOT_FOUND");
+  const changed = Object.keys(parsed.data).filter((k) => JSON.stringify(before.custom[k] ?? null) !== JSON.stringify(parsed.data[k] ?? null));
   await log(orgId, appKey, g.app.section, id, "cambio", "Campos actualizados", userId);
+  if (changed.length) await fire({ orgId, actorId: userId, appKey, recordId: id, type: "campo", fields: changed, depth: opts.depth });
   return { ok: true, data: saved };
 }
 
@@ -101,4 +145,19 @@ export async function listActivity(userId: string, orgId: string, appKey: string
     .where(and(eq(recordActivity.orgId, orgId), eq(recordActivity.appKey, appKey), eq(recordActivity.recordId, id)))
     .orderBy(desc(recordActivity.createdAt));
   return { ok: true, data: rows };
+}
+
+/** Registro nuevo en una app propia; nace en su primera etapa. Las base se crean desde sus pantallas de siempre. */
+export async function createRecord(userId: string, orgId: string, appKey: string, title: string, opts: ChainOpts = {}): Promise<Result<{ id: string }>> {
+  const g = await gate(userId, orgId, appKey, true);
+  if (g.error) return g.error;
+  if (g.app.kind !== "custom") return fail("En esta app los registros se crean desde su pantalla de siempre.");
+  const t = z.string().trim().min(1).max(120).safeParse(title);
+  if (!t.success) return fail("Ponle un nombre.");
+  const stage = await firstStage(g.app.id);
+  if (!stage) return fail("Esta app no tiene etapas.");
+  const [row] = await db.insert(appRecord).values({ orgId, appId: g.app.id, title: t.data, stage, createdBy: userId }).returning({ id: appRecord.id });
+  await log(orgId, appKey, g.app.section, row!.id, "cambio", "Registro creado", userId);
+  await fire({ orgId, actorId: userId, appKey, recordId: row!.id, type: "creado", depth: opts.depth });
+  return { ok: true, data: { id: row!.id } };
 }
