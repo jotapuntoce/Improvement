@@ -7,6 +7,7 @@ export function ControlPanel({
   q,
   vista,
   create,
+  importHref,
 }: {
   title: string;
   base: string;
@@ -14,6 +15,8 @@ export function ControlPanel({
   vista: "lista" | "kanban";
   /** Solo en apps propias: crea un registro con su nombre. */
   create?: (formData: FormData) => Promise<void>;
+  /** Solo el dueño, en Clientes y en apps propias: lleva a traer un archivo. */
+  importHref?: string;
 }) {
   return (
     <header className="view-control">
@@ -30,6 +33,7 @@ export function ControlPanel({
           <button type="submit" className="panel-cta">Nuevo</button>
         </form>
       )}
+      {importHref && <Link href={importHref} className="panel-cta">Importar</Link>}
       <nav aria-label="Vista" className="view-switch">
         <Link href={`${base}?vista=lista`} aria-current={vista === "lista" ? "page" : undefined}>Lista</Link>
         <Link href={`${base}?vista=kanban`} aria-current={vista === "kanban" ? "page" : undefined}>Kanban</Link>

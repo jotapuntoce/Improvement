@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { createRecord, getAppMeta, listRecords, moveRecord } from "@/server/apps/records.ts";
+import { IMPORTABLE } from "@/server/import/jobs.ts";
 import { ControlPanel } from "@/components/views/ControlPanel.tsx";
 import { ListView } from "@/components/views/ListView.tsx";
 import { KanbanBoard } from "@/components/views/KanbanBoard.tsx";
@@ -13,10 +14,10 @@ export default async function AppPage({
   searchParams,
 }: {
   params: Promise<{ org: string; app: string }>;
-  searchParams: Promise<{ q?: string; vista?: string; error?: string }>;
+  searchParams: Promise<{ q?: string; vista?: string; error?: string; aviso?: string }>;
 }) {
   const { org: orgId, app } = await params;
-  const { q = "", vista: rawVista, error } = await searchParams;
+  const { q = "", vista: rawVista, error, aviso } = await searchParams;
   const meta = await getAppMeta(orgId, app);
   if (!meta) notFound();
   const { membership } = await requireSection(orgId, meta.section);
@@ -47,8 +48,11 @@ export default async function AppPage({
 
   return (
     <main className="config-page view-page">
-      <ControlPanel title={meta.name} base={base} q={q} vista={vista} create={meta.kind === "custom" ? nuevo : undefined} />
+      <ControlPanel title={meta.name} base={base} q={q} vista={vista} create={meta.kind === "custom" ? nuevo : undefined}
+        importHref={membership.role === "owner" && IMPORTABLE(meta) ? `${base}/importar` : undefined}
+      />
       {error && <p className="invite-error" role="alert">{error}</p>}
+      {aviso && <p className="config-hint" role="status">{aviso}</p>}
       {vista === "kanban" ? (
         <KanbanBoard base={base} records={result.data.records} stages={result.data.stages} move={move} />
       ) : (

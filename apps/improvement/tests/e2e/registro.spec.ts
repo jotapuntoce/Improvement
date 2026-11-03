@@ -1,6 +1,6 @@
 // apps/improvement/tests/e2e/registro.spec.ts
 // Registro y arranque contra el build de producción: alguien con cuenta y sin empresa cuenta su
-// negocio, salta la marca, acepta la propuesta y llega a su inicio con las apps de su giro. La cuenta
+// negocio, salta la marca, acepta la propuesta, salta la importación y llega a su inicio con las apps de su giro. La cuenta
 // se crea ya confirmada con el fixture (signUp real dependería de la confirmación por correo).
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -74,6 +74,11 @@ test("WHEN cuenta su negocio, salta la marca y acepta la propuesta THE SYSTEM SH
   await expect(page.locator('input[name="name-0"]')).toHaveValue("Pacientes");
   await noSerious(page);
   await page.getByRole("button", { name: "Armar mi Improvement" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/arranque/${orgId}/importar$`), { timeout: 20_000 });
+  await expect(page.getByLabel("¿A dónde va?")).toContainText("Pacientes");
+  await noSerious(page);
+  await page.getByRole("link", { name: "No tengo nada, ir a mi Improvement" }).click();
 
   await expect(page).toHaveURL(new RegExp(`/${orgId}$`), { timeout: 20_000 });
   const nav = page.getByRole("navigation", { name: "Aplicaciones" });

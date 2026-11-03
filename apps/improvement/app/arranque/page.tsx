@@ -1,4 +1,4 @@
-// Arranque, paso 1 de 3: el negocio. Crea la empresa con quien llega como dueño y sigue con su marca.
+// Arranque, paso 1 de 4: el negocio. Crea la empresa con quien llega como dueño y sigue con su marca.
 import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/server/auth/guard.ts";
 import { createOwnBusiness } from "@/server/registro/business.ts";
@@ -22,7 +22,7 @@ export default async function Arranque({ searchParams }: { searchParams: Promise
 
   return (
     <main className="config-page auth-page">
-      <p className="config-hint">Paso 1 de 3</p>
+      <p className="config-hint">Paso 1 de 4</p>
       <h1 className="config-title">Cuéntanos de tu negocio</h1>
       {error && <p className="invite-error" role="alert">{error}</p>}
       <form action={crear} className="config-form config-form-stack config-card" aria-label="Tu negocio">

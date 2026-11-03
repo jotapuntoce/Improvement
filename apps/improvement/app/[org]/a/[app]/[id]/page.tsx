@@ -57,6 +57,7 @@ export default async function RecordPage({
       <p className="config-hint"><Link href={`/${orgId}/a/${app}`}>Volver a {meta.name}</Link></p>
       <h1 className="config-title">{record.data.title}</h1>
       {record.data.subtitle && <p className="config-hint">{record.data.subtitle}</p>}
+      <p><Link href={`/${orgId}/tareas/nueva?app=${app}&record=${id}`} className="panel-btn-ghost">Crear tarea sobre esto</Link></p>
       <ol className="view-stagebar" aria-label="Etapa">
         {stages.map((s) => (
           <li key={s.key} aria-current={s.key === record.data.stage ? "step" : undefined}>{s.name}</li>
