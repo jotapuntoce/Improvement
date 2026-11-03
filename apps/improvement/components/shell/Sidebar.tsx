@@ -20,7 +20,6 @@ export function Sidebar({ data, header, footer }: { data: SidebarData; header: R
         <li><NavLink href={`/${data.orgId}/calendario`}>Calendario</NavLink></li>
         <li><NavLink href={`/${data.orgId}/conversacion`}>Conversar con Improvement</NavLink></li>
         {data.direccion && <li><NavLink href={`/${data.orgId}/direccion`}>Dirección</NavLink></li>}
-        <li><NavLink href={`/${data.orgId}/configuracion/marca`}>Tu marca</NavLink></li>
         {data.canAddApps && <li><NavLink href={`/${data.orgId}/aplicaciones/nueva`}>Agregar aplicación</NavLink></li>}
         {data.canAddApps && <li><NavLink href={`/${data.orgId}/automatizaciones`}>Automatizaciones</NavLink></li>}
       </ul>
