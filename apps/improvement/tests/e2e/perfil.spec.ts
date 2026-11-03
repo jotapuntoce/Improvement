@@ -56,7 +56,7 @@ test("WHEN el dueño da clic en Cerrar sesión THE SYSTEM SHALL llevarlo al logi
   await page.goto(`/${orgId}/configuracion`);
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page).toHaveURL(/\/login$/);
-  // Sin sesión el guard responde 404 (nunca revela que el negocio existe).
-  expect((await page.goto(`/${orgId}/configuracion`))?.status()).toBe(404);
-  await expect(page.getByRole("heading", { name: "Configuración" })).toHaveCount(0);
+  // Sin sesión el guard manda al login (igual con cualquier negocio, no revela nada).
+  await page.goto(`/${orgId}/configuracion`);
+  await expect(page).toHaveURL(/\/login$/);
 });
