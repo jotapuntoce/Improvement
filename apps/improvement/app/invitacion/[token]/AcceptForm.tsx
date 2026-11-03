@@ -107,7 +107,7 @@ export function AcceptForm({
 
     // A su oficina, no a un menú: quien acaba de entrar a una empresa ve primero el edificio y
     // adentro la recepción, igual que cualquier otro día. La única entrada es la misma para todos.
-    router.push(`/empresas/${result.orgId}`);
+    router.push(`/${result.orgId}`);
     router.refresh();
   }
 

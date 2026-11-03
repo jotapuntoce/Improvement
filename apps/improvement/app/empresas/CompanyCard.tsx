@@ -76,7 +76,7 @@ export function CompanyCard({ company }: { company: PanelCompany }) {
   }
 
   return (
-    <Link href={`/empresas/${company.orgId}`} className="company-card">
+    <Link href={`/${company.orgId}`} className="company-card">
       {body}
     </Link>
   );

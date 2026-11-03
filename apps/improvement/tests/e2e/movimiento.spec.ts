@@ -90,12 +90,12 @@ test("WHEN hay una sugerencia reciente de la IA THE SYSTEM SHALL mostrarla con S
   await expect(card).toContainText("Sugerido por Improvement");
 });
 
-test("WHEN el dueño abre /empresas/[orgId] THE SYSTEM SHALL mostrar Pedir siguiente movimiento; al empleado no", async ({ page, context, baseURL }) => {
+test("WHEN el dueño abre /[org] THE SYSTEM SHALL mostrar Pedir siguiente movimiento; al empleado no", async ({ page, context, baseURL }) => {
   await as(context, ownerToken, baseURL);
-  await page.goto(`/empresas/${orgId}`);
+  await page.goto(`/${orgId}`);
   await expect(page.getByRole("button", { name: "Pedir siguiente movimiento" })).toBeVisible();
 
   await as(context, employeeToken, baseURL);
-  await page.goto(`/empresas/${orgId}`);
+  await page.goto(`/${orgId}`);
   await expect(page.getByRole("button", { name: "Pedir siguiente movimiento" })).toHaveCount(0);
 });

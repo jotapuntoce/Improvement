@@ -20,6 +20,7 @@ import {
   check,
   bigint,
   unique,
+  primaryKey,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -327,6 +328,7 @@ export const project = pgTable(
     authorizedBy: uuid("authorized_by").references(() => profile.id, { onDelete: "set null" }),
     authorizedAt: timestamp("authorized_at", { withTimezone: true }),
     ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -487,6 +489,7 @@ export const client = pgTable(
     notes: text("notes"),
     // La llave del monedero público del cliente (lealtad). Única: es la que viaja en el enlace.
     walletToken: text("wallet_token").unique(),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -541,6 +544,7 @@ export const deal = pgTable(
     stage: text("stage", { enum: DEAL_STAGES }).notNull().default("prospecto"),
     ownerProfileId: uuid("owner_profile_id").references(() => profile.id, { onDelete: "set null" }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -575,6 +579,7 @@ export const ticket = pgTable(
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     satisfaction: integer("satisfaction"),
     createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    custom: jsonb("custom").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -605,7 +610,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento','alerta')`),
   ],
 );
 
@@ -2004,4 +2009,380 @@ export const experienceGrant = pgTable(
     createdAt: createdAt(),
   },
   (t) => [check("experience_grant_value_nonneg", sql`${t.valueCents} >= 0`)],
+);
+
+// ─── Motor de apps (blueprint improvement-odoo, fase 1) ───────────────────────────────────────────
+// Lo que el dueño personaliza son filas: apps, grupos, etapas, campos extra y vistas. Las apps base
+// apuntan a su tabla real (`kind = 'base'`); las del dueño (`custom`) llegan en la fase 2.
+
+export const APP_FIELD_TYPES = ["texto", "numero", "dinero", "fecha", "opcion", "si_no"] as const;
+export const APP_VIEW_KINDS = ["lista", "kanban", "ficha"] as const;
+
+export const orgBrand = pgTable("org_brand", {
+  id: id(),
+  orgId: uuid("org_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),
+  primaryColor: text("primary_color"),
+  secondaryColor: text("secondary_color"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("org_brand_primary_hex", sql`${t.primaryColor} is null or ${t.primaryColor} ~ '^#[0-9a-fA-F]{6}$'`),
+  check("org_brand_secondary_hex", sql`${t.secondaryColor} is null or ${t.secondaryColor} ~ '^#[0-9a-fA-F]{6}$'`),
+]);
+
+export const appGroup = pgTable("app_group", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [index("idx_app_group_org").on(t.orgId)]);
+
+export const appModel = pgTable("app_model", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  kind: text("kind", { enum: ["base", "custom"] }).notNull(),
+  // La sección de permisos que la abre (SECTION_SLUGS). Las custom de la fase 2 traerán la suya.
+  section: text("section").notNull(),
+  icon: text("icon"),
+  groupId: uuid("group_id").references(() => appGroup.id, { onDelete: "set null" }),
+  position: integer("position").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_app_model_org_key").on(t.orgId, t.key),
+  check("app_model_kind_check", sql`${t.kind} in ('base','custom')`),
+]);
+
+export const appStage = pgTable("app_stage", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  // En apps base, el valor real de la columna de etapa (p. ej. 'ganado'). Nunca cambia; el nombre sí.
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [unique("uq_app_stage_app_key").on(t.appId, t.key)]);
+
+export const appField = pgTable("app_field", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  type: text("type", { enum: APP_FIELD_TYPES }).notNull(),
+  options: jsonb("options").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  required: boolean("required").notNull().default(false),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_app_field_app_key").on(t.appId, t.key),
+  check("app_field_key_format", sql`${t.key} ~ '^[a-z][a-z0-9_]{1,39}$'`),
+]);
+
+export const appView = pgTable("app_view", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: APP_VIEW_KINDS }).notNull(),
+  // Llaves de campo visibles, en orden. Las de la tabla base usan su nombre ('title', 'amount').
+  columns: jsonb("columns").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const recordActivity = pgTable("record_activity", {
+  id: id(),
+  orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  appKey: text("app_key").notNull(),
+  // La sección que permite leerla: la RLS la usa sin unir con app_model.
+  section: text("section").notNull(),
+  recordId: uuid("record_id").notNull(),
+  kind: text("kind", { enum: ["nota", "cambio"] }).notNull(),
+  body: text("body").notNull(),
+  actorId: uuid("actor_id").references(() => profile.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+}, (t) => [index("idx_record_activity_record").on(t.orgId, t.recordId)]);
+
+// ─── Registro y apps propias (Fase 2 de improvement-odoo) ────────────────────────────────────────
+
+export const TEAM_SIZES = ["solo", "2-5", "6-20", "21+"] as const;
+
+// Lo que el dueño cuenta de su negocio al registrarse. El giro vive en organization.industry (ya
+// existe); aquí lo demás. onboarded_at = terminó el arranque guiado (null = mandarlo a /arranque).
+export const orgProfile = pgTable(
+  "org_profile",
+  {
+    orgId: uuid("org_id").primaryKey().references(() => organization.id, { onDelete: "cascade" }),
+    teamSize: text("team_size"),
+    city: text("city"),
+    templateKey: text("template_key"),
+    onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("org_profile_team_size_check", sql`${t.teamSize} is null or ${t.teamSize} in ('solo','2-5','6-20','21+')`)],
+);
+
+// Registros de las apps que crea el dueño (app_model.kind = 'custom'). Los valores de sus campos
+// (app_field) van en data; title y stage son columnas porque toda vista los usa.
+export const appRecord = pgTable(
+  "app_record",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    stage: text("stage").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("idx_app_record_app").on(t.appId, t.updatedAt)],
+);
+
+// ── Importación (spec improvement-odoo §5, Fase 3) ───────────────────────────────────────────────
+export const IMPORT_SOURCES = ["csv", "xlsx", "sheets", "pdf", "imagen"] as const;
+export const IMPORT_STATUSES = ["borrador", "importado", "deshecho"] as const;
+
+// Una importación de archivo a una app. rows guarda la tabla leída solo mientras es borrador; al
+// importar se vacía (los datos ya viven en sus registros) y record_origin queda para deshacer.
+export const importJob = pgTable(
+  "import_job",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appId: uuid("app_id").notNull().references(() => appModel.id, { onDelete: "cascade" }),
+    source: text("source", { enum: IMPORT_SOURCES }).notNull(),
+    fileName: text("file_name").notNull(),
+    status: text("status", { enum: IMPORT_STATUSES }).notNull().default("borrador"),
+    headers: jsonb("headers").$type<string[]>().notNull(),
+    rows: jsonb("rows").$type<string[][]>().notNull(),
+    mapping: jsonb("mapping").$type<Record<string, string>>().notNull().default({}),
+    mappedBy: text("mapped_by"),
+    errors: jsonb("errors").$type<{ row: number; message: string }[]>().notNull().default([]),
+    importedCount: integer("imported_count").notNull().default(0),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    importedAt: timestamp("imported_at", { withTimezone: true }),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_import_job_app").on(t.appId, t.createdAt),
+    check("import_job_source_check", sql`${t.source} in ('csv','xlsx','sheets','pdf','imagen')`),
+    check("import_job_status_check", sql`${t.status} in ('borrador','importado','deshecho')`),
+    check("import_job_mapped_by_check", sql`${t.mappedBy} is null or ${t.mappedBy} in ('ia','nombre')`),
+  ],
+);
+
+// Qué registro nació de qué importación (client o app_record, según la app del job).
+export const recordOrigin = pgTable(
+  "record_origin",
+  {
+    importJobId: uuid("import_job_id").notNull().references(() => importJob.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.importJobId, t.recordId] })],
+);
+
+// ── Tareas con Improvement y automatizaciones (spec improvement-odoo §6 y §7, Fase 4) ─────────────
+export const TASK_SOURCES = ["dueno", "propia", "improvement", "automatizacion"] as const;
+export const TASK_STATUSES = ["abierta", "hecha", "descartada"] as const;
+export const STEP_KINDS = ["persona", "improvement"] as const;
+export const STEP_STATUSES = ["pendiente", "propuesto", "hecho", "rechazado"] as const;
+// El catálogo cerrado de lo que el copiloto puede ejecutar. Nada sale hacia clientes finales ni mueve dinero.
+export const AGENT_ACTIONS = ["crear_registro", "mover_etapa", "actualizar_campos", "nota", "borrador_mensaje", "recordatorio"] as const;
+export const AGENT_MODES = ["siempre", "primera_vez", "solo"] as const;
+export const AUTOMATION_TRIGGERS = ["creado", "etapa", "campo", "fecha", "sin_actividad"] as const;
+export const AUTOMATION_STATUSES = ["prueba", "activa", "pausada"] as const;
+export const AUTOMATION_OUTCOMES = ["hecho", "prueba", "error", "tope"] as const;
+
+export type TaskSource = (typeof TASK_SOURCES)[number];
+export type AgentAction = (typeof AGENT_ACTIONS)[number];
+export type AgentMode = (typeof AGENT_MODES)[number];
+export type AutomationStatus = (typeof AUTOMATION_STATUSES)[number];
+
+// fecha: days < 0 = N días antes de la fecha del campo; 0 = el día; > 0 = vencida hace N días.
+export type AutomationTrigger =
+  | { type: "creado" }
+  | { type: "etapa"; to?: string }
+  | { type: "campo"; field: string }
+  | { type: "fecha"; field: string; days: number }
+  | { type: "sin_actividad"; days: number };
+export interface AutomationCondition { field: string; op: "es" | "no_es" | "mayor" | "menor" | "vacio" | "no_vacio"; value?: string | number | boolean }
+export type AutomationAction =
+  | { type: "crear_registro"; app: string; title: string }
+  | { type: "mover_etapa"; stage: string }
+  | { type: "actualizar_campos"; values: Record<string, unknown> }
+  | { type: "crear_tarea"; assigneeId: string; title: string; dueInDays?: number }
+  | { type: "crear_objetivo"; assigneeId: string; title: string; impactWeight: number; dueInDays: number }
+  | { type: "avisar"; userId: string; text: string; channel: "in_app" | "email" }
+  | { type: "experiencia_lealtad"; title: string };
+
+// Lo que le toca a una persona. Puede apuntar a un registro de cualquier app y a un objetivo: cerrar
+// la tarea completa el objetivo, que es lo único que paga puntos.
+export const task = pgTable(
+  "task",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    assigneeId: uuid("assignee_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    source: text("source", { enum: TASK_SOURCES }).notNull(),
+    status: text("status", { enum: TASK_STATUSES }).notNull().default("abierta"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    appKey: text("app_key"),
+    recordId: uuid("record_id"),
+    objectiveId: uuid("objective_id").references(() => objective.id, { onDelete: "set null" }),
+    ruleId: uuid("rule_id"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_task_assignee").on(t.orgId, t.assigneeId, t.status),
+    check("task_source_check", sql`${t.source} in ('dueno','propia','improvement','automatizacion')`),
+    check("task_status_check", sql`${t.status} in ('abierta','hecha','descartada')`),
+  ],
+);
+
+// Los pasos de una tarea: de la persona o de Improvement (con una acción del catálogo y su payload).
+// result es la evidencia: qué se hizo, o el borrador que quedó.
+export const taskStep = pgTable(
+  "task_step",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull().references(() => task.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    kind: text("kind", { enum: STEP_KINDS }).notNull(),
+    action: text("action", { enum: AGENT_ACTIONS }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    status: text("status", { enum: STEP_STATUSES }).notNull().default("pendiente"),
+    result: text("result"),
+    doneBy: text("done_by", { enum: STEP_KINDS }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_task_step_task").on(t.taskId, t.position),
+    check("task_step_kind_check", sql`${t.kind} in ('persona','improvement')`),
+    check("task_step_status_check", sql`${t.status} in ('pendiente','propuesto','hecho','rechazado')`),
+    check("task_step_action_check", sql`${t.action} is null or ${t.action} in ('crear_registro','mover_etapa','actualizar_campos','nota','borrador_mensaje','recordatorio')`),
+  ],
+);
+
+// Qué puede hacer Improvement sin preguntarle a esta persona, por tipo de acción. Sin fila = "siempre".
+export const agentPermission = pgTable(
+  "agent_permission",
+  {
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    action: text("action", { enum: AGENT_ACTIONS }).notNull(),
+    mode: text("mode", { enum: AGENT_MODES }).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId, t.action] }),
+    check("agent_permission_mode_check", sql`${t.mode} in ('siempre','primera_vez','solo')`),
+  ],
+);
+
+// Reglas del dueño: cuando pasa algo en una app (y se cumplen las condiciones), hacer estas acciones.
+// Nacen en 'prueba': se evalúan y registran lo que harían, sin hacerlo.
+export const automationRule = pgTable(
+  "automation_rule",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    appKey: text("app_key").notNull(),
+    name: text("name").notNull(),
+    trigger: jsonb("trigger").$type<AutomationTrigger>().notNull(),
+    conditions: jsonb("conditions").$type<AutomationCondition[]>().notNull().default([]),
+    actions: jsonb("actions").$type<AutomationAction[]>().notNull(),
+    status: text("status", { enum: AUTOMATION_STATUSES }).notNull().default("prueba"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_automation_rule_app").on(t.orgId, t.appKey, t.status),
+    check("automation_rule_status_check", sql`${t.status} in ('prueba','activa','pausada')`),
+  ],
+);
+
+// Cada vez que una regla se evaluó y actuó (o habría actuado) sobre un registro. day + el índice
+// único parcial hacen idempotente al cron: una regla no actúa dos veces el mismo día sobre lo mismo.
+export const automationRun = pgTable(
+  "automation_run",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    ruleId: uuid("rule_id").notNull().references(() => automationRule.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id").notNull(),
+    depth: integer("depth").notNull(),
+    outcome: text("outcome", { enum: AUTOMATION_OUTCOMES }).notNull(),
+    detail: text("detail").notNull(),
+    day: text("day").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_automation_run_rule").on(t.ruleId, t.createdAt),
+    uniqueIndex("uq_automation_run_daily").on(t.ruleId, t.recordId, t.day).where(sql`${t.depth} = 0 and ${t.outcome} <> 'error'`),
+    check("automation_run_outcome_check", sql`${t.outcome} in ('hecho','prueba','error','tope')`),
+  ],
+);
+
+// El tablero de cada persona en el inicio: una fila por tarjeta, en el orden de `position`. Lo lee
+// quien lo armó y el dueño de la empresa. Los datos de cada tarjeta se calculan al verla, con
+// los permisos de esa persona (server/dashboard/cards.ts).
+export const DASHBOARD_CARD_KINDS = ["numero", "barras", "embudo", "lista", "hoy", "alertas", "momentos", "ingresos_meta", "pronostico", "que_falta", "calendario"] as const;
+export const dashboardCard = pgTable(
+  "dashboard_card",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: DASHBOARD_CARD_KINDS }).notNull(),
+    title: text("title").notNull(),
+    config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("idx_dashboard_card_user").on(t.orgId, t.userId, t.position),
+    check("dashboard_card_kind_check", sql`${t.kind} in ('numero','barras','embudo','lista','hoy','alertas','momentos','ingresos_meta','pronostico','que_falta','calendario')`),
+  ],
+);
+
+// La conversación de cada persona con Improvement (el dueño) o con el agente de su rol (un empleado),
+// desde la burbuja. Es solo suya: nadie más la lee, ni el dueño (server/conversation/agent.ts).
+export const AGENT_MESSAGE_ROLES = ["persona", "improvement"] as const;
+export const agentMessage = pgTable(
+  "agent_message",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => profile.id, { onDelete: "cascade" }),
+    role: text("role", { enum: AGENT_MESSAGE_ROLES }).notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("idx_agent_message_user").on(t.orgId, t.userId, t.createdAt),
+    check("agent_message_role_check", sql`${t.role} in ('persona','improvement')`),
+  ],
 );

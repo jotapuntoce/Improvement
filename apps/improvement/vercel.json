@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/sello",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/automatizaciones",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/salud",
+      "schedule": "30 13 * * *"
     }
   ]
 }
