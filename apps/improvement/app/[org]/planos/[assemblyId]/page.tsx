@@ -1,6 +1,7 @@
 // El plano dibujado, con el panel de "qué hace esta pieza" al lado. La pieza abierta viaja en la URL
 // (?pieza=<id>) en vez de en estado de cliente: así el panel lo renderiza el servidor, funciona sin
 // JS y el enlace a una pieza concreta se puede pasar a otra persona tal cual.
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { AssemblyMap } from "@jotapuntoce/ui/assembly/AssemblyMap.tsx";
@@ -105,9 +106,9 @@ export default async function PlanoPage({
       }}
     >
       <header>
-        <a href={`/${orgId}/planos`} style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
+        <Link href={`/${orgId}/planos`} style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
           ← Planos
-        </a>
+        </Link>
         <h1 style={{ fontSize: "28px", fontWeight: 700, margin: "8px 0 0" }}>{assembly.name}</h1>
         {assembly.description && (
           <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: "6px 0 0" }}>
@@ -135,9 +136,9 @@ export default async function PlanoPage({
             style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "12px" }}
           >
             <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>{selected.name}</h2>
-            <a href={basePath} style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
+            <Link href={basePath} style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
               Cerrar
-            </a>
+            </Link>
           </div>
 
           <ul

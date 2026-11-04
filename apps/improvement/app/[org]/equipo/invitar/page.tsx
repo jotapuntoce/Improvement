@@ -82,7 +82,7 @@ export default async function InvitarPage({
             Listo. Mándale este enlace por donde tú quieras. Vence en 7 días, sirve una sola vez y no
             se vuelve a mostrar.
           </p>
-          <InviteLink url={`${proto}://${host}/invitacion/${token}`} />
+          <InviteLink url={`${proto}://${host}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/invitacion/${token}`} />
         </div>
       )}
 

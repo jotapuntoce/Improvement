@@ -14,7 +14,7 @@ export function PasswordReset({ email }: { email: string }) {
     if (!supabaseUrl || !supabaseAnonKey) return setStatus("No se pudo mandar el enlace en este entorno.");
     setStatus("Mandando…");
     const { error } = await createClient(supabaseUrl, supabaseAnonKey).auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/nueva-contrasena`,
+      redirectTo: `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/auth/nueva-contrasena`,
     });
     setStatus(error ? "No se pudo mandar el enlace. Intenta en unos minutos." : `Te mandamos un enlace a ${email}.`);
   }

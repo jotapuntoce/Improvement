@@ -31,7 +31,7 @@ export function RegistroForm() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/auth/callback` },
     });
     if (signUpError) {
       setLoading(false);
@@ -57,7 +57,7 @@ export function RegistroForm() {
     if (!supabaseUrl || !supabaseAnonKey) return setError("Supabase no está configurado en este entorno.");
     const { error: oauthError } = await createClient(supabaseUrl, supabaseAnonKey).auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/auth/callback` },
     });
     if (oauthError) setError("Google no está disponible todavía. Usa tu correo.");
   }

@@ -1,19 +1,19 @@
 {
   "crons": [
     {
-      "path": "/api/cron/revisiones",
+      "path": "/improvement/api/cron/revisiones",
       "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/cron/sello",
+      "path": "/improvement/api/cron/sello",
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/cron/automatizaciones",
+      "path": "/improvement/api/cron/automatizaciones",
       "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/cron/salud",
+      "path": "/improvement/api/cron/salud",
       "schedule": "30 13 * * *"
     }
   ]
