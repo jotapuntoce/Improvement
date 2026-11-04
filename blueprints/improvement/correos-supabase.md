@@ -4,7 +4,7 @@ Se pegan en Supabase → Authentication → Emails → Templates (proyecto `impr
 escritos porque los clientes de correo no leen los tokens de `packages/ui/src/tokens.css`; son los
 mismos valores (`--bg`, `--brand-improvement-1`, `--brand-improvement-2`).
 
-Remitente (SMTP Settings): **Improvement** `<hola@jotapuntoce.com>` vía Resend
+Remitente (SMTP Settings): **Improvement** `<improvement@jotapuntoce.com>` vía Resend (dominio verificado 2026-11-04)
 (`smtp.resend.com`, puerto 465, usuario `resend`, contraseña = API key de Resend).
 
 ## Confirm signup
