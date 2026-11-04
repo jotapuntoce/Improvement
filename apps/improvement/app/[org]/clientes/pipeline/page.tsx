@@ -1,5 +1,6 @@
 // Pipeline de ventas: los tratos por etapa (server/crm/deals.ts). Lo ve quien tenga la sección
 // `clientes`; crear y mover lo valida el server (dueño o `clientes: empresa`).
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
@@ -69,7 +70,7 @@ export default async function PipelinePage({
     <main className="config-page">
       <h1 className="config-title">Pipeline de ventas</h1>
       <p className="config-hint">
-        <a href={`/${orgId}/clientes`}>Volver a clientes</a>
+        <Link href={`/${orgId}/clientes`}>Volver a clientes</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
 
@@ -113,7 +114,7 @@ export default async function PipelinePage({
             {group.deals.map((d) => (
               <li key={d.id}>
                 <p>
-                  <strong>{d.title}</strong> · <a href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</a> ·{" "}
+                  <strong>{d.title}</strong> · <Link href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</Link> ·{" "}
                   {MXN.format(d.amountCents / 100)}
                 </p>
                 {canWrite && (

@@ -1,5 +1,5 @@
 "use client";
-// Regreso de Google: supabase-js lee la sesión del fragmento de la URL; aquí solo se copia el token
+// Regreso de Google y del enlace de confirmación de correo del registro: supabase-js lee la sesión del fragmento de la URL; aquí solo se copia el token
 // a la cookie que lee guard.ts (mismo atajo documentado en LoginForm) y se manda a "/".
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,7 +24,7 @@ export default function AuthCallback() {
   }, [router]);
   return (
     <main className="config-page">
-      <p role="status">{error ? "No pudimos entrar con Google. Intenta con tu correo." : "Entrando…"}</p>
+      <p role="status">{error ? "No pudimos abrir tu sesión con ese enlace. Entra con tu correo y contraseña." : "Entrando…"}</p>
     </main>
   );
 }

@@ -1,5 +1,6 @@
 // Ficha del cliente: su hiperpersonalización (server/crm/preferences.ts), la sugerencia de atención
 // de la IA (server/crm/attention.ts) y sus tratos. Cliente de otro org → 404.
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
@@ -81,7 +82,7 @@ export default async function FichaClientePage({
     <main className="config-page">
       <h1 className="config-title">{cliente.name}</h1>
       <p className="config-hint">
-        <a href={`/${orgId}/clientes`}>Volver a clientes</a> · <a href={`/${orgId}/clientes/pipeline`}>Pipeline de ventas</a>
+        <Link href={`/${orgId}/clientes`}>Volver a clientes</Link> · <Link href={`/${orgId}/clientes/pipeline`}>Pipeline de ventas</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
       {preference?.unmetFlaggedAt && (
