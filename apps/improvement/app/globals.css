@@ -820,7 +820,10 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .auth-google svg { width: 18px; height: 18px; }
 .auth-google:focus-visible { outline: 2px solid var(--brand-improvement-2); outline-offset: 2px; }
 .auth-back { margin: 6px 0 0; font-size: 16px; }
-.auth-back a { color: var(--brand-improvement-2); font-weight: 600; text-decoration: none; }
+.auth-back a, a.auth-back { color: var(--brand-improvement-2); font-weight: 600; text-decoration: none; }
+a.auth-back { text-align: center; }
+.auth-forgot { align-self: flex-end; margin-top: -6px; font-size: 14px; color: var(--brand-improvement-2); text-decoration: none; }
+.auth-forgot:hover, a.auth-back:hover { text-decoration: underline; }
 
 @media (max-width: 760px) {
   .auth-split { grid-template-columns: 1fr; }

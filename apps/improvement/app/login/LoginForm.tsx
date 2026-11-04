@@ -10,15 +10,15 @@
 // leerla, este formulario copia el access token a una cookie propia (`imp-access-token`) al iniciar
 // sesión. El manejo "oficial" de sesión SSR de Supabase usa el paquete @supabase/ssr, que no está en
 // las dependencias fijadas de este blueprint (§11) — este es un atajo documentado, no un descuido:
-// sin refresh automático de token todavía, aceptable para el piloto de un solo cliente. Si el
-// refresco automático se vuelve necesario, ese es el momento de agregar @supabase/ssr (con su propio
-// pin verificado vía stack-researcher), no de inventar más cookies a mano.
-import { useState } from "react";
+// la renovación del token la hace components/auth/SesionViva.tsx (montada en el layout), que copia cada
+// token nuevo de supabase-js a esta misma cookie.
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { Isotipo } from "@/components/brand/Isotipo.tsx";
 import { Constelacion } from "@/components/auth/Constelacion.tsx";
+import { guardarCookie } from "@/components/auth/SesionViva.tsx";
 
 // Next.js solo inlinea NEXT_PUBLIC_* en el bundle del navegador cuando detecta un acceso literal
 // `process.env.NEXT_PUBLIC_X` en el código fuente — lib/env.ts hace `schema.parse(process.env)`
@@ -36,6 +36,18 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const returnTo = searchParams.get("returnTo") ?? "/";
+
+  // La cookie venció pero supabase-js aún tiene la sesión (refresh token): se renueva y se entra solo.
+  useEffect(() => {
+    if (!supabaseUrl || !supabaseAnonKey) return;
+    createClient(supabaseUrl, supabaseAnonKey).auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      guardarCookie(data.session);
+      router.replace(returnTo);
+      router.refresh();
+    });
+  }, [router, returnTo]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,9 +82,7 @@ export function LoginForm() {
     // host) ambas apps se pisaban bajo un solo nombre. Peor: document.cookie no puede sobrescribir
     // ni borrar una httpOnly, así que la sesión de admin ganaba siempre y el cliente terminaba
     // viendo el panel de Jose Carlos. Bug real encontrado probando el flujo de cliente end-to-end.
-    document.cookie = `imp-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
-
-    const returnTo = searchParams.get("returnTo") ?? "/";
+    guardarCookie(data.session);
     router.push(returnTo);
     router.refresh();
   }
@@ -103,6 +113,7 @@ export function LoginForm() {
           Contraseña
           <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="auth-input" />
         </label>
+        <Link href="/recuperar" className="auth-forgot">¿Olvidaste tu contraseña?</Link>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button type="submit" disabled={loading} className="auth-primary">
           {loading ? "Entrando..." : "Entrar"}
