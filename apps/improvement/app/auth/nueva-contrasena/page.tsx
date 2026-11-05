@@ -24,7 +24,7 @@ export default function NuevaContrasena() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
     const { data } = await supabase.auth.getSession();
     setPending(false);
-    if (updateError || !data.session) return setError("El enlace ya no sirve. Pide otro desde Configuración.");
+    if (updateError || !data.session) return setError("El enlace ya no sirve. Pide otro en ¿Olvidaste tu contraseña?");
     document.cookie = `imp-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
     router.replace("/");
     router.refresh();
