@@ -19,6 +19,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Isotipo } from "@/components/brand/Isotipo.tsx";
 import { Constelacion } from "@/components/auth/Constelacion.tsx";
 import { guardarCookie } from "@/components/auth/SesionViva.tsx";
+import { BotonGoogle } from "@/components/auth/BotonGoogle.tsx";
 
 // Next.js solo inlinea NEXT_PUBLIC_* en el bundle del navegador cuando detecta un acceso literal
 // `process.env.NEXT_PUBLIC_X` en el código fuente — lib/env.ts hace `schema.parse(process.env)`
@@ -105,6 +106,8 @@ export function LoginForm() {
         <Isotipo variante="red" className="auth-logo" />
         <h1 className="auth-title">Entra a tu Improvement</h1>
         <p className="auth-sub">Entra para ver lo que toca hoy en tu negocio.</p>
+        <BotonGoogle onError={setError} />
+        <p className="auth-divider">o con tu correo</p>
         <label className="auth-field">
           Correo
           <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="auth-input" />
