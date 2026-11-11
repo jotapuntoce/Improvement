@@ -6,15 +6,19 @@ import { z } from "zod";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
 import { fetchDriveFile } from "@/server/import/drive.ts";
 import { createImportJob, listImportableApps } from "@/server/import/jobs.ts";
+import { loadArmado } from "@/server/registro/onboarding.ts";
 import { DrivePicker } from "@/components/import/DrivePicker.tsx";
+import { ARRANQUE_FORM } from "@/components/arranque/armadoDatos.ts";
+import { Pregunta } from "@/components/arranque/Pregunta.tsx";
 import { env } from "@/lib/env.ts";
+import { ArranqueShell } from "../../ArranqueShell.tsx";
 
 export default async function ArranqueImportar({ params, searchParams }: { params: Promise<{ org: string }>; searchParams: Promise<{ error?: string }> }) {
   const { org: orgId } = await params;
   const { error } = await searchParams;
   const me = await requireOrgMembership(orgId);
-  const apps = await listImportableApps(me.userId, orgId);
-  if (!apps.ok) notFound();
+  const [apps, armado] = await Promise.all([listImportableApps(me.userId, orgId), loadArmado(me.userId, orgId)]);
+  if (!apps.ok || !armado.ok) notFound();
   const { NEXT_PUBLIC_GOOGLE_CLIENT_ID: clientId, NEXT_PUBLIC_GOOGLE_API_KEY: apiKey, NEXT_PUBLIC_GOOGLE_APP_ID: appId } = env;
   const drive = clientId && apiKey && appId ? { clientId, apiKey, appId } : null;
 
@@ -44,27 +48,30 @@ export default async function ArranqueImportar({ params, searchParams }: { param
   }
 
   return (
-    <main className="config-page auth-page">
-      <p className="config-hint">Paso 4 de 4</p>
-      <h1 className="config-title">Trae lo que ya tienes</h1>
-      <p className="config-hint">¿Ya llevas tus clientes o pedidos en Excel, Sheets o papel? Súbelo y lo acomodamos.</p>
-      {error && <p className="invite-error" role="alert">{error}</p>}
-      <form action={subir} className="config-form config-form-stack config-card" aria-label="Subir lo que ya tienes">
-        <label className="permiso-field">
+    <ArranqueShell paso={4} armado={armado.data}>
+      <form id={ARRANQUE_FORM} action={subir} className="arr-ask" aria-label="Subir lo que ya tienes">
+        <Pregunta why="Súbelo como esté — Excel, Sheets, PDF o una foto — y yo lo acomodo.">
+          Listo. ¿Ya llevas tus clientes en algún lado?
+        </Pregunta>
+        {error && <p className="arr-error" role="alert">{error}</p>}
+        <label className="arr-field">
           <span>¿A dónde va?</span>
-          <select name="app" className="config-input" defaultValue={apps.data[0]?.key}>
+          <select name="app" className="arr-input" defaultValue={apps.data[0]?.key}>
             {apps.data.map((a) => <option key={a.key} value={a.key}>{a.name}</option>)}
           </select>
         </label>
-        <label className="permiso-field">
-          <span>Archivo</span>
-          <input type="file" name="archivo" accept=".csv,.xlsx,.pdf,image/png,image/jpeg,image/webp" className="config-input" aria-describedby="archivo-ayuda" />
+        <label className="arr-drop">
+          <span className="arr-drop-icon" aria-hidden="true">↑</span>
+          <span className="arr-drop-title">Sube tu archivo</span>
+          <span className="arr-drop-hint" id="archivo-ayuda">CSV, Excel, PDF o una foto. Hasta 5 MB y 5,000 filas.</span>
+          <input type="file" name="archivo" accept=".csv,.xlsx,.pdf,image/png,image/jpeg,image/webp" aria-label="Archivo" aria-describedby="archivo-ayuda" />
         </label>
-        <p id="archivo-ayuda" className="config-hint">CSV, Excel, PDF o una foto. Hasta 5 MB y 5,000 filas.</p>
-        <button type="submit" className="panel-cta">Leer archivo</button>
         {drive && <DrivePicker {...drive} />}
+        <div className="arr-row">
+          <Link href={`/${orgId}`} className="arr-ghost">No tengo nada, vamos →</Link>
+          <button type="submit" className="arr-primary">Leer archivo</button>
+        </div>
       </form>
-      <p className="config-hint"><Link href={`/${orgId}`}>No tengo nada, ir a mi Improvement</Link></p>
-    </main>
+    </ArranqueShell>
   );
 }

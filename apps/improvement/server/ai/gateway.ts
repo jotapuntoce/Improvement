@@ -103,7 +103,9 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
       response = await this.client.beta.messages.create({
         model: MODEL_ID,
         max_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
-        system,
+        // En caché: los prompts que llevan el conocimiento de Improvement (server/ai/knowledge.ts) son
+        // largos y casi idénticos en cada llamada. Uno corto que no llega al mínimo simplemente no se cachea.
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content }],
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
@@ -307,7 +309,16 @@ async function callStructured<T>(args: {
     };
   }
 
-  const resolvedProvider = args.provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  let resolvedProvider = args.provider;
+  if (!resolvedProvider) {
+    // Sin llave (local, o antes de conectar la API en vivo) es un error tipado, no una excepción que
+    // tumbe la página: quien llama ya sabe seguir sin IA.
+    try {
+      resolvedProvider = new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+    } catch {
+      return { ok: false, error: { code: "INTERNAL", retryable: false, message: "La IA no está configurada." } };
+    }
+  }
   const opts = args.attachment || args.maxTokens ? { attachment: args.attachment, maxTokens: args.maxTokens } : undefined;
   const startedAt = Date.now();
   let completion: SuggestionCompletion | null = null;
@@ -362,7 +373,7 @@ async function logCall(orgId: string, purpose: string, completion: SuggestionCom
  */
 export async function extractStructured<T>(args: {
   orgId: string;
-  purpose: "importacion_lectura" | "importacion_mapeo" | "tarea_plan" | "conversacion";
+  purpose: "importacion_lectura" | "importacion_mapeo" | "tarea_plan" | "conversacion" | "diagnostico";
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
