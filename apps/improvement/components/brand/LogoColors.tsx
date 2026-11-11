@@ -11,6 +11,7 @@ export function LogoColors({ primary, secondary }: { primary: string; secondary:
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    const form = e.currentTarget.form;
     if (!file) return;
     const url = URL.createObjectURL(file);
     setPreview(url);
@@ -25,27 +26,33 @@ export function LogoColors({ primary, secondary }: { primary: string; secondary:
       if (!a) return;
       setColors({ primary: a, secondary: b ?? a });
       setFound(true);
+      // Cambiar el value por estado no dispara "input": se avisa al formulario para que quien lo
+      // escucha (la tarjeta del arranque) vea los colores nuevos, después de que React los pinte.
+      requestAnimationFrame(() => form?.dispatchEvent(new Event("input", { bubbles: true })));
     };
     img.src = url;
   }
 
   return (
     <>
-      <label className="permiso-field">
-        <span>Tu logo</span>
-        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" onChange={onFile} className="config-input" />
+      <label className="arr-drop">
+        {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob:), no pasa por next/image */}
+        {preview ? <img src={preview} alt="Vista previa de tu logo" className="arr-drop-logo" /> : <span className="arr-drop-icon" aria-hidden="true">↑</span>}
+        <span className="arr-drop-title">{preview ? "Cambiar logo" : "Elige tu logo"}</span>
+        <span className="arr-drop-hint">PNG, JPG o WebP · tomamos sus colores</span>
+        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" onChange={onFile} aria-label="Tu logo" />
       </label>
-      {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob:), no pasa por next/image */}
-      {preview && <img src={preview} alt="Vista previa de tu logo" className="home-logo" />}
-      {found && <p className="config-hint" role="status">Tomamos estos colores de tu logo; cámbialos si quieres.</p>}
-      <label className="permiso-field">
-        <span>Color principal</span>
-        <input type="color" name="primaryColor" value={colors.primary} onChange={(e) => setColors({ ...colors, primary: e.target.value })} />
-      </label>
-      <label className="permiso-field">
-        <span>Color secundario</span>
-        <input type="color" name="secondaryColor" value={colors.secondary} onChange={(e) => setColors({ ...colors, secondary: e.target.value })} />
-      </label>
+      {found && <p className="arr-why" role="status">Tomé estos colores de tu logo; cámbialos si quieres.</p>}
+      <div className="arr-swatches">
+        <label className="arr-swatch">
+          <input type="color" name="primaryColor" value={colors.primary} onChange={(e) => setColors({ ...colors, primary: e.target.value })} />
+          <span>Color principal<br /><code>{colors.primary}</code></span>
+        </label>
+        <label className="arr-swatch">
+          <input type="color" name="secondaryColor" value={colors.secondary} onChange={(e) => setColors({ ...colors, secondary: e.target.value })} />
+          <span>Color secundario<br /><code>{colors.secondary}</code></span>
+        </label>
+      </div>
     </>
   );
 }

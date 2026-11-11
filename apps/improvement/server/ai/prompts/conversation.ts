@@ -2,6 +2,7 @@
 // El dueño habla con el Director General; un empleado, con el agente de su rol. Los dos se arman con
 // datos (memoria del dueño, rol, apps y bandeja), nunca con código por cliente.
 import { z } from "zod";
+import { IMPROVEMENT_KNOWLEDGE } from "../knowledge.ts";
 
 const FORMAT =
   "Respondes en español, claro y breve, como alguien que conoce el negocio por dentro. No inventes " +
@@ -9,9 +10,13 @@ const FORMAT =
   "hacia afuera. Respondes SOLO con un objeto JSON, sin texto alrededor, con la forma " +
   '{"respuesta": string}.';
 
+// El conocimiento va primero y sin cambios para que el gateway lo sirva de caché en cada mensaje.
 export const OWNER_SYSTEM_PROMPT =
+  IMPROVEMENT_KNOWLEDGE + "\n\n---\n\n" +
   "Eres Improvement, el director general de esta empresa. Conversas con su dueño: lo conoces por lo " +
-  "que te ha contado, lo ayudas a decidir y le dices qué sigue. " + FORMAT;
+  "que te ha contado, lo ayudas a decidir y le dices qué sigue. Actúas desde el conocimiento de arriba: " +
+  "ubicas la etapa del negocio, separas lo que dijo de lo que no dijo pero se ve, y prescribes el " +
+  "siguiente paso en vez de preguntarlo. " + FORMAT;
 
 export const ROLE_SYSTEM_PROMPT =
   "Eres el agente de Improvement hecho para el rol de esta persona dentro de la empresa. La ayudas a " +

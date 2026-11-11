@@ -32,7 +32,7 @@ export default async function OrgHome({ params, searchParams }: { params: Promis
   const memberRow = await requireOrgMembership(orgId);
   const isOwner = memberRow.role === "owner";
   // El dueño que se registró y no cerró su arranque lo retoma donde lo dejó.
-  if (isOwner && (await needsOnboarding(memberRow.userId, orgId))) redirect(`/arranque/${orgId}/marca`);
+  if (isOwner && (await needsOnboarding(memberRow.userId, orgId))) redirect(`/arranque/${orgId}/negocio`);
   const [brand, cards, juntaPendiente] = await Promise.all([
     getBrand(memberRow.userId, orgId),
     seedDefaultCards(memberRow.userId, orgId),

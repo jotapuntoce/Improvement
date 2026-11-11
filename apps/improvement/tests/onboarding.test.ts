@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { appModel, organization, profile } from "@jotapuntoce/db/schema";
 import { createOwnBusiness } from "../server/registro/business.ts";
-import { finishOnboarding, loadProposal, needsOnboarding } from "../server/registro/onboarding.ts";
+import { finishOnboarding, loadArmado, loadProposal, needsOnboarding } from "../server/registro/onboarding.ts";
 
 const orgIds: string[] = [];
 const profileIds: string[] = [];
@@ -37,5 +37,16 @@ describe("arranque guiado", () => {
     const custom = await db.select({ key: appModel.key }).from(appModel).where(and(eq(appModel.orgId, orgId), eq(appModel.kind, "custom")));
     expect(custom.map((c) => c.key)).toEqual(["mesas-apartadas"]);
     expect(await needsOnboarding(owner, orgId)).toBe(false);
+  });
+
+  it("WHEN la tarjeta del arranque carga THE SYSTEM SHALL darle al dueño su negocio y sus apps propias, y a nadie más", async () => {
+    const { owner, orgId } = await business("restaurante");
+    const p = await loadProposal(owner, orgId);
+    if (!p.ok) throw new Error(p.error.message);
+    await finishOnboarding(owner, orgId, [{ ...p.data.apps[0]!, name: "Mesas apartadas" }]);
+    const a = await loadArmado(owner, orgId);
+    expect(a.ok && a.data).toMatchObject({ ownerName: "Ana", name: "Negocio", industry: "restaurante", city: "León", apps: ["Mesas apartadas"] });
+    // Quien no es del negocio ni siquiera lo ve existir (findOwnerMembership → notFound).
+    await expect(loadArmado(crypto.randomUUID(), orgId)).rejects.toThrow();
   });
 });

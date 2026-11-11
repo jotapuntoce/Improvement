@@ -1,15 +1,20 @@
 // Arranque, paso 3 de 4: la propuesta. Las apps sugeridas para su giro, que el dueño elige y renombra
 // antes de crear nada.
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
-import { finishOnboarding, loadProposal } from "@/server/registro/onboarding.ts";
+import { finishOnboarding, loadArmado, loadProposal } from "@/server/registro/onboarding.ts";
+import { loadAnalysis } from "@/server/owner/diagnostico.ts";
+import { ARRANQUE_FORM } from "@/components/arranque/armadoDatos.ts";
+import { Pregunta } from "@/components/arranque/Pregunta.tsx";
+import { ArranqueShell } from "../../ArranqueShell.tsx";
 
 export default async function ArranquePropuesta({ params, searchParams }: { params: Promise<{ org: string }>; searchParams: Promise<{ error?: string }> }) {
   const { org: orgId } = await params;
   const { error } = await searchParams;
   const me = await requireOrgMembership(orgId);
-  const proposal = await loadProposal(me.userId, orgId);
-  if (!proposal.ok) notFound();
+  const [proposal, armado, analisis] = await Promise.all([loadProposal(me.userId, orgId), loadArmado(me.userId, orgId), loadAnalysis(me.userId, orgId)]);
+  if (!proposal.ok || !armado.ok) notFound();
   const { apps } = proposal.data;
 
   async function armar(formData: FormData) {
@@ -30,28 +35,41 @@ export default async function ArranquePropuesta({ params, searchParams }: { para
   }
 
   return (
-    <main className="config-page auth-page">
-      <p className="config-hint">Paso 3 de 4</p>
-      <h1 className="config-title">Así armamos tu Improvement</h1>
-      <p className="config-hint">Ya traes Clientes, Ventas, Proyectos y Postventa. Para tu giro te sugerimos además:</p>
-      {error && <p className="invite-error" role="alert">{error}</p>}
-      <form action={armar} className="config-form config-form-stack" aria-label="Propuesta de aplicaciones">
+    <ArranqueShell paso={3} armado={armado.data}>
+      <form id={ARRANQUE_FORM} action={armar} className="arr-ask" aria-label="Propuesta de aplicaciones">
+        <Pregunta why="Ya traes Clientes, Ventas, Proyectos y Postventa. Además te sugiero estas; quita o renombra las que quieras.">
+          Para {armado.data.name} te armé esto.
+        </Pregunta>
+        {error && <p className="arr-error" role="alert">{error}</p>}
+        {analisis && (
+          <section className="arr-analisis" aria-label="Lo que veo de tu negocio">
+            <h2>Lo que veo de tu negocio</h2>
+            <p>{analisis.resumen}</p>
+            {analisis.necesidades.length > 0 && (
+              <ul aria-label="Lo que necesita tu negocio">
+                {analisis.necesidades.map((n) => <li key={n.title} className={n.severity === 3 ? "is-3" : undefined}>{n.title}</li>)}
+              </ul>
+            )}
+          </section>
+        )}
         {apps.map((app, i) => (
-          <fieldset key={app.name} className="config-card">
+          <fieldset key={app.name} className="arr-app">
             <legend className="sr-only">{app.name}</legend>
-            <label className="check-field">
-              <input type="checkbox" name="pick" value={i} defaultChecked /> Quiero esta app
-            </label>
-            <label className="permiso-field">
-              <span>Nombre</span>
-              <input name={`name-${i}`} defaultValue={app.name} maxLength={40} className="config-input" />
-            </label>
-            <p className="config-hint">Etapas: {app.stages.join(" → ")}</p>
-            {app.fields.length > 0 && <p className="config-hint">Campos: {app.fields.map((f) => f.label).join(", ")}</p>}
+            <input type="checkbox" name="pick" value={i} defaultChecked aria-label={`Quiero ${app.name}`} />
+            <div className="arr-app-body">
+              <input name={`name-${i}`} defaultValue={app.name} maxLength={40} className="arr-app-name" aria-label={`Nombre de ${app.name}`} />
+              {app.fields.length > 0 && <p className="arr-app-fields">{app.fields.map((f) => f.label).join(", ")}</p>}
+              <ul className="arr-stages" aria-label="Etapas">
+                {app.stages.map((s) => <li key={s}>{s}</li>)}
+              </ul>
+            </div>
           </fieldset>
         ))}
-        <button type="submit" className="panel-cta">Armar mi Improvement</button>
+        <div className="arr-row">
+          <Link href={`/arranque/${orgId}/resultado`} className="arr-ghost">← Atrás</Link>
+          <button type="submit" className="arr-primary">Así me gusta, ármalo</button>
+        </div>
       </form>
-    </main>
+    </ArranqueShell>
   );
 }
