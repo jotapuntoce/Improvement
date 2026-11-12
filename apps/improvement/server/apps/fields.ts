@@ -29,8 +29,8 @@ function valueSchema(f: FieldDef): z.ZodType<unknown> {
 export function schemaFor(fields: FieldDef[]): z.ZodType<Record<string, unknown>> {
   const shape: Record<string, z.ZodType<unknown>> = {};
   for (const f of fields) {
-    const base = z.preprocess((v) => (v === "" || v === null ? undefined : v), valueSchema(f));
-    shape[f.key] = f.required ? base : base.optional();
+    // El optional va adentro: en zod 4, uno por fuera no deja pasar el undefined que sale del preprocess.
+    shape[f.key] = z.preprocess((v) => (v === "" || v === null ? undefined : v), f.required ? valueSchema(f) : valueSchema(f).optional());
   }
   return z.object(shape).strip() as z.ZodType<Record<string, unknown>>;
 }
