@@ -92,15 +92,17 @@ type Done = { ok: true } | { ok: false; error: { message: string } };
 async function perform(a: AutomationAction, owner: string, rule: RuleRow, rec: AppRecord, orgId: string, depth: number, now: Date): Promise<Done> {
   const appKey = rule.appKey;
   const due = (days?: number) => (days === undefined ? undefined : new Date(now.getTime() + days * DAY_MS));
+  // "{titulo}" en un título es el del registro que disparó la regla (el prospecto que pasa a trabajo).
+  const fill = (s: string) => s.replaceAll("{titulo}", rec.title).slice(0, 160);
   switch (a.type) {
     case "crear_registro":
-      return createRecord(owner, orgId, a.app, a.title, { depth });
+      return createRecord(owner, orgId, a.app, fill(a.title), { depth });
     case "mover_etapa":
       return moveRecord(owner, orgId, appKey, rec.id, a.stage, { depth });
     case "actualizar_campos":
       return saveCustomValues(owner, orgId, appKey, rec.id, { ...rec.custom, ...a.values }, { depth });
     case "crear_tarea":
-      return createTask(owner, orgId, { title: a.title, assigneeId: a.assigneeId, dueAt: due(a.dueInDays), appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
+      return createTask(owner, orgId, { title: fill(a.title), assigneeId: a.assigneeId, dueAt: due(a.dueInDays), appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
     case "crear_objetivo":
       return createObjective(owner, orgId, {
         title: a.title, description: null, impactWeight: a.impactWeight, dueDate: due(a.dueInDays), areaId: null,

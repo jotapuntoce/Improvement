@@ -14,15 +14,24 @@ export interface TemplateApp {
   stages: string[];
   /** La llave de cada campo sale de su nombre (addField). */
   fields: { label: string; type: FieldType; options?: string[] }[];
+  /** Las que salen del proceso del dueño (server/owner/estructura.ts) y se conectan con reglas. */
+  role?: "prospectos" | "trabajos";
+  /** Por etapa, la tarea que se crea al entrar (null = ninguna). */
+  tasks?: (string | null)[];
 }
 
 const TAREAS: TemplateApp = {
   name: "Tareas del equipo", group: "Operación", stages: ["Por hacer", "En proceso", "Hecho"],
   fields: [{ label: "Responsable", type: "texto" }, { label: "Fecha límite", type: "fecha" }],
 };
-const INVENTARIO: TemplateApp = {
+// Punto de reorden = consumo diario × días que tarda el proveedor + inventario de seguridad.
+export const INVENTARIO: TemplateApp = {
   name: "Inventario", group: "Operación", stages: ["Suficiente", "Por pedir", "Pedido"],
-  fields: [{ label: "Proveedor", type: "texto" }, { label: "Costo", type: "dinero" }],
+  fields: [
+    { label: "Existencia", type: "numero" }, { label: "Mínimo", type: "numero" }, { label: "Consumo diario", type: "numero" },
+    { label: "Días de entrega del proveedor", type: "numero" }, { label: "Punto de reorden", type: "numero" },
+    { label: "Proveedor", type: "texto" }, { label: "Costo", type: "dinero" },
+  ],
 };
 
 const TEMPLATES: Record<string, TemplateApp[]> = {

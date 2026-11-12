@@ -4,6 +4,7 @@ import { db } from "@jotapuntoce/db";
 import { appModel, organization, orgBrand, orgProfile, profile } from "@jotapuntoce/db/schema";
 import { findOwnerMembership } from "../auth/guard.ts";
 import { applyTemplate, templateFor, type TemplateApp } from "../apps/templates.ts";
+import { proposalFor, wireProcess } from "../owner/estructura.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const forbidden = { ok: false as const, error: { code: "FORBIDDEN", message: "Solo el dueño arma su Improvement." } };
@@ -12,7 +13,7 @@ export async function loadProposal(userId: string, orgId: string): Promise<Resul
   if (!(await findOwnerMembership(userId, orgId))) return forbidden;
   const [org] = await db.select({ industry: organization.industry }).from(organization).where(eq(organization.id, orgId));
   const t = templateFor(org?.industry ?? null);
-  return { ok: true, data: { templateKey: t.key, apps: t.apps } };
+  return { ok: true, data: { templateKey: t.key, apps: await proposalFor(userId, orgId, t.apps) } };
 }
 
 export interface Armado {
@@ -65,6 +66,7 @@ export async function finishOnboarding(userId: string, orgId: string, picks: Tem
   if (!(await findOwnerMembership(userId, orgId))) return forbidden;
   const r = await applyTemplate(userId, orgId, picks);
   if (!r.ok) return r;
+  await wireProcess(userId, orgId, picks, r.data.created);
   await db.update(orgProfile).set({ onboardedAt: new Date(), updatedAt: new Date() }).where(eq(orgProfile.orgId, orgId));
   return { ok: true, data: true };
 }

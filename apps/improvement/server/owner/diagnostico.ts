@@ -22,10 +22,14 @@ export interface InterviewQuestion { name: string; question: string; why?: strin
 // Genéricas a propósito: ningún giro, empresa ni nombre (motor genérico).
 export const NEGOCIO_QUESTIONS: InterviewQuestion[] = [
   { name: "consolidacion", question: "¿Cuánto tiempo lleva tu negocio y cómo está constituido?", why: "Solo tú, con socios, persona física o moral. Así sé qué se te exige y qué no.", placeholder: "Ej. 4 años, somos dos socios, persona moral…" },
-  { name: "proceso", question: "Cuéntame el camino de un cliente: desde que te conoce hasta que le entregas y te vuelve a comprar.", why: "Ese camino es la columna de tu CRM.", placeholder: "Nos encuentran por…, cotizamos…, entregamos…" },
+  // prospecto, servicios, trabajo e inventario arman pantallas sin IA (server/owner/estructura.ts): por eso piden listas.
+  { name: "prospecto", question: "¿Por qué pasos pasa alguien desde que te conoce hasta que se vuelve tu cliente?", why: "Un paso por renglón. Con esto armo tu tablero de prospectos; el último paso es cuando ya es cliente.", placeholder: "Me escribe\nLe cotizo\nSeguimiento\nPaga el anticipo" },
+  { name: "servicios", question: "¿Qué servicios o productos vendes?", why: "Uno por renglón. Cada trabajo que entre llevará cuál pidió.", placeholder: "Cocinas integrales\nClósets\nReparaciones" },
+  { name: "trabajo", question: "Ya que es tu cliente, ¿por qué pasos pasa su trabajo hasta entregarlo?", why: "Un paso por renglón. Si después de dos puntos me dices qué se hace ahí, te aviso qué toca en cada paso.", placeholder: "Diseño: medir y mandar el plano\nFabricación\nInstalación: agendar con el cliente\nEntregado" },
   { name: "areas", question: "¿Qué áreas tiene tu negocio y quién está a cargo de cada una?", why: "Ventas, operación, administración, compras… aunque varias las lleves tú.", placeholder: "Ventas: Laura · Operación: yo · Cobranza: nadie…" },
   { name: "roles", question: "¿Qué hace cada persona de tu equipo? ¿Quién es insustituible?", why: "Con esto armo los permisos y el agente de cada rol.", placeholder: "Pedro hace…, sin Laura no sale…" },
   { name: "ausencia", question: "Si faltas dos semanas, ¿qué se detiene?", why: "Lo que depende solo de ti es lo primero que hay que soltar." },
+  { name: "inventario", question: "¿Manejas inventario o almacén? ¿De qué?", why: "Si sí, te armo el control de existencias con su mínimo y su punto de reorden.", placeholder: "Sí, materia prima y piezas terminadas · No" },
   { name: "herramientas", question: "¿Con qué llevas hoy tu negocio y qué te quita el sueño?", why: "Excel, libreta, WhatsApp, algún sistema… y el riesgo que más te preocupa." },
 ];
 
@@ -105,23 +109,28 @@ export async function analyzeBusiness(userId: string, orgId: string, provider?: 
   return { ok: true, data: { needs: d.necesidades.length } };
 }
 
-export interface Analisis { resumen: string; necesidades: { title: string; severity: number }[] }
+export interface Analisis { resumen: string | null; necesidades: { title: string; severity: number }[] }
 
-/** Lo que Improvement ya vio, para mostrárselo al dueño. null si todavía no hay análisis. */
+/**
+ * Lo que Improvement ya vio, para mostrárselo al dueño: el resumen de la IA (si corrió) y las
+ * necesidades abiertas, incluidas las que prescribe la estructura sin IA. null si no hay nada.
+ */
 export async function loadAnalysis(userId: string, orgId: string): Promise<Analisis | null> {
   if (!(await findOwnerMembership(userId, orgId))) return null;
-  const [resumen] = await db
-    .select({ answer: ownerMemory.answer })
-    .from(ownerMemory)
-    .where(and(eq(ownerMemory.orgId, orgId), eq(ownerMemory.ownerId, userId), eq(ownerMemory.topic, "observacion"), eq(ownerMemory.question, RESUMEN_QUESTION)))
-    .orderBy(desc(ownerMemory.createdAt))
-    .limit(1);
-  if (!resumen) return null;
-  const necesidades = await db
-    .select({ title: orgNeed.title, severity: orgNeed.severity })
-    .from(orgNeed)
-    .where(and(eq(orgNeed.orgId, orgId), inArray(orgNeed.status, ["abierta", "en_progreso"])))
-    .orderBy(desc(orgNeed.severity), desc(orgNeed.createdAt))
-    .limit(5);
-  return { resumen: resumen.answer, necesidades };
+  const [[resumen], necesidades] = await Promise.all([
+    db
+      .select({ answer: ownerMemory.answer })
+      .from(ownerMemory)
+      .where(and(eq(ownerMemory.orgId, orgId), eq(ownerMemory.ownerId, userId), eq(ownerMemory.topic, "observacion"), eq(ownerMemory.question, RESUMEN_QUESTION)))
+      .orderBy(desc(ownerMemory.createdAt))
+      .limit(1),
+    db
+      .select({ title: orgNeed.title, severity: orgNeed.severity })
+      .from(orgNeed)
+      .where(and(eq(orgNeed.orgId, orgId), inArray(orgNeed.status, ["abierta", "en_progreso"])))
+      .orderBy(desc(orgNeed.severity), desc(orgNeed.createdAt))
+      .limit(10),
+  ]);
+  if (!resumen && !necesidades.length) return null;
+  return { resumen: resumen?.answer ?? null, necesidades };
 }

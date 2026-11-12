@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
 import { loadArmado } from "@/server/registro/onboarding.ts";
 import { NEGOCIO_QUESTIONS, saveInterview } from "@/server/owner/diagnostico.ts";
+import { prescribeStructure } from "@/server/owner/estructura.ts";
 import { Entrevista } from "@/components/arranque/Entrevista.tsx";
 import { ArranqueShell } from "../../ArranqueShell.tsx";
 
@@ -20,6 +21,8 @@ export default async function ArranqueNegocio({ params, searchParams }: { params
     if (!actor) notFound();
     const r = await saveInterview(actor, orgId, "negocio", Object.fromEntries(formData));
     if (!r.ok) redirect(`/arranque/${orgId}/negocio?error=${encodeURIComponent(r.error.message)}`);
+    // Sin IA: lo que su empresa necesita por dentro según su etapa y lo que acaba de contar.
+    await prescribeStructure(actor, orgId);
     redirect(`/arranque/${orgId}/marca`);
   }
 
