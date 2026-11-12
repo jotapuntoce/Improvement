@@ -44,7 +44,7 @@ class Simulado implements SuggestionProvider {
 describe("entrevista y análisis del arranque", () => {
   it("WHEN el dueño cuenta su negocio THE SYSTEM SHALL guardar solo lo contestado y analizarlo una vez con el conocimiento de Improvement", async () => {
     const { owner, orgId } = await business();
-    const saved = await saveInterview(owner, orgId, "negocio", { proceso: "Nos buscan por WhatsApp, cotizo y entrego.", areas: "", roles: "x" });
+    const saved = await saveInterview(owner, orgId, "negocio", { prospecto: "Nos buscan por WhatsApp, cotizo y entrego.", areas: "", roles: "x" });
     expect(saved.ok && saved.data.saved).toBe(1);
 
     const ia = new Simulado();
@@ -71,7 +71,7 @@ describe("entrevista y análisis del arranque", () => {
     const extraño = crypto.randomUUID();
     const ia = new Simulado();
     // Quien no es del negocio ni siquiera lo ve existir (assertMembership → notFound).
-    await expect(saveInterview(extraño, orgId, "negocio", { proceso: "algo" })).rejects.toThrow();
+    await expect(saveInterview(extraño, orgId, "negocio", { prospecto: "algo" })).rejects.toThrow();
     await expect(analyzeBusiness(extraño, orgId, ia)).rejects.toThrow();
     await expect(loadAnalysis(extraño, orgId)).rejects.toThrow();
     expect(ia.calls).toHaveLength(0);

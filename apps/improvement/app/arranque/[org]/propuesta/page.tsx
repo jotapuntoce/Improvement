@@ -37,14 +37,14 @@ export default async function ArranquePropuesta({ params, searchParams }: { para
   return (
     <ArranqueShell paso={3} armado={armado.data}>
       <form id={ARRANQUE_FORM} action={armar} className="arr-ask" aria-label="Propuesta de aplicaciones">
-        <Pregunta why="Ya traes Clientes, Ventas, Proyectos y Postventa. Además te sugiero estas; quita o renombra las que quieras.">
+        <Pregunta why="Lo armé con lo que me contaste: tus pasos, tu proceso y tu giro. Ya traes Clientes, Ventas, Proyectos y Postventa; quita o renombra lo que quieras.">
           Para {armado.data.name} te armé esto.
         </Pregunta>
         {error && <p className="arr-error" role="alert">{error}</p>}
         {analisis && (
-          <section className="arr-analisis" aria-label="Lo que veo de tu negocio">
-            <h2>Lo que veo de tu negocio</h2>
-            <p>{analisis.resumen}</p>
+          <section className="arr-analisis" aria-label={analisis.resumen ? "Lo que veo de tu negocio" : "Lo que tu empresa necesita por dentro"}>
+            <h2>{analisis.resumen ? "Lo que veo de tu negocio" : "Lo que tu empresa necesita por dentro"}</h2>
+            {analisis.resumen && <p>{analisis.resumen}</p>}
             {analisis.necesidades.length > 0 && (
               <ul aria-label="Lo que necesita tu negocio">
                 {analisis.necesidades.map((n) => <li key={n.title} className={n.severity === 3 ? "is-3" : undefined}>{n.title}</li>)}

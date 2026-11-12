@@ -78,7 +78,7 @@ test("WHEN cuenta su negocio, salta la marca y acepta la propuesta THE SYSTEM SH
   await noSerious(page);
   await page.locator('textarea[name="consolidacion"]').fill("Dos años, solo yo.");
   await page.getByRole("button", { name: "Seguir" }).click();
-  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Saltar por ahora" }).click();
+  for (let i = 0; i < 7; i++) await page.getByRole("button", { name: "Saltar por ahora" }).click();
   await page.getByRole("button", { name: "Listo, sigamos" }).click();
 
   await expect(page).toHaveURL(new RegExp(`/arranque/${orgId}/marca$`), { timeout: 20_000 });

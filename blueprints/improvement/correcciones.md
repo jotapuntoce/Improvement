@@ -80,6 +80,14 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   Director General de lo nano a lo industrial, motor de clientes, Profit First). Lo usan el primer
   análisis (`server/owner/diagnostico.ts`: observaciones + `org_need`, una vez por empresa) y la
   burbuja del dueño.
+- **Hiperpersonalización sin IA** (`server/owner/estructura.ts`): la entrevista pide en listas los pasos
+  del prospecto, los servicios, los pasos del trabajo (con "Paso: qué se hace") y si hay inventario.
+  La propuesta arma con eso los tableros **Prospectos** y **Trabajos** (e **Inventario** con mínimo y
+  punto de reorden) antes de las apps del giro; al aceptar, reglas activas: el último paso del
+  prospecto abre su trabajo, y cada paso con tarea se la crea al dueño. La estructura interna la
+  prescribe Improvement por etapa (manual del DG: nano/micro/pequeña + capas industrial e
+  inventario) más áreas sin nadie y lo que depende del dueño, como necesidades. Probado local con la
+  org de prueba (propuesta y 4 reglas activas ✅).
 - Pruebas en producción (2026-11-12, org de prueba "Taller Prueba Arranque"): entrevista ✅,
   respuestas guardadas ✅, propuesta ✅, Salir ✅. **Análisis ❌ — `AI_UNAVAILABLE`**: ninguna llamada
   a la IA ha funcionado nunca en producción (`llm_calls` vacía en todos los orgs). Decidido:
@@ -96,7 +104,11 @@ josecarlos@summumsystem.com) que recibe las respuestas.
 - **Sección 3:** la burbuja ya carga el conocimiento; las observaciones del análisis viven en
   `owner_memory` (`topic 'observacion'`) y las necesidades en `org_need`.
 - Las áreas y roles que cuenta el dueño no se convierten todavía en áreas ni empleados reales
-  (Sección 8, Equipo).
+  (Sección 8, Equipo). Las tareas de cada paso van al dueño hasta que haya equipo.
+- **Secciones 5 y 7:** que las tarjetas se muevan solas por señales de fuera (WhatsApp, pagos); el
+  cliente ganado aún no se crea en la app base Clientes (las reglas solo crean en apps propias).
+- "Así me gusta, ármalo" tarda ~40 s en local contra el Supabase remoto (una consulta por campo) y el
+  botón no muestra que está trabajando.
 - No entró el modelo mental de contenido (26 KB); el E2E `registro.spec.ts` está actualizado pero
   no se ha corrido.
 - Opcional: borrar la org de prueba "Taller Prueba Arranque" (`ab88051c-…`).
