@@ -34,6 +34,12 @@ describe("schemaFor", () => {
     expect(s.safeParse({ fecha_boda: "2027-03-01", paquete: "Bronce" }).success).toBe(false);
     expect(s.parse({ fecha_boda: "2027-03-01", anticipo: "1500.50", paquete: "Oro" })).toEqual({ fecha_boda: "2027-03-01", anticipo: 150050, paquete: "Oro" });
   });
+
+  it("WHEN el formulario manda vacío un campo opcional (select en —) THE SYSTEM SHALL guardar lo demás", () => {
+    const s = schemaFor(FIELDS);
+    expect(s.safeParse({ fecha_boda: "2027-03-01", anticipo: "", paquete: "" }).success).toBe(true);
+    expect(s.safeParse({ fecha_boda: "" }).success).toBe(false);
+  });
 });
 
 describe("addField", () => {
