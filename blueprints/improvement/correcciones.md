@@ -99,6 +99,12 @@ josecarlos@summumsystem.com) que recibe las respuestas.
 - Arreglado después de esa prueba: las apps con etapas abren en **tarjetas** por default (Lista
   sigue a un clic) y en la ficha de un registro las etapas son botones que lo mueven (misma vía
   `moveRecord`, disparan las automatizaciones).
+- **Vistas por cliente** (`server/apps/views.ts`): catálogo lista · tarjetas · calendario (por un campo
+  fecha) · números (conteos y sumas por etapa) · tabla agrupada (por un campo opción). Cada vista es
+  configuración en `app_view` (tipo + campos), nunca código por cliente. Al cerrar el arranque,
+  Improvement lee "¿Cómo lo quieres ver?" y deja a cada app la primera vista pedida que puede
+  armar; el dueño la cambia con "Que abra así". Lo que no reconoce queda como necesidad. Sin IA lee
+  palabras clave; con la llave, la IA llenará el mismo `ViewConfig` desde texto libre.
 
 **Heredado:**
 - **Llave de la API (cuando Jose Carlos decida):** crédito en console.anthropic.com → llave nueva →

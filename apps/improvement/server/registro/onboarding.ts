@@ -5,6 +5,7 @@ import { appModel, organization, orgBrand, orgProfile, profile } from "@jotapunt
 import { findOwnerMembership } from "../auth/guard.ts";
 import { applyTemplate, templateFor, type TemplateApp } from "../apps/templates.ts";
 import { proposalFor, wireProcess } from "../owner/estructura.ts";
+import { applyOwnerViews } from "../apps/views.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const forbidden = { ok: false as const, error: { code: "FORBIDDEN", message: "Solo el dueño arma su Improvement." } };
@@ -67,6 +68,7 @@ export async function finishOnboarding(userId: string, orgId: string, picks: Tem
   const r = await applyTemplate(userId, orgId, picks);
   if (!r.ok) return r;
   await wireProcess(userId, orgId, picks, r.data.created);
+  await applyOwnerViews(userId, orgId);
   await db.update(orgProfile).set({ onboardedAt: new Date(), updatedAt: new Date() }).where(eq(orgProfile.orgId, orgId));
   return { ok: true, data: true };
 }

@@ -6,13 +6,19 @@ export function ControlPanel({
   base,
   q,
   vista,
+  options,
+  saveDefault,
   create,
   importHref,
 }: {
   title: string;
   base: string;
   q: string;
-  vista: "lista" | "kanban";
+  vista: string;
+  /** Las vistas que esta app puede mostrar (las que piden un campo que no tiene no salen). */
+  options: { kind: string; name: string }[];
+  /** Solo el dueño, cuando la vista actual no es la que abre la app: la deja así. */
+  saveDefault?: (formData: FormData) => Promise<void>;
   /** Solo en apps propias: crea un registro con su nombre. */
   create?: (formData: FormData) => Promise<void>;
   /** Solo el dueño, en Clientes y en apps propias: lleva a traer un archivo. */
@@ -35,9 +41,16 @@ export function ControlPanel({
       )}
       {importHref && <Link href={importHref} className="panel-cta">Importar</Link>}
       <nav aria-label="Vista" className="view-switch">
-        <Link href={`${base}?vista=lista`} aria-current={vista === "lista" ? "page" : undefined}>Lista</Link>
-        <Link href={`${base}?vista=kanban`} aria-current={vista === "kanban" ? "page" : undefined}>Kanban</Link>
+        {options.map((o) => (
+          <Link key={o.kind} href={`${base}?vista=${o.kind}`} aria-current={vista === o.kind ? "page" : undefined}>{o.name}</Link>
+        ))}
       </nav>
+      {saveDefault && (
+        <form action={saveDefault}>
+          <input type="hidden" name="kind" value={vista} />
+          <button type="submit" className="panel-btn-ghost">Que abra así</button>
+        </form>
+      )}
     </header>
   );
 }
