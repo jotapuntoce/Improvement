@@ -16,6 +16,8 @@ export interface TemplateApp {
   fields: { label: string; type: FieldType; options?: string[] }[];
   /** Las que salen del proceso del dueño (server/owner/estructura.ts) y se conectan con reglas. */
   role?: "prospectos" | "trabajos";
+  /** La jugada del plan para quitarle carga (server/owner/alivio.ts) que la creó; sobrevive si la renombra. */
+  relief?: string;
   /** Por etapa, la tarea que se crea al entrar (null = ninguna). */
   tasks?: (string | null)[];
 }

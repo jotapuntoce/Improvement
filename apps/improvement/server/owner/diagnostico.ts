@@ -17,7 +17,18 @@ import { buildDiagnosticoPrompt, diagnosticoSchema, DIAGNOSTICO_SYSTEM_PROMPT } 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const fail = (message: string, code = "VALIDATION_ERROR") => ({ ok: false as const, error: { code, message } });
 
-export interface InterviewQuestion { name: string; question: string; why?: string; placeholder?: string }
+export interface InterviewQuestion { name: string; question: string; why?: string; placeholder?: string; /** Casillas: la respuesta son las marcadas, separadas por coma. */ options?: string[] }
+
+// Lo primero del arranque: lo que más le duele al dueño y lo que carga. Con esto Improvement arma el
+// plan para quitarle carga (server/owner/alivio.ts) antes que cualquier pantalla.
+export const CARGAS = ["Administración", "RH y contratación", "Sueldos y nómina", "Marketing y redes", "Finanzas y caja", "Proveedores y compras", "Inventario", "Atención a clientes", "Operación diaria", "Apagar fuegos"];
+export const DOLOR_QUESTIONS: InterviewQuestion[] = [
+  { name: "dolor", question: "Cuéntame tu situación: ¿qué es lo que más te duele hoy de tu negocio?", why: "Por ahí empiezo. Lo primero que hago es quitarte ese peso.", placeholder: "Hago todo yo, no me da el día, ahora con dos sucursales…" },
+  { name: "cargas", question: "¿De qué te encargas tú hoy?", why: "Marca todo lo que pasa por tus manos, aunque sea a medias.", options: CARGAS },
+  { name: "sucursales", question: "¿Tienes sucursales? ¿Cómo se llaman?", why: "Una por renglón. Así te muestro todo por sucursal.", placeholder: "Centro, Cumbres" },
+  { name: "fuego", question: "¿Cuál fue el último fuego que apagaste?", why: "Los fuegos que se repiten se vuelven proceso para que ya no lleguen a ti.", placeholder: "Faltó un cocinero y tuve que cubrir el turno…" },
+  { name: "foco", question: "Si te quitara todo eso de encima, ¿a qué te dedicarías como director?", why: "Eso es lo que te importa; lo cuido como tu meta principal.", placeholder: "Abrir la tercera sucursal, cuidar la calidad…" },
+];
 
 // Genéricas a propósito: ningún giro, empresa ni nombre (motor genérico).
 export const NEGOCIO_QUESTIONS: InterviewQuestion[] = [
@@ -39,7 +50,7 @@ export const RESULTADO_QUESTIONS: InterviewQuestion[] = [
   { name: "vista", question: "¿Cómo lo quieres ver en tus pantallas?", why: "Números grandes, listas, un tablero por etapas, un calendario… o lo que te imagines.", placeholder: "Un tablero por etapas con los montos…" },
 ];
 
-const ALL = { negocio: NEGOCIO_QUESTIONS, resultado: RESULTADO_QUESTIONS };
+const ALL = { dolor: DOLOR_QUESTIONS, negocio: NEGOCIO_QUESTIONS, resultado: RESULTADO_QUESTIONS };
 export const RESUMEN_QUESTION = "Lo que veo de tu negocio";
 
 /**

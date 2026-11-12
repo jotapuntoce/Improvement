@@ -52,7 +52,7 @@ const addSchema = z.object({
   required: z.boolean().default(false),
 });
 
-const toKey = (label: string) =>
+export const toKey = (label: string) =>
   label.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "c_$1").slice(0, 40);
 
 /** El dueño agrega un campo extra a una app. La llave sale del nombre y no cambia aunque lo renombre. */

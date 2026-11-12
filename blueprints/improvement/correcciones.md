@@ -105,6 +105,15 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   Improvement lee "¿Cómo lo quieres ver?" y deja a cada app la primera vista pedida que puede
   armar; el dueño la cambia con "Que abra así". Lo que no reconoce queda como necesidad. Sin IA lee
   palabras clave; con la llave, la IA llenará el mismo `ViewConfig` desde texto libre.
+- **Dolor primero y plan para quitarle carga** (`server/owner/alivio.ts`): el arranque empieza en
+  `/arranque/<org>/dolor` — qué le duele, qué carga (casillas), sucursales, el último fuego y a qué se
+  dedicaría como director. Un catálogo de jugadas (nómina, caja, pagos, proveedores, inventario,
+  contenido, RH, apertura y cierre, fuegos) arma "Lo hago yo / Lo delegas / Te quedas tú" en la
+  propuesta, las apps con campo Sucursal y sus reglas activas (aviso de corte con diferencia, pedido
+  cuando se acaba algo, nómina 2 días antes…). Lo que suelta queda como necesidad (lo que duele en
+  severidad 3) y su foco como meta principal. Sin IA lee palabras clave.
+- Pendiente: "delegar a" todavía es texto; las tareas son del dueño hasta que la Sección 8 (Equipo)
+  convierta a sus encargados en personas reales y las reglas les asignen a ellos.
 
 **Heredado:**
 - **Llave de la API (cuando Jose Carlos decida):** crédito en console.anthropic.com → llave nueva →
