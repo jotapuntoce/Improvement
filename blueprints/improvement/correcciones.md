@@ -112,6 +112,11 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   propuesta, las apps con campo Sucursal y sus reglas activas (aviso de corte con diferencia, pedido
   cuando se acaba algo, nómina 2 días antes…). Lo que suelta queda como necesidad (lo que duele en
   severidad 3) y su foco como meta principal. Sin IA lee palabras clave.
+- Probado en producción (PR #21, org de prueba "Taquería Prueba Dolor"): plan, 11 apps, 12 reglas
+  activas, necesidades y meta ✅; corte movido a "Con diferencia" → tarea "Aviso: Corte con
+  diferencia: Centro 12 nov" ✅. Arreglado después: el último fuego ya no enciende otras jugadas
+  (solo Fuegos), las siglas se respetan ("Soltar: RH y contratación") y con varias sucursales
+  también las apps del giro llevan el campo Sucursal.
 - Pendiente: "delegar a" todavía es texto; las tareas son del dueño hasta que la Sección 8 (Equipo)
   convierta a sus encargados en personas reales y las reglas les asignen a ellos.
 

@@ -30,6 +30,9 @@ describe("el plan para quitarle carga", () => {
     const keys = p.jugadas.map((j) => j.key);
     expect(keys).toEqual(expect.arrayContaining(["nomina", "caja", "administracion", "proveedores", "marketing", "fuegos"]));
     expect(keys).not.toContain("inventario");
+    // "cubrir el turno" en el último fuego no enciende Operación diaria: no la marcó.
+    expect(keys).not.toContain("operacion");
+    expect(reliefPlan({ fuego: "Se descompuso el refri" }).jugadas.map((j) => j.key)).toEqual(["fuegos"]);
     expect(p.jugadas.filter((j) => j.duele).map((j) => j.key)).toEqual(expect.arrayContaining(["nomina", "proveedores", "marketing", "fuegos"]));
     expect(p.jugadas[0]!.duele).toBe(true);
     expect(p.quedaTu[0]).toBe("Tu foco: Abrir la tercera sucursal");
@@ -61,16 +64,19 @@ const tareas = async (orgId: string) => (await db.select({ title: task.title }).
 describe("el arranque empieza por su dolor", () => {
   it("WHEN cuenta su dolor y acepta THE SYSTEM SHALL dejar necesidades, su foco como meta, las apps y las reglas que le quitan la carga", async () => {
     const { owner, orgId } = await taqueria();
-    await saveInterview(owner, orgId, "dolor", { ...TAQUERIA, cargas: `${TAQUERIA.cargas}, Inventario` });
+    await saveInterview(owner, orgId, "dolor", { ...TAQUERIA, cargas: `${TAQUERIA.cargas}, Inventario, RH y contratación` });
     expect(await prescribeRelief(owner, orgId)).toBeGreaterThan(0);
     expect(await prescribeRelief(owner, orgId)).toBe(0);
     const needs = await db.select({ title: orgNeed.title, severity: orgNeed.severity }).from(orgNeed).where(eq(orgNeed.orgId, orgId));
     expect(needs).toContainEqual({ title: "Soltar: sueldos y nómina", severity: 3 });
+    expect(needs.map((n) => n.title)).toContain("Soltar: RH y contratación");
     const metas = await db.select({ title: objective.title }).from(objective).where(eq(objective.orgId, orgId));
     expect(metas.map((m) => m.title)).toEqual(["Mi foco como director: Abrir la tercera sucursal"]);
 
     const p = await loadProposal(owner, orgId);
     if (!p.ok) throw new Error(p.error.message);
+    // Con dos sucursales, todas las apps llevan Sucursal una vez, también las del giro.
+    expect(p.data.apps.every((a) => a.fields.filter((f) => f.label === "Sucursal").length === 1)).toBe(true);
     const relief = p.data.apps.filter((a) => a.relief);
     expect(relief.map((a) => a.name)).toEqual(expect.arrayContaining(["Nómina", "Corte de caja", "Pedidos a proveedores", "Fuegos", "Inventario"]));
     // Renombra una: sus reglas igual se encienden.
