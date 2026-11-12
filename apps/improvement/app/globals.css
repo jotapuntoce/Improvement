@@ -849,6 +849,9 @@ a.auth-back { text-align: center; }
 .view-card { display: grid; gap: 0.35rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem; cursor: grab; }
 .view-stagebar { display: flex; flex-wrap: wrap; gap: 0.25rem; list-style: none; padding: 0; margin: 0.75rem 0; }
 .view-stagebar li { padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); }
+.view-stagebar li:has(form) { padding: 0; }
+.view-stagebar button { padding: 0.35rem 0.75rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease; }
+.view-stagebar button:hover, .view-stagebar button:focus-visible { border-color: var(--accent-1); color: var(--text-primary); }
 .home-cover { position: relative; height: 12rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); background-size: cover; background-position: center; margin-bottom: 3rem; }
 .home-logo { position: absolute; left: 1.5rem; bottom: -2.5rem; width: 5.5rem; height: 5.5rem; border-radius: var(--radius-md); border: 3px solid var(--bg); object-fit: cover; background: var(--bg-elevated); }
 

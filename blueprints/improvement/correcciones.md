@@ -92,6 +92,13 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   respuestas guardadas ✅, propuesta ✅, Salir ✅. **Análisis ❌ — `AI_UNAVAILABLE`**: ninguna llamada
   a la IA ha funcionado nunca en producción (`llm_calls` vacía en todos los orgs). Decidido:
   seguir sin IA por ahora; la suscripción de Claude no sirve para la API.
+- Hiperpersonalización en producción (PR #17, org de prueba "Carpintería Prueba Hiper"): propuesta con
+  Prospectos/Trabajos/Inventario y 10 necesidades ✅, 4 reglas activas ✅; prospecto movido a "Paga el
+  anticipo" → su trabajo nace solo en Diseño ✅ con la tarea "medir y mandar el plano — Familia
+  López" ✅; trabajo a Instalación → tarea "agendar con el cliente" ✅.
+- Arreglado después de esa prueba: las apps con etapas abren en **tarjetas** por default (Lista
+  sigue a un clic) y en la ficha de un registro las etapas son botones que lo mueven (misma vía
+  `moveRecord`, disparan las automatizaciones).
 
 **Heredado:**
 - **Llave de la API (cuando Jose Carlos decida):** crédito en console.anthropic.com → llave nueva →
@@ -111,4 +118,5 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   botón no muestra que está trabajando.
 - No entró el modelo mental de contenido (26 KB); el E2E `registro.spec.ts` está actualizado pero
   no se ha corrido.
-- Opcional: borrar la org de prueba "Taller Prueba Arranque" (`ab88051c-…`).
+- Opcional: borrar las orgs de prueba "Taller Prueba Arranque" (`ab88051c-…`) y "Carpintería Prueba
+  Hiper" (`11a6a528-…`).

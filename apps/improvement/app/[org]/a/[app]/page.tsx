@@ -24,7 +24,8 @@ export default async function AppPage({
   const result = await listRecords(membership.userId, orgId, app, { q });
   if (!result.ok) notFound();
 
-  const vista = rawVista === "kanban" ? "kanban" : "lista";
+  // Con etapas, tarjetas por default (el dueño ve dónde va cada quien); sin etapas, lista.
+  const vista = rawVista === "lista" || (rawVista !== "kanban" && result.data.stages.length < 2) ? "lista" : "kanban";
   const base = `/${orgId}/a/${app}`;
   const stageName = Object.fromEntries(result.data.stages.map((s) => [s.key, s.name]));
 
