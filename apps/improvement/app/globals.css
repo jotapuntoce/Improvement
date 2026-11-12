@@ -941,6 +941,19 @@ a.auth-back { text-align: center; }
 .arr-big:focus-visible { border-color: var(--brand-improvement-1); }
 /* Respuestas largas de la entrevista: mismo trazo que .arr-big, letra de lectura. */
 .arr-long { font-size: 18px; line-height: 1.5; resize: vertical; min-height: 120px; }
+/* Casillas de la entrevista (lo que carga el dueño). */
+.arr-checks { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.arr-check { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); cursor: pointer; transition: border-color 0.15s ease; }
+.arr-check:has(input:checked) { border-color: var(--brand-improvement-1); color: var(--text-primary); }
+.arr-check input { accent-color: var(--brand-improvement-1); }
+/* El plan para quitarle carga (propuesta): tres columnas que bajan en teléfono. */
+.arr-alivio { display: grid; gap: 12px; margin: 8px 0 20px; }
+.arr-alivio-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.arr-alivio-col { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
+.arr-alivio-col h3 { margin: 0 0 8px; font-size: 15px; }
+.arr-alivio-col ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.arr-alivio-col li.is-3 { color: var(--text-primary); }
+.arr-alivio-col li strong { display: block; }
 /* Lo que Improvement ya vio (propuesta): su análisis antes de las apps. */
 .arr-analisis { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px 20px; }
 .arr-analisis h2 { margin: 0 0 8px; font-size: 15px; color: var(--text-secondary); font-weight: 600; }

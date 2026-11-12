@@ -6,6 +6,7 @@ import { findOwnerMembership } from "../auth/guard.ts";
 import { applyTemplate, templateFor, type TemplateApp } from "../apps/templates.ts";
 import { proposalFor, wireProcess } from "../owner/estructura.ts";
 import { applyOwnerViews } from "../apps/views.ts";
+import { dolorOf, reliefPlan, wireRelief } from "../owner/alivio.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 const forbidden = { ok: false as const, error: { code: "FORBIDDEN", message: "Solo el dueño arma su Improvement." } };
@@ -14,7 +15,12 @@ export async function loadProposal(userId: string, orgId: string): Promise<Resul
   if (!(await findOwnerMembership(userId, orgId))) return forbidden;
   const [org] = await db.select({ industry: organization.industry }).from(organization).where(eq(organization.id, orgId));
   const t = templateFor(org?.industry ?? null);
-  return { ok: true, data: { templateKey: t.key, apps: await proposalFor(userId, orgId, t.apps) } };
+  // Su proceso primero, luego lo que le quita carga, luego lo del giro; un solo app por nombre.
+  const relief = reliefPlan(await dolorOf(userId, orgId)).apps;
+  const all = await proposalFor(userId, orgId, [...relief, ...t.apps]);
+  const seen = new Set<string>();
+  const apps = all.filter((a) => !seen.has(a.name) && !!seen.add(a.name));
+  return { ok: true, data: { templateKey: t.key, apps } };
 }
 
 export interface Armado {
@@ -68,6 +74,7 @@ export async function finishOnboarding(userId: string, orgId: string, picks: Tem
   const r = await applyTemplate(userId, orgId, picks);
   if (!r.ok) return r;
   await wireProcess(userId, orgId, picks, r.data.created);
+  await wireRelief(userId, orgId, picks, r.data.created);
   await applyOwnerViews(userId, orgId);
   await db.update(orgProfile).set({ onboardedAt: new Date(), updatedAt: new Date() }).where(eq(orgProfile.orgId, orgId));
   return { ok: true, data: true };

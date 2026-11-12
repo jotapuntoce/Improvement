@@ -85,7 +85,7 @@ export async function proposalFor(userId: string, orgId: string, template: Templ
   return [...mine, ...template.filter((t) => !names.has(t.name))];
 }
 
-async function stageKeys(orgId: string, appKey: string): Promise<string[]> {
+export async function stageKeys(orgId: string, appKey: string): Promise<string[]> {
   const rows = await db
     .select({ key: appStage.key })
     .from(appStage)

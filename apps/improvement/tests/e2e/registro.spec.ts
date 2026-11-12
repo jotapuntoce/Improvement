@@ -71,11 +71,19 @@ test("WHEN cuenta su negocio, salta la marca y acepta la propuesta THE SYSTEM SH
   await page.getByLabel("Ciudad").fill("Monterrey");
   await page.getByRole("button", { name: "Crear mi Improvement" }).click();
   // Crea la empresa y siembra sus apps contra el Supabase remoto: tarda más que una navegación normal.
-  // Ya con empresa, Improvement conoce el negocio: una pregunta a la vez, contestar una y saltar las demás.
-  await expect(page).toHaveURL(/\/arranque\/[0-9a-f-]{36}\/negocio$/, { timeout: 20_000 });
+  // Ya con empresa, lo primero es lo que le duele: marca una carga y salta lo demás.
+  await expect(page).toHaveURL(/\/arranque\/[0-9a-f-]{36}\/dolor$/, { timeout: 20_000 });
   orgId = page.url().split("/")[4];
   await expect(page.getByRole("button", { name: "Salir" })).toBeVisible();
   await noSerious(page);
+  await page.getByRole("button", { name: "Saltar por ahora" }).click();
+  await page.getByLabel("Sueldos y nómina").check();
+  await noSerious(page);
+  await page.getByRole("button", { name: "Seguir" }).click();
+  for (let i = 0; i < 2; i++) await page.getByRole("button", { name: "Saltar por ahora" }).click();
+  await page.getByRole("button", { name: "Esto es lo que me pesa" }).click();
+  // Luego Improvement conoce el negocio: una pregunta a la vez, contestar una y saltar las demás.
+  await expect(page).toHaveURL(/\/arranque\/[0-9a-f-]{36}\/negocio$/, { timeout: 20_000 });
   await page.locator('textarea[name="consolidacion"]').fill("Dos años, solo yo.");
   await page.getByRole("button", { name: "Seguir" }).click();
   for (let i = 0; i < 7; i++) await page.getByRole("button", { name: "Saltar por ahora" }).click();

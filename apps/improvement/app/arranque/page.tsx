@@ -19,7 +19,7 @@ export default async function Arranque({ searchParams }: { searchParams: Promise
     if (!actor) notFound();
     const r = await createOwnBusiness(actor, Object.fromEntries(FIELDS.map((k) => [k, formData.get(k)?.toString() ?? ""])));
     if (!r.ok) redirect(`/arranque?error=${encodeURIComponent(r.error.message)}`);
-    redirect(`/arranque/${r.data.orgId}/negocio`);
+    redirect(`/arranque/${r.data.orgId}/dolor`);
   }
 
   return (

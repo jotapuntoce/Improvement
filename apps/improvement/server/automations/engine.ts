@@ -111,7 +111,7 @@ async function perform(a: AutomationAction, owner: string, rule: RuleRow, rec: A
     case "avisar":
       // ponytail: un reminder sin objetivo no le llega a nadie; el aviso cae en la bandeja de la
       // persona con fecha de hoy. El correo llega con las plantillas de la Fase 6.
-      return createTask(owner, orgId, { title: `Aviso: ${a.text}`, assigneeId: a.userId, dueAt: now, appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
+      return createTask(owner, orgId, { title: fill(`Aviso: ${a.text}`), assigneeId: a.userId, dueAt: now, appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
     case "experiencia_lealtad":
       return grantExperience(owner, orgId, { clientId: rec.id, title: a.title, valueCents: 0, grantedOn: cdmxDay(now) });
   }

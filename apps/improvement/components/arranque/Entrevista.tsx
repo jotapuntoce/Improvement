@@ -8,7 +8,7 @@ import { useFormStatus } from "react-dom";
 import { Isotipo } from "@/components/brand/Isotipo.tsx";
 import { ARRANQUE_FORM } from "./armadoDatos.ts";
 
-export interface EntrevistaPregunta { name: string; question: string; why?: string; placeholder?: string }
+export interface EntrevistaPregunta { name: string; question: string; why?: string; placeholder?: string; /** Casillas en vez de texto: viaja como "A, B, C". */ options?: string[] }
 
 function Seguir({ last, empty, finish, pendingLabel }: { last: boolean; empty: boolean; finish: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
@@ -37,7 +37,7 @@ export function Entrevista({ action, questions, label, finish, pendingLabel, err
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
-    area.current?.querySelector<HTMLTextAreaElement>(`[data-q="${q}"] textarea`)?.focus();
+    area.current?.querySelector<HTMLElement>(`[data-q="${q}"] textarea, [data-q="${q}"] input[type=checkbox]`)?.focus();
   }, [q]);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -58,10 +58,26 @@ export function Entrevista({ action, questions, label, finish, pendingLabel, err
       <div ref={area}>
         {questions.map((x, i) => (
           <div key={x.name} data-q={i} hidden={i !== q}>
+            {x.options ? (
+              <fieldset className="arr-checks" aria-label={x.question}>
+                <input type="hidden" name={x.name} value={v[x.name] ?? ""} />
+                {x.options.map((o) => {
+                  const marked = (v[x.name] ?? "").split(", ").filter(Boolean);
+                  return (
+                    <label key={o} className="arr-check">
+                      <input type="checkbox" checked={marked.includes(o)}
+                        onChange={(e) => setV({ ...v, [x.name]: (e.target.checked ? [...marked, o] : marked.filter((m) => m !== o)).join(", ") })} />
+                      {o}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            ) : (
             <textarea name={x.name} className="arr-big arr-long" aria-label={x.question} aria-describedby="arr-q"
               placeholder={x.placeholder ?? "Escríbelo como me lo dirías…"} rows={4} maxLength={2000}
               value={v[x.name] ?? ""} onChange={(e) => setV({ ...v, [x.name]: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} />
+            )}
           </div>
         ))}
       </div>
