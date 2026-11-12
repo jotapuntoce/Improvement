@@ -30,8 +30,8 @@ la app de Claude no abre la ventana de Google (FedCM): esa prueba se hace en Chr
 | # | Sección | Estado |
 |---|---|---|
 | 1 | Entrada (`/login`, `/registro`, `/recuperar`, `/auth/*`, `/invitacion`) | ✅ Terminada 2026-11-05 |
-| 2 | Arranque | Siguiente |
-| 3 | Inicio, conversación, alertas y calendario | — |
+| 2 | Arranque | ✅ Terminada 2026-11-12 (análisis con IA espera la llave) |
+| 3 | Inicio, conversación, alertas y calendario | Siguiente |
 | 4 | Aplicaciones (ERP/CRM, importar) | — |
 | 5 | Tareas, automatizaciones, proceso y "¿Qué pasa si?" | — |
 | 6 | Mapa, objetivos, necesidades, proyectos y planos | — |
@@ -60,10 +60,43 @@ paga licencia ni subdominio). Existe el grupo de Workspace `improvement@jotapunt
 josecarlos@summumsystem.com) que recibe las respuestas.
 
 **Heredado a otras secciones:**
-- **Sección 2:** la pantalla de Arranque **no tiene botón de Salir** (hoy solo en Empresas y
-  Configuración). Agregarlo.
+- ~~**Sección 2:** la pantalla de Arranque no tiene botón de Salir.~~ Hecho en la sección 2.
 - Rotar el secreto del cliente OAuth de Google (quedó escrito en un chat): Google Cloud → Clientes →
   Improvement web → Agregar secreto → pegarlo en Supabase → Providers → Google → desactivar el viejo.
 - Opcional: que la sesión caduque tras días sin uso, o 2FA, si Jose Carlos lo pide.
 - `.env.example` debería decir que `NEXT_PUBLIC_GOOGLE_CLIENT_ID` también lo usa el botón de Google
   (los permisos bloquean que Claude edite `.env*`).
+
+## 2. Arranque — terminada 2026-11-12 (PR #16)
+
+- Diseño (opción D): conversación de una pregunta a la vez con la tarjeta "Tu Improvement,
+  armándose" en vivo — ruta arriba, texto a la izquierda, tarjeta a la derecha; en teléfono la
+  tarjeta baja. Botón **Salir** en todas las pantallas.
+- Flujo: crear empresa → **negocio** (consolidación, camino del cliente, áreas y encargados, roles,
+  qué se detiene sin el dueño, herramientas) → marca → **resultado** (qué quiere ver primero, cómo
+  debe funcionar su ERP/CRM, cómo lo quiere ver) → propuesta → importar. Respuestas en
+  `owner_memory` (`topic 'arranque'`).
+- Conocimiento de Improvement en `server/ai/knowledge.ts` (método 360°, modelo mental y manual del
+  Director General de lo nano a lo industrial, motor de clientes, Profit First). Lo usan el primer
+  análisis (`server/owner/diagnostico.ts`: observaciones + `org_need`, una vez por empresa) y la
+  burbuja del dueño.
+- Pruebas en producción (2026-11-12, org de prueba "Taller Prueba Arranque"): entrevista ✅,
+  respuestas guardadas ✅, propuesta ✅, Salir ✅. **Análisis ❌ — `AI_UNAVAILABLE`**: ninguna llamada
+  a la IA ha funcionado nunca en producción (`llm_calls` vacía en todos los orgs). Decidido:
+  seguir sin IA por ahora; la suscripción de Claude no sirve para la API.
+
+**Heredado:**
+- **Llave de la API (cuando Jose Carlos decida):** crédito en console.anthropic.com → llave nueva →
+  `ANTHROPIC_API_KEY` en Vercel (improvement) → redeploy. Después, en `/arranque/<org>/resultado`,
+  "Analiza mi negocio" otra vez: analiza todo lo ya guardado. Sin llave también están apagados la
+  burbuja, la lectura de PDF/foto y el mapeo en Importar, el copiloto de tareas, la atención y el
+  siguiente movimiento del CRM, y las alertas.
+- El error real del proveedor no se registra (`analyzeBusiness` solo devuelve `AI_UNAVAILABLE`);
+  registrar `r.error` si al poner la llave sigue fallando.
+- **Sección 3:** la burbuja ya carga el conocimiento; las observaciones del análisis viven en
+  `owner_memory` (`topic 'observacion'`) y las necesidades en `org_need`.
+- Las áreas y roles que cuenta el dueño no se convierten todavía en áreas ni empleados reales
+  (Sección 8, Equipo).
+- No entró el modelo mental de contenido (26 KB); el E2E `registro.spec.ts` está actualizado pero
+  no se ha corrido.
+- Opcional: borrar la org de prueba "Taller Prueba Arranque" (`ab88051c-…`).
