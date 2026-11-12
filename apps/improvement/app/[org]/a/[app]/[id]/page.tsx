@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
-import { addNote, getAppMeta, getRecord, listActivity, listRecords, saveCustomValues } from "@/server/apps/records.ts";
+import { addNote, getAppMeta, getRecord, listActivity, listRecords, moveRecord, saveCustomValues } from "@/server/apps/records.ts";
 import { listFields } from "@/server/apps/fields.ts";
 import { RecordForm } from "@/components/views/RecordForm.tsx";
 import { ActivityLog } from "@/components/views/ActivityLog.tsx";
@@ -43,6 +43,17 @@ export default async function RecordPage({
     redirect(pagina);
   }
 
+  // Mover desde la ficha: misma vía que el tablero (moveRecord dispara las automatizaciones).
+  async function mover(formData: FormData) {
+    "use server";
+    const actor = await getSessionUserId();
+    if (!actor) notFound();
+    const r = await moveRecord(actor, orgId, app, id, formData.get("stage")?.toString() ?? "");
+    if (!r.ok) redirect(`${pagina}?error=${encodeURIComponent(r.error.message)}`);
+    revalidatePath(`/${orgId}/a/${app}`);
+    revalidatePath(pagina);
+  }
+
   async function nota(formData: FormData) {
     "use server";
     const actor = await getSessionUserId();
@@ -59,9 +70,18 @@ export default async function RecordPage({
       {record.data.subtitle && <p className="config-hint">{record.data.subtitle}</p>}
       <p><Link href={`/${orgId}/tareas/nueva?app=${app}&record=${id}`} className="panel-btn-ghost">Crear tarea sobre esto</Link></p>
       <ol className="view-stagebar" aria-label="Etapa">
-        {stages.map((s) => (
-          <li key={s.key} aria-current={s.key === record.data.stage ? "step" : undefined}>{s.name}</li>
-        ))}
+        {stages.map((s) =>
+          s.key === record.data.stage ? (
+            <li key={s.key} aria-current="step">{s.name}</li>
+          ) : (
+            <li key={s.key}>
+              <form action={mover}>
+                <input type="hidden" name="stage" value={s.key} />
+                <button type="submit">{s.name}</button>
+              </form>
+            </li>
+          ),
+        )}
       </ol>
       {error && <p className="invite-error" role="alert">{error}</p>}
       <section className="config-card" aria-labelledby="campos">
