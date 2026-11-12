@@ -2016,7 +2016,8 @@ export const experienceGrant = pgTable(
 // apuntan a su tabla real (`kind = 'base'`); las del dueño (`custom`) llegan en la fase 2.
 
 export const APP_FIELD_TYPES = ["texto", "numero", "dinero", "fecha", "opcion", "si_no"] as const;
-export const APP_VIEW_KINDS = ["lista", "kanban", "ficha"] as const;
+// Sin check en la base: agregar un tipo aquí no pide migración. "ficha" es la página de un registro.
+export const APP_VIEW_KINDS = ["lista", "kanban", "ficha", "calendario", "numeros", "tabla"] as const;
 
 export const orgBrand = pgTable("org_brand", {
   id: id(),
