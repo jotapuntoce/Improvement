@@ -26,7 +26,7 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   if (!mio.conocido) {
     return (
       <main className="arr-main mi-agente">
-        <p className="arr-why">Hola {nombre}. Soy tu agente de Improvement para {mio.puesto}{mio.sucursal ? ` en ${mio.sucursal}` : ""}. Antes de ayudarte quiero conocer tu trabajo.</p>
+        <p className="arr-why">Hola {nombre}. Soy tu agente de Improvement para {mio.puesto}{mio.sucursal ? ` en ${mio.sucursal}` : ""}. Antes de ayudarte quiero conocer todo tu trabajo: tu proceso de principio a fin y todas las tareas que te tocan.</p>
         <Entrevista action={contar} questions={EMPLEADO_QUESTIONS} label="Conocer tu trabajo" finish="Esto es lo que hago" pendingLabel="Guardando…" error={error} />
       </main>
     );

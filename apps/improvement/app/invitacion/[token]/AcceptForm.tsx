@@ -7,13 +7,13 @@
 // sobre por qué el nombre lleva prefijo propio); la Server Action que sigue la lee para saber quién
 // es quien acaba de registrarse, así que el id nunca viaja como campo del formulario.
 //
-// Clases: config-page/config-title/config-hint/config-card/permiso-field/config-input/panel-cta —
-// las mismas de /[org]/equipo/permisos y /[org]/equipo/invitar (Tareas 5 y 6). "permisos-page",
-// "permisos-title", "permisos-hint", "permiso-name" y "config-btn" del brief original no existen en
+// Mismo diseño que /login y /recuperar (auth-card, auth-field, auth-input, auth-primary).
 // globals.css — no se agregó CSS nuevo, esta pantalla reusa lo que ya hay.
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { Isotipo } from "@/components/brand/Isotipo.tsx";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -112,27 +112,31 @@ export function AcceptForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="config-card">
-      <p className="config-hint">
-        Te invitaron a <strong>{orgName}</strong> como <strong>{email}</strong>.
+    <form onSubmit={handleSubmit} className="auth-card auth-card-center" aria-label="Aceptar invitación">
+      <Isotipo variante="red" className="auth-logo" />
+      <h1 className="auth-title">Te están esperando</h1>
+      <p className="auth-sub">
+        Te invitaron a <strong>{orgName}</strong> como <strong>{email}</strong>. Si ya tienes cuenta
+        en Improvement, usa tu misma contraseña.
       </p>
 
-      <label className="permiso-field">
-        <span>Crea tu contraseña</span>
-        <input type="password" name="password" required minLength={8} className="config-input" />
+      <label className="auth-field">
+        <span>Tu contraseña</span>
+        <input type="password" name="password" required minLength={8} autoComplete="current-password" className="auth-input" />
       </label>
-      <label className="permiso-field">
+      <Link href="/recuperar" className="auth-forgot">¿Olvidaste tu contraseña?</Link>
+      <label className="auth-field">
         <span>Tu nombre completo</span>
-        <input name="fullName" required className="config-input" />
+        <input name="fullName" required autoComplete="name" className="auth-input" />
       </label>
-      <label className="permiso-field">
+      <label className="auth-field">
         <span>Tu teléfono</span>
-        <input name="phone" required minLength={7} className="config-input" />
+        <input name="phone" type="tel" required minLength={7} autoComplete="tel" className="auth-input" />
       </label>
       {areas.length > 0 && (
-        <label className="permiso-field">
+        <label className="auth-field">
           <span>Tu área</span>
-          <select name="areaId" defaultValue="" className="config-input">
+          <select name="areaId" defaultValue="" className="auth-input">
             <option value="">Sin área</option>
             {areas.map((areaChoice) => (
               <option key={areaChoice.id} value={areaChoice.id}>{areaChoice.name}</option>
@@ -140,18 +144,18 @@ export function AcceptForm({
           </select>
         </label>
       )}
-      <label className="permiso-field">
+      <label className="auth-field">
         <span>Tu puesto</span>
-        <input name="jobTitle" required className="config-input" />
+        <input name="jobTitle" required className="auth-input" />
       </label>
-      <label className="permiso-field">
+      <label className="auth-field">
         <span>De qué te encargas</span>
-        <textarea name="responsibilities" required rows={3} className="config-input" />
+        <textarea name="responsibilities" required rows={3} className="auth-input" />
       </label>
 
-      {error && <p className="invite-error">{error}</p>}
+      {error && <p className="auth-error" role="alert">{error}</p>}
 
-      <button type="submit" disabled={loading} className="panel-cta">
+      <button type="submit" disabled={loading} className="auth-primary">
         {loading ? "Entrando..." : "Entrar a mi empresa"}
       </button>
     </form>

@@ -1,13 +1,13 @@
 // Aceptación de invitación. Fuera de [org] a propósito: quien entra aquí todavía no es miembro de
 // nada, así que no puede pasar por requireOrgMembership.
 //
-// Clases: config-page/config-title/config-hint — reales de globals.css (mismo criterio que
-// /[org]/equipo/permisos y /[org]/equipo/invitar, Tareas 5 y 6); "permisos-page"/"permisos-title"/
-// "permisos-hint" del brief original no existen.
+// Mismo diseño que /login y /recuperar: constelación, isotipo y tarjeta auth-card.
 import { getSessionUser } from "@/server/auth/guard";
 import { findOpenInvitation } from "@/server/invitations/loadInvitations";
 import { acceptInvitation } from "@/server/invitations/mutations";
 import { listAreasByOrg } from "@/server/areas/listAreas.ts";
+import { Isotipo } from "@/components/brand/Isotipo.tsx";
+import { Constelacion } from "@/components/auth/Constelacion.tsx";
 import { AcceptForm } from "./AcceptForm.tsx";
 
 export default async function InvitacionPage({ params }: { params: Promise<{ token: string }> }) {
@@ -18,12 +18,16 @@ export default async function InvitacionPage({ params }: { params: Promise<{ tok
   // empresa existe.
   if (!invitacion) {
     return (
-      <main className="config-page">
-        <h1 className="config-title">Este enlace ya no sirve</h1>
-        <p className="config-hint">
-          Puede que ya lo hayas usado o que haya vencido. Pídele a quien te invitó que te mande uno
-          nuevo.
-        </p>
+      <main className="auth-shell">
+        <Constelacion />
+        <div className="auth-card auth-card-center">
+          <Isotipo variante="red" className="auth-logo" />
+          <h1 className="auth-title">Este enlace ya no sirve</h1>
+          <p className="auth-sub">
+            Puede que ya lo hayas usado o que haya vencido. Pídele a quien te invitó que te mande uno
+            nuevo.
+          </p>
+        </div>
       </main>
     );
   }
@@ -47,8 +51,8 @@ export default async function InvitacionPage({ params }: { params: Promise<{ tok
   }
 
   return (
-    <main className="config-page">
-      <h1 className="config-title">Te están esperando</h1>
+    <main className="auth-shell">
+      <Constelacion />
       <AcceptForm
         email={invitacion.email}
         orgName={invitacion.orgName}

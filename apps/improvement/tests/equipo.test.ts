@@ -69,11 +69,12 @@ describe("el equipo y sus agentes", () => {
     // Acepta: el agente ya es suyo y Improvement lo conoce.
     expect((await acceptInvitation(token, emp, { fullName: "Luis Compras", phone: "8112345678", areaId: null, jobTitle: "Compras", responsibilities: "Los pedidos" })).ok).toBe(true);
     expect((await loadMiAgente(emp.id, orgId))?.conocido).toBe(false);
-    await saveConocerte(emp.id, orgId, { trabajo: "Hago los pedidos", friccion: "Me piden todo por WhatsApp" });
+    await saveConocerte(emp.id, orgId, { trabajo: "Hago los pedidos", tareas: "Diario: revisar faltantes. Martes: pedido", friccion: "Me piden todo por WhatsApp" });
     const mio = (await loadMiAgente(emp.id, orgId))!;
     expect(mio.conocido).toBe(true);
     expect(mio.apps.map((x) => x.key)).toEqual(["pedidos-a-proveedores"]);
     expect(agenteBrief(mio)).toContain("Dónde se le atora: Me piden todo por WhatsApp");
+    expect(agenteBrief(mio)).toContain("Todas sus tareas: Diario: revisar faltantes. Martes: pedido");
 
     // Se acaba la carne → nace su pedido → la tarea de mandarlo es de Luis, no del dueño.
     const carne = await createRecord(owner.id, orgId, "inventario", "Carne al pastor");

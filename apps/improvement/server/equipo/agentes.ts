@@ -156,10 +156,11 @@ async function sendInvite(email: string, replyTo: string | null, c: CorreoInvita
   }
 }
 
-// Conocer el trabajo de la persona: lo que hace, lo que repite y dónde se le atora.
+// Conocer el trabajo de la persona: su proceso completo, todas sus tareas y dónde se le atora.
 export const EMPLEADO_QUESTIONS: InterviewQuestion[] = [
   { name: "trabajo", question: "Cuéntame tu trabajo: ¿qué haces en un día normal?", why: "Con esto tu agente sabe qué es lo tuyo.", placeholder: "Abro la sucursal, reviso que haya de todo, cobro, hago el corte…" },
-  { name: "repite", question: "¿Qué haces que se repite cada día o cada semana?", placeholder: "El corte, el pedido de los martes, el reporte al dueño…" },
+  { name: "proceso", question: "Llévame paso a paso por tu jornada: desde que llegas hasta que te vas.", why: "Así conozco tu proceso completo, en el orden en que lo haces.", placeholder: "Llego 8:30, abro caja, reviso el inventario de la barra, recibo al proveedor, a las 4 hago el corte…" },
+  { name: "tareas", question: "Haz la lista de todas las tareas que te tocan, aunque sean chiquitas: las de cada día, cada semana y cada mes.", why: "De aquí salen tus recordatorios y lo que te puedo quitar de encima.", placeholder: "Diario: corte, limpieza, revisar faltantes. Semanal: pedido de los martes. Mensual: inventario completo, nómina…" },
   { name: "friccion", question: "¿Dónde se te atora tu trabajo? ¿Qué es lo más pesado o lo que más tiempo te quita?", why: "Por aquí empiezo a ayudarte.", placeholder: "Cuadrar la caja, esperar a que me autoricen, que me pidan todo por WhatsApp…" },
   { name: "espera", question: "¿Qué esperas de otros para poder avanzar?", placeholder: "Que el dueño apruebe, que el proveedor llegue…" },
   { name: "herramientas", question: "¿Con qué trabajas hoy?", placeholder: "WhatsApp, una libreta, Excel…" },
@@ -230,6 +231,8 @@ export function agenteBrief(a: MiAgente): string {
     `Puesto: ${a.puesto}${a.sucursal ? ` (${a.sucursal})` : ""}`,
     a.apps.length ? `Se encarga de: ${a.apps.map((x) => x.name).join(", ")}` : null,
     r.trabajo ? `Su trabajo: ${r.trabajo}` : null,
+    r.proceso ? `Su proceso, paso a paso: ${r.proceso}` : null,
+    r.tareas ? `Todas sus tareas: ${r.tareas}` : null,
     r.friccion ? `Dónde se le atora: ${r.friccion}` : null,
     r.espera ? `Espera de otros: ${r.espera}` : null,
     r.herramientas ? `Trabaja con: ${r.herramientas}` : null,
