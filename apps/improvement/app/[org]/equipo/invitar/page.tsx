@@ -82,7 +82,8 @@ export default async function InvitarPage({
             Listo. Mándale este enlace por donde tú quieras. Vence en 7 días, sirve una sola vez y no
             se vuelve a mostrar.
           </p>
-          <InviteLink url={`${proto}://${host}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/invitacion/${token}`} />
+          {/* La URL pública (jotapuntoce.com/improvement), no el host de Vercel detrás del rewrite. */}
+          <InviteLink url={`${process.env.NEXT_PUBLIC_APP_URL ?? `${proto}://${host}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`}/invitacion/${token}`} />
         </div>
       )}
 
