@@ -13,9 +13,9 @@ export default async function ArranqueEquipo({ params }: { params: Promise<{ org
   const me = await requireOrgMembership(orgId);
   const [armado, equipo] = await Promise.all([loadArmado(me.userId, orgId), teamSuggestion(me.userId, orgId)]);
   if (!armado.ok || !equipo.ok) notFound();
-  // Mismo enlace que /equipo/invitar.
+  // La URL pública (jotapuntoce.com/improvement), no el host de Vercel detrás del rewrite.
   const host = (await headers()).get("host") ?? "localhost:3200";
-  const origin = `${host.startsWith("localhost") ? "http" : "https"}://${host}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`;
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? `${host.startsWith("localhost") ? "http" : "https"}://${host}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`;
 
   async function invitar(_prev: EquipoEstado, formData: FormData): Promise<EquipoEstado> {
     "use server";
