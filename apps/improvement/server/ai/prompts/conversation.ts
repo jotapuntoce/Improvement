@@ -18,12 +18,21 @@ export const OWNER_SYSTEM_PROMPT =
   "ubicas la etapa del negocio, separas lo que dijo de lo que no dijo pero se ve, y prescribes el " +
   "siguiente paso en vez de preguntarlo. " + FORMAT;
 
+// El agente del empleado además va aprendiendo su puesto: lo nuevo que cuenta de su trabajo real
+// vuelve en "aprendido" y se guarda en su agente (server/equipo/agentes.ts, learnFromChat).
 export const ROLE_SYSTEM_PROMPT =
   "Eres el agente de Improvement hecho para el rol de esta persona dentro de la empresa. La ayudas a " +
   "sacar su trabajo: qué toca hoy, cómo hacerlo y qué preparar. Solo hablas de lo que su rol puede " +
-  "ver. " + FORMAT;
+  "ver. Vas aprendiendo lo que de verdad hace en su puesto: si en su mensaje cuenta algo nuevo de su " +
+  "trabajo (una tarea, un paso de su proceso, una herramienta, con quién trabaja, qué se le atora, " +
+  "qué ya no hace) que no esté en lo que sabes de ella, anótalo como dato corto en tercera persona. " +
+  "Si no contó nada nuevo, deja la lista vacía. " +
+  FORMAT.replace('{"respuesta": string}', '{"respuesta": string, "aprendido": string[]}');
 
-export const conversationSchema = z.object({ respuesta: z.string().min(1).max(2000) });
+export const conversationSchema = z.object({
+  respuesta: z.string().min(1).max(2000),
+  aprendido: z.array(z.string().max(300)).max(5).optional(),
+});
 
 export interface ConversationContext {
   persona: string;

@@ -183,7 +183,7 @@ export async function loadMiAgente(userId: string, orgId: string): Promise<MiAge
   const apps = a.encargos.length
     ? (await db.select({ key: appModel.key, name: appModel.name }).from(appModel).where(eq(appModel.orgId, orgId))).filter((x) => a.encargos.includes(x.key))
     : [];
-  return { nombre: a.nombre, puesto: a.puesto, sucursal: a.sucursal, apps, respuestas: a.respuestas, conocido: Object.keys(a.respuestas).length > 0 };
+  return { nombre: a.nombre, puesto: a.puesto, sucursal: a.sucursal, apps, respuestas: a.respuestas, conocido: Object.keys(a.respuestas).some((k) => k !== "aprendido") };
 }
 
 export async function saveConocerte(userId: string, orgId: string, input: Record<string, unknown>): Promise<Result<{ saved: number }>> {
@@ -195,9 +195,31 @@ export async function saveConocerte(userId: string, orgId: string, input: Record
   }
   // Aunque salte todo, ya lo conoció: no se le vuelve a preguntar al entrar.
   if (!Object.keys(respuestas).length) respuestas.trabajo = "(no contó)";
+  const [prev] = await db.select({ respuestas: agente.respuestas }).from(agente)
+    .where(and(eq(agente.orgId, orgId), eq(agente.userId, userId)));
+  if (prev?.respuestas.aprendido) respuestas.aprendido = prev.respuestas.aprendido; // Lo que ya aprendió en la burbuja se queda.
   const r = await db.update(agente).set({ respuestas, updatedAt: new Date() })
     .where(and(eq(agente.orgId, orgId), eq(agente.userId, userId))).returning({ id: agente.id });
   return r.length ? { ok: true, data: { saved: Object.keys(respuestas).length } } : fail("No encontré tu agente.", "NOT_FOUND");
+}
+
+// Lo que la burbuja va aprendiendo del puesto: cada dato nuevo que la persona cuenta de su trabajo
+// real se suma a respuestas.aprendido (una línea por dato, sin repetir, los más recientes al final).
+// ponytail: se recorta a los últimos 40 datos; si crece más, resumir con la IA en vez de recortar.
+export async function learnFromChat(userId: string, orgId: string, datos: string[]): Promise<Result<{ total: number }>> {
+  await assertMembership(userId, orgId);
+  const nuevos = datos.map((d) => d.trim().replace(/\s+/g, " ").slice(0, 300)).filter((d) => d.length >= 4);
+  const [a] = await db.select({ id: agente.id, respuestas: agente.respuestas }).from(agente)
+    .where(and(eq(agente.orgId, orgId), eq(agente.userId, userId)));
+  if (!a) return fail("No encontré tu agente.", "NOT_FOUND");
+  const antes = (a.respuestas.aprendido ?? "").split("\n").filter(Boolean);
+  const visto = new Set(antes.map((x) => x.toLowerCase()));
+  const sumar = [...new Set(nuevos)].filter((d) => !visto.has(d.toLowerCase()));
+  const todo = [...antes, ...sumar].slice(-40);
+  if (sumar.length) {
+    await db.update(agente).set({ respuestas: { ...a.respuestas, aprendido: todo.join("\n") }, updatedAt: new Date() }).where(eq(agente.id, a.id));
+  }
+  return { ok: true, data: { total: todo.length } };
 }
 
 // En qué le facilita Improvement el trabajo, según lo que contó. Primero lo que se le atora.
@@ -237,5 +259,6 @@ export function agenteBrief(a: MiAgente): string {
     r.espera ? `Espera de otros: ${r.espera}` : null,
     r.herramientas ? `Trabaja con: ${r.herramientas}` : null,
     r.ayuda ? `Lo primero que pediría: ${r.ayuda}` : null,
+    r.aprendido ? `Lo que has aprendido de su trabajo platicando:\n${r.aprendido}` : null,
   ].filter(Boolean).join("\n");
 }
