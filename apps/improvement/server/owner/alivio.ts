@@ -133,23 +133,32 @@ export interface PlanAlivio {
   apps: TemplateApp[];
 }
 
+/** Con varias sucursales, toda app lleva su campo Sucursal (una sola vez). */
+export function withSucursal(t: TemplateApp, sucs: string[]): TemplateApp {
+  if (!sucs.length || t.fields.some((f) => f.label === SUC)) return t;
+  return { ...t, fields: [...t.fields, { label: SUC, type: "opcion", options: sucs }] };
+}
+
+/** "RH y contratación" → "RH y contratación"; "Sueldos y nómina" → "sueldos y nómina". Las siglas se quedan. */
+const enFrase = (label: string) => label.split(" ").map((w) => (w.length > 1 && w === w.toUpperCase() ? w : w.toLowerCase())).join(" ");
+
 /** El plan, de sus respuestas. Primero lo que más le duele. */
 export function reliefPlan(a: Answers): PlanAlivio {
   const dolor = a.dolor?.trim() || null;
-  const carga = `${a.cargas ?? ""}\n${a.fuego ?? ""}`;
+  // Solo lo que dijo que le duele o marcó; el último fuego solo enciende la jugada de fuegos.
+  const fuego = !!a.fuego?.trim();
   const picked = JUGADAS
     .map((j) => ({ j, duele: !!dolor && j.says.test(dolor) }))
-    .filter(({ j, duele }) => duele || j.says.test(carga))
+    .filter(({ j, duele }) => duele || j.says.test(a.cargas ?? "") || (fuego && j.key === "fuegos"))
     .sort((x, y) => Number(y.duele) - Number(x.duele));
   const sucs = sucursales(a.sucursales);
-  const withSuc = (t: TemplateApp): TemplateApp => (sucs.length ? { ...t, fields: [...t.fields, { label: SUC, type: "opcion", options: sucs }] } : t);
   const foco = a.foco?.trim() || null;
   return {
     dolor,
     foco,
     jugadas: picked.map(({ j, duele }) => ({ key: j.key, label: j.label, improvement: j.improvement, delega: j.delega, duele })),
     quedaTu: foco ? [`Tu foco: ${foco.slice(0, 120)}`, ...QUEDA_TU] : QUEDA_TU,
-    apps: picked.map(({ j }) => ({ ...withSuc(j.app), relief: j.key })),
+    apps: picked.map(({ j }) => ({ ...withSucursal(j.app, sucs), relief: j.key })),
   };
 }
 
@@ -180,7 +189,7 @@ export async function prescribeRelief(userId: string, orgId: string): Promise<nu
   const plan = reliefPlan(await dolorOf(userId, orgId));
   const have = new Set((await db.select({ title: orgNeed.title }).from(orgNeed).where(eq(orgNeed.orgId, orgId))).map((n) => n.title));
   const nuevas = plan.jugadas
-    .map((j) => ({ orgId, title: `Soltar: ${j.label.toLowerCase()}`, detail: `${j.improvement} Delegar a: ${j.delega}`, severity: j.duele ? 3 : 2, source: "improvement" as const }))
+    .map((j) => ({ orgId, title: `Soltar: ${enFrase(j.label)}`, detail: `${j.improvement} Delegar a: ${j.delega}`, severity: j.duele ? 3 : 2, source: "improvement" as const }))
     .filter((n) => !have.has(n.title));
   if (nuevas.length) await db.insert(orgNeed).values(nuevas);
 
