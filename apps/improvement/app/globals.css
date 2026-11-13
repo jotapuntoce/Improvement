@@ -667,7 +667,9 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .scorecard-off { color: var(--danger); font-weight: 600; }
 
 /* Shell estilo Whop (blueprint improvement-odoo, fase 1). Solo tokens. */
-.shell { display: grid; grid-template-columns: 17rem 1fr; min-height: 100dvh; background: var(--bg); }
+/* El color va con el fondo: <body> no trae color, y un texto sin color propio (la pregunta de la
+   entrevista en /[org]/mi-agente) salía negro sobre --bg. */
+.shell { display: grid; grid-template-columns: 17rem 1fr; min-height: 100dvh; background: var(--bg); color: var(--text-primary); }
 .shell-sidebar { position: sticky; top: 0; height: 100dvh; overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg-elevated); padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .shell-sidebar a { display: block; padding: 0.45rem 0.6rem; border-radius: var(--radius-sm); color: var(--text-secondary); text-decoration: none; transition: background 0.15s ease, color 0.15s ease; }
 .shell-sidebar a:hover, .shell-sidebar a:focus-visible, .shell-sidebar a[aria-current="page"] { background: var(--bg-card-hover); color: var(--text-primary); }
