@@ -29,6 +29,8 @@ export interface Jugada {
   says: RegExp;
   improvement: string;
   delega: string;
+  /** Quién lo recibe en el equipo; "Encargado de sucursal" se abre uno por sucursal. */
+  puesto: string;
   app: TemplateApp;
   reglas: Regla[];
 }
@@ -41,6 +43,7 @@ export const JUGADAS: Jugada[] = [
     key: "nomina", label: "Sueldos y nómina", says: /sueldo|n[oó]mina|salario|pagar a (mi|los) (gente|empleados)/i,
     improvement: "Te recuerdo la nómina 2 días antes y te la dejo lista para que solo la apruebes.",
     delega: "Quien lleve la administración: captura faltas, horas extra y adelantos.",
+    puesto: "Administración",
     app: app("Nómina", "Administración", ["Por revisar", "Aprobada", "Pagada"], [{ label: "Fecha de pago", type: "fecha" }, { label: "Monto", type: "dinero" }]),
     reglas: [{ name: "Nómina: revisar 2 días antes", trigger: { type: "fecha", field: "Fecha de pago", days: 2 }, action: { type: "tarea", title: "Revisar y aprobar la nómina — {titulo}" } }],
   },
@@ -48,6 +51,7 @@ export const JUGADAS: Jugada[] = [
     key: "caja", label: "Finanzas y caja", says: /finanza|caja|dinero|corte|flujo|ganancia|utilidad|cuentas/i,
     improvement: "Cada sucursal cierra su corte del día; te aviso solo si hay diferencia o si nadie lo cerró.",
     delega: "El encargado de cada sucursal: hacer el corte diario.",
+    puesto: "Encargado de sucursal",
     app: app("Corte de caja", "Administración", ["Pendiente", "Cuadrado", "Con diferencia"], [{ label: "Fecha", type: "fecha" }, { label: "Venta del día", type: "dinero" }, { label: "Diferencia", type: "dinero" }]),
     reglas: [
       { name: "Corte con diferencia", trigger: { type: "etapa", stage: 2 }, action: { type: "aviso", text: "Corte con diferencia: {titulo}" } },
@@ -58,6 +62,7 @@ export const JUGADAS: Jugada[] = [
     key: "administracion", label: "Administración", says: /administra|renta|luz|impuesto|sat\b|pagos?\b|servicios|factura/i,
     improvement: "Renta, luz, impuestos y servicios: te aviso 3 días antes de cada vencimiento.",
     delega: "Tu contador o un administrador: pagar y guardar comprobantes.",
+    puesto: "Administración",
     app: app("Pagos y obligaciones", "Administración", ["Por pagar", "Pagado"], [{ label: "Fecha límite", type: "fecha" }, { label: "Monto", type: "dinero" }]),
     reglas: [{ name: "Pago por vencer", trigger: { type: "fecha", field: "Fecha límite", days: 3 }, action: { type: "tarea", title: "Pagar — {titulo}" } }],
   },
@@ -65,6 +70,7 @@ export const JUGADAS: Jugada[] = [
     key: "proveedores", label: "Proveedores y compras", says: /proveedor|compra|pedido|insumo|surtir/i,
     improvement: "Cuando algo baja del mínimo te armo el pedido; tú o tu encargado solo lo mandan.",
     delega: "El encargado de compras o de cada sucursal.",
+    puesto: "Compras",
     app: app("Pedidos a proveedores", "Operación", ["Por pedir", "Pedido", "Recibido"], [{ label: "Proveedor", type: "texto" }, { label: "Monto", type: "dinero" }, { label: "Fecha de entrega", type: "fecha" }]),
     reglas: [
       { name: "Pedido nuevo", trigger: { type: "creado" }, action: { type: "tarea", title: "Mandar el pedido — {titulo}", dueInDays: 1 } },
@@ -75,6 +81,7 @@ export const JUGADAS: Jugada[] = [
     key: "inventario", label: "Inventario", says: /inventario|almac[eé]n|existencia|stock|merma/i,
     improvement: "Llevo existencias con su mínimo y punto de reorden; si algo baja, nace su pedido.",
     delega: "Quien recibe la mercancía: actualizar existencias.",
+    puesto: "Almacén",
     app: INVENTARIO,
     // Con proveedores en el plan, lo que pasa a "Por pedir" abre su pedido (se agrega en wireRelief).
     reglas: [],
@@ -83,6 +90,7 @@ export const JUGADAS: Jugada[] = [
     key: "marketing", label: "Marketing y redes", says: /marketing|redes|publicidad|contenido|instagram|tiktok|facebook|clientes nuevos/i,
     improvement: "Llevo tu calendario de contenido y te recuerdo un día antes de cada publicación.",
     delega: "Alguien del equipo o una agencia: grabar y publicar.",
+    puesto: "Marketing",
     app: app("Contenido", "Ventas", ["Idea", "Grabando", "Publicado"], [{ label: "Red", type: "opcion", options: ["Instagram", "TikTok", "Facebook", "WhatsApp"] }, { label: "Fecha de publicación", type: "fecha" }]),
     reglas: [{ name: "Publicación mañana", trigger: { type: "fecha", field: "Fecha de publicación", days: 1 }, action: { type: "tarea", title: "Grabar y publicar — {titulo}" } }],
   },
@@ -90,6 +98,7 @@ export const JUGADAS: Jugada[] = [
     key: "rh", label: "RH y contratación", says: /\brh\b|recursos humanos|contrat|personal|vacante|rotaci[oó]n|faltan? (gente|cocinero|mesero)|renunci/i,
     improvement: "Llevo cada vacante de punta a punta y te digo qué sigue; la capacitación sale del manual.",
     delega: "El encargado de cada sucursal: primeras entrevistas.",
+    puesto: "Encargado de sucursal",
     app: app("Vacantes y personal", "Administración", ["Vacante", "Entrevistas", "Contratado", "Capacitación"], [{ label: "Puesto", type: "texto" }]),
     reglas: [
       { name: "Agendar entrevistas", trigger: { type: "etapa", stage: 1 }, action: { type: "tarea", title: "Agendar entrevistas — {titulo}", dueInDays: 2 } },
@@ -100,6 +109,7 @@ export const JUGADAS: Jugada[] = [
     key: "operacion", label: "Operación diaria", says: /operaci[oó]n|abrir|cerrar|apertura|turno|limpieza|cocina/i,
     improvement: "Checklist de apertura y cierre por sucursal; te aviso solo si alguno no se hizo.",
     delega: "El encargado de turno.",
+    puesto: "Encargado de sucursal",
     app: app("Apertura y cierre", "Operación", ["Pendiente", "Hecho"], [{ label: "Fecha", type: "fecha" }]),
     reglas: [{ name: "Apertura o cierre sin hacer", trigger: { type: "sin_actividad", days: 1 }, action: { type: "aviso", text: "No se marcó como hecho: {titulo}" } }],
   },
@@ -107,6 +117,7 @@ export const JUGADAS: Jugada[] = [
     key: "fuegos", label: "Apagar fuegos", says: /fuego|urgencia|imprevist|problema|queja|atenci[oó]n a clientes|todo yo|de todo/i,
     improvement: "Cada fuego se anota y lo atiende el encargado; te aviso solo si lleva un día sin resolverse. Los que se repiten se vuelven proceso.",
     delega: "El encargado de cada sucursal: atender el fuego y anotarlo.",
+    puesto: "Encargado de sucursal",
     app: app("Fuegos", "Operación", ["Reportado", "En atención", "Resuelto"], [{ label: "Qué pasó", type: "texto" }, { label: "Se repite", type: "si_no" }]),
     reglas: [{ name: "Fuego sin atender", trigger: { type: "sin_actividad", days: 1 }, action: { type: "aviso", text: "Fuego sin resolver desde ayer: {titulo}" } }],
   },

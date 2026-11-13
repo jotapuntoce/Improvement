@@ -103,6 +103,11 @@ test("WHEN cuenta su negocio, salta la marca y acepta la propuesta THE SYSTEM SH
   await noSerious(page);
   await page.getByRole("button", { name: "Así me gusta, ármalo" }).click();
 
+  // Quién se encarga de qué: lo deja para después.
+  await expect(page).toHaveURL(new RegExp(`/arranque/${orgId}/equipo$`), { timeout: 20_000 });
+  await noSerious(page);
+  await page.getByRole("link", { name: "Lo hago después" }).click();
+
   await expect(page).toHaveURL(new RegExp(`/arranque/${orgId}/importar$`), { timeout: 20_000 });
   await expect(page.getByLabel("¿A dónde va?")).toContainText("Pacientes");
   await noSerious(page);

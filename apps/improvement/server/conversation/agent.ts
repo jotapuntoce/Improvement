@@ -10,6 +10,7 @@ import { loadSidebar } from "../apps/sidebar.ts";
 import { listInbox } from "../tasks/inbox.ts";
 import { createTask } from "../tasks/inbox.ts";
 import { listOwnerMemory, ownerBrief } from "../owner/memory.ts";
+import { agenteBrief, loadMiAgente } from "../equipo/agentes.ts";
 import { extractStructured, type SuggestionProvider } from "../ai/gateway.ts";
 import { OWNER_SYSTEM_PROMPT, ROLE_SYSTEM_PROMPT, buildConversationPrompt, conversationSchema } from "../ai/prompts/conversation.ts";
 
@@ -59,6 +60,9 @@ export async function ask(userId: string, orgId: string, raw: unknown, provider?
     const [tipo] = me.permissionTypeId ? await db.select({ name: permissionType.name }).from(permissionType).where(eq(permissionType.id, me.permissionTypeId)) : [];
     const apps = (await loadSidebar(userId, orgId)).groups.flatMap((g) => g.apps.map((a) => a.name));
     perfil = `Rol: ${tipo?.name ?? "Equipo"}\nApps que ve: ${apps.join(", ") || "ninguna"}`;
+    // Su agente: lo que le toca y dónde se le atora, para que la ayuda sea suya y no genérica.
+    const mio = await loadMiAgente(userId, orgId);
+    if (mio) perfil += `\n${agenteBrief(mio)}`;
   }
 
   const r = await extractStructured({

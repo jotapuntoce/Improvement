@@ -10,6 +10,7 @@ import { findMembership } from "../auth/guard.ts";
 import { addNote, createRecord, loadRecord, loadRecords, moveRecord, saveCustomValues, type AppRecord } from "../apps/records.ts";
 import { grantExperience } from "../crm/loyalty.ts";
 import { createObjective } from "../objectives/mutations.ts";
+import { responsable } from "../equipo/responsable.ts";
 import { createTask } from "../tasks/inbox.ts";
 
 export interface AutomationEvent { orgId: string; actorId: string; appKey: string; recordId: string; type: "creado" | "etapa" | "campo"; stage?: string; fields?: string[]; depth?: number }
@@ -101,8 +102,11 @@ async function perform(a: AutomationAction, owner: string, rule: RuleRow, rec: A
       return moveRecord(owner, orgId, appKey, rec.id, a.stage, { depth });
     case "actualizar_campos":
       return saveCustomValues(owner, orgId, appKey, rec.id, { ...rec.custom, ...a.values }, { depth });
-    case "crear_tarea":
-      return createTask(owner, orgId, { title: fill(a.title), assigneeId: a.assigneeId, dueAt: due(a.dueInDays), appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
+    case "crear_tarea": {
+      // La del dueño la toma quien se encarga de esta app en su equipo, si ya entró.
+      const assigneeId = a.assigneeId && a.assigneeId !== owner ? a.assigneeId : ((await responsable(orgId, appKey, rec.custom)) ?? a.assigneeId);
+      return createTask(owner, orgId, { title: fill(a.title), assigneeId,dueAt: due(a.dueInDays), appKey, recordId: rec.id }, { source: "automatizacion", ruleId: rule.id });
+    }
     case "crear_objetivo":
       return createObjective(owner, orgId, {
         title: a.title, description: null, impactWeight: a.impactWeight, dueDate: due(a.dueInDays), areaId: null,

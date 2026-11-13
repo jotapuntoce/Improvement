@@ -32,7 +32,7 @@ export default async function ArranquePropuesta({ params, searchParams }: { para
       .map((i) => ({ ...fresh.data.apps[i]!, name: formData.get(`name-${i}`)?.toString().trim().slice(0, 40) || fresh.data.apps[i]!.name }));
     const r = await finishOnboarding(actor, orgId, picks);
     if (!r.ok) redirect(`/arranque/${orgId}/propuesta?error=${encodeURIComponent(r.error.message)}`);
-    redirect(`/arranque/${orgId}/importar`);
+    redirect(`/arranque/${orgId}/equipo`);
   }
 
   return (
