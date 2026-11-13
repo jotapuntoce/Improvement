@@ -117,7 +117,16 @@ josecarlos@summumsystem.com) que recibe las respuestas.
   diferencia: Centro 12 nov" ✅. Arreglado después: el último fuego ya no enciende otras jugadas
   (solo Fuegos), las siglas se respetan ("Soltar: RH y contratación") y con varias sucursales
   también las apps del giro llevan el campo Sucursal.
-- Pendiente: "delegar a" todavía es texto; las tareas son del dueño hasta que la Sección 8 (Equipo)
+- **Tu equipo y sus agentes** (`server/equipo/agentes.ts`, tabla `agente` con RLS): después de la
+  propuesta, "¿Quién se encarga de qué?" propone una persona por puesto con lo que el dueño delega
+  (un encargado por sucursal). Cada una recibe tipo de permiso, invitación (correo si hay
+  `RESEND_API_KEY`; si no, enlace y WhatsApp) y su agente. Al aceptar entra a `/[org]/mi-agente`:
+  Improvement conoce su trabajo (qué hace, qué repite, dónde se le atora, qué espera, con qué trabaja)
+  y le dice en qué le facilita el trabajo. Las tareas de las reglas de sus apps le llegan a ella (por
+  sucursal); los avisos siguen al dueño. Su burbuja usa ese perfil.
+- Pendiente: el empleado ve todas las apps propias (el permiso de apps es uno solo); Mi agente no
+  tiene botón en el menú todavía.
+- Antes pendiente: "delegar a" todavía es texto; las tareas son del dueño hasta que la Sección 8 (Equipo)
   convierta a sus encargados en personas reales y las reglas les asignen a ellos.
 
 **Heredado:**

@@ -2387,3 +2387,29 @@ export const agentMessage = pgTable(
     check("agent_message_role_check", sql`${t.role} in ('persona','improvement')`),
   ],
 );
+
+// El agente de cada persona del equipo. Lo arma el dueño al invitarla en el arranque (puesto,
+// sucursal y qué le toca: las jugadas de server/owner/alivio.ts) y lo completa la persona al entrar
+// (qué hace, dónde se le atora). user_id se llena al aceptar la invitación. Lo leen la persona y el
+// dueño; se escribe solo desde el servidor (server/equipo/agentes.ts).
+export const agente = pgTable(
+  "agente",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    invitationId: uuid("invitation_id").references(() => invitation.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => profile.id, { onDelete: "cascade" }),
+    nombre: text("nombre").notNull(),
+    email: text("email").notNull(),
+    puesto: text("puesto").notNull(),
+    sucursal: text("sucursal"),
+    encargos: jsonb("encargos").$type<string[]>().notNull().default([]),
+    respuestas: jsonb("respuestas").$type<Record<string, string>>().notNull().default({}),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("uq_agente_org_email").on(t.orgId, t.email),
+    index("idx_agente_user").on(t.userId),
+  ],
+);
