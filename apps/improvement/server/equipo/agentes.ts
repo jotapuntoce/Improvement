@@ -103,9 +103,10 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs.at(-1)}`);
 
 /**
- * La invitación se lee como una nota del dueño, no como publicidad: de su nombre, a la persona por su
- * nombre, con lo que le toca, un solo enlace al mismo dominio y sin imágenes ni botones de campaña
- * (Gmail manda a Promociones lo que parece campaña).
+ * La invitación: de parte del dueño, a la persona por su nombre, con lo que le toca y un botón para
+ * aceptar. Mismo formato que los correos de confirmación y de contraseña
+ * (blueprints/improvement/correos-supabase.md), que ya llegan a Recibidos; el enlace va al mismo
+ * dominio que el remitente.
  */
 export function inviteEmail(x: { de: string | null; empresa: string; para: string; puesto: string; sucursal: string | null; encargos: string[]; link: string }): CorreoInvitacion {
   const de = x.de?.trim() || "El dueño";
@@ -123,9 +124,18 @@ export function inviteEmail(x: { de: string | null; empresa: string; para: strin
     fromName: `${de.split(/\s+/)[0]} vía Improvement`,
     subject: `${primero}, te sumé a ${x.empresa}`,
     text: lineas.join("\n\n"),
-    html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222">${lineas
-      .map((l, i) => (i === 3 ? `<p>Entra con este enlace (vale 7 días):<br><a href="${esc(x.link)}">${esc(x.link)}</a></p>` : `<p>${esc(l)}</p>`))
-      .join("")}</div>`,
+    html: `<div style="background:#000;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#f4f6fb">
+  <div style="max-width:480px;margin:0 auto;background:#0b0d12;border:1px solid #1f2a24;border-radius:22px;padding:32px;text-align:center">
+    <img src="https://jotapuntoce.com/improvement/brand/isotipo-correo.gif" width="80" height="80" alt="Improvement" style="display:block;margin:0 auto 12px;border:0">
+    <p style="margin:0 0 8px;color:#1fbe79;letter-spacing:.14em;font-size:12px;font-weight:700">IMPROVEMENT</p>
+    <h1 style="margin:0 0 12px;font-size:24px">Hola ${esc(primero)}</h1>
+    <p style="margin:0 0 12px;color:#aab3c2;font-size:15px;line-height:1.5">${esc(`${de} te sumó a ${x.empresa} como ${x.puesto}${donde}.`)}</p>
+    ${x.encargos.length ? `<p style="margin:0 0 12px;color:#aab3c2;font-size:15px;line-height:1.5">Ya te dejó listo lo tuyo: <strong style="color:#f4f6fb">${esc(lista(x.encargos))}</strong>.</p>` : ""}
+    <p style="margin:0 0 24px;color:#aab3c2;font-size:15px;line-height:1.5">Al entrar, Improvement te pregunta cómo es tu día y dónde se te atora el trabajo, para ayudarte justo con eso.</p>
+    <a href="${esc(x.link)}" style="display:inline-block;padding:14px 28px;border-radius:10px;background:#1fbe79;background-image:linear-gradient(135deg,#1fbe79,#98e33b);color:#05060b;font-weight:700;text-decoration:none">Aceptar invitación</a>
+    <p style="margin:24px 0 0;color:#6b7386;font-size:13px">El enlace vale 7 días y sirve una sola vez. Si no esperabas esta invitación, ignora este correo.</p>
+  </div>
+</div>`,
   };
 }
 

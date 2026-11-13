@@ -17,13 +17,14 @@ describe("en qué le facilita Improvement el trabajo", () => {
     expect(h[0]).toMatch(/corte/);
     expect(h).toContainEqual(expect.stringMatching(/libreta/));
   });
-  it("WHEN el dueño invita THE SYSTEM SHALL mandar una nota personal suya, no una campaña", () => {
+  it("WHEN el dueño invita THE SYSTEM SHALL mandarla de su parte, con lo que le toca y un botón para aceptar", () => {
     const c = inviteEmail({ de: "Ana López", empresa: "Taquería <Dos>", para: "Carlos Pérez", puesto: "Encargado de Centro", sucursal: "Centro", encargos: ["Corte de caja", "Fuegos"], link: "https://jotapuntoce.com/improvement/invitacion/t" });
     expect(c.fromName).toBe("Ana vía Improvement");
     expect(c.subject).toBe("Carlos, te sumé a Taquería <Dos>");
     expect(c.text).toContain("como Encargado de Centro en Centro. Ya te dejé listo lo tuyo: Corte de caja y Fuegos.");
-    expect(c.html).toContain("Taquería &#60;Dos&#62;");
-    expect(c.html).not.toMatch(/<img|<button/);
+    expect(c.html).toContain("Ana López te sumó a Taquería &#60;Dos&#62; como Encargado de Centro en Centro.");
+    expect(c.html).toContain('href="https://jotapuntoce.com/improvement/invitacion/t"');
+    expect(c.html).toContain("Aceptar invitación");
   });
   it("WHEN no contó nada THE SYSTEM SHALL ofrecerle la burbuja", () => {
     expect(helpFor({})).toEqual([expect.stringMatching(/burbuja/)]);
