@@ -9,13 +9,21 @@ import { finishOnboarding, loadProposal } from "../server/registro/onboarding.ts
 import { saveInterview } from "../server/owner/diagnostico.ts";
 import { acceptInvitation } from "../server/invitations/mutations.ts";
 import { createRecord, moveRecord } from "../server/apps/records.ts";
-import { agenteBrief, helpFor, inviteTeam, loadMiAgente, saveConocerte, teamSuggestion } from "../server/equipo/agentes.ts";
+import { agenteBrief, helpFor, inviteEmail, inviteTeam, loadMiAgente, saveConocerte, teamSuggestion } from "../server/equipo/agentes.ts";
 
 describe("en qué le facilita Improvement el trabajo", () => {
   it("WHEN cuenta dónde se le atora THE SYSTEM SHALL decirle primero eso", () => {
     const h = helpFor({ trabajo: "Llevo todo en una libreta", friccion: "Cuadrar la caja cada noche" });
     expect(h[0]).toMatch(/corte/);
     expect(h).toContainEqual(expect.stringMatching(/libreta/));
+  });
+  it("WHEN el dueño invita THE SYSTEM SHALL mandar una nota personal suya, no una campaña", () => {
+    const c = inviteEmail({ de: "Ana López", empresa: "Taquería <Dos>", para: "Carlos Pérez", puesto: "Encargado de Centro", sucursal: "Centro", encargos: ["Corte de caja", "Fuegos"], link: "https://jotapuntoce.com/improvement/invitacion/t" });
+    expect(c.fromName).toBe("Ana vía Improvement");
+    expect(c.subject).toBe("Carlos, te sumé a Taquería <Dos>");
+    expect(c.text).toContain("como Encargado de Centro en Centro. Ya te dejé listo lo tuyo: Corte de caja y Fuegos.");
+    expect(c.html).toContain("Taquería &#60;Dos&#62;");
+    expect(c.html).not.toMatch(/<img|<button/);
   });
   it("WHEN no contó nada THE SYSTEM SHALL ofrecerle la burbuja", () => {
     expect(helpFor({})).toEqual([expect.stringMatching(/burbuja/)]);

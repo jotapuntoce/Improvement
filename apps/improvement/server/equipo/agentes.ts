@@ -8,7 +8,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { Resend } from "resend";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { agente, appModel, permissionType } from "@jotapuntoce/db/schema";
+import { agente, appModel, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { assertMembership, findOwnerMembership } from "../auth/guard.ts";
 import { createInvitation } from "../invitations/mutations.ts";
 import { JUGADAS, loadReliefPlan, sucursales, dolorOf } from "../owner/alivio.ts";
@@ -70,7 +70,12 @@ export async function inviteTeam(userId: string, orgId: string, input: unknown, 
   if (!(await findOwnerMembership(userId, orgId))) return forbidden;
   const parsed = z.array(personaSchema).max(30).safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Revisa los datos del equipo.");
-  const valid = new Set((await db.select({ key: appModel.key }).from(appModel).where(eq(appModel.orgId, orgId))).map((a) => a.key));
+  const [apps, [dueno], [org]] = await Promise.all([
+    db.select({ key: appModel.key, name: appModel.name }).from(appModel).where(eq(appModel.orgId, orgId)),
+    db.select({ nombre: profile.fullName, email: profile.email }).from(profile).where(eq(profile.id, userId)),
+    db.select({ name: organization.name }).from(organization).where(eq(organization.id, orgId)),
+  ]);
+  const nameOf = new Map(apps.map((a) => [a.key, a.name]));
   const out: Invitado[] = [];
   for (const p of parsed.data) {
     const name = `Equipo: ${p.puesto}`.slice(0, 80);
@@ -79,23 +84,61 @@ export async function inviteTeam(userId: string, orgId: string, input: unknown, 
       .returning({ id: permissionType.id });
     const inv = await createInvitation(userId, orgId, p.email, tipo!.id);
     if (!inv.ok) return inv;
-    const values = { nombre: p.nombre, puesto: p.puesto, sucursal: p.sucursal, encargos: p.encargos.filter((k) => valid.has(k)) };
+    const values = { nombre: p.nombre, puesto: p.puesto, sucursal: p.sucursal, encargos: p.encargos.filter((k) => nameOf.has(k)) };
     await db.insert(agente).values({ orgId, email: p.email, ...values })
       .onConflictDoUpdate({ target: [agente.orgId, agente.email], set: { ...values, updatedAt: new Date() } });
     const link = `${origin}/invitacion/${inv.data.token}`;
-    out.push({ nombre: p.nombre, email: p.email, link, enviado: await sendInvite(p.nombre, p.email, p.puesto, link) });
+    const correo = inviteEmail({
+      de: dueno?.nombre ?? null, empresa: org?.name ?? "tu empresa", para: p.nombre, puesto: p.puesto, sucursal: p.sucursal,
+      encargos: values.encargos.map((k) => nameOf.get(k)!), link,
+    });
+    out.push({ nombre: p.nombre, email: p.email, link, enviado: await sendInvite(p.email, dueno?.email ?? null, correo) });
   }
   return { ok: true, data: out };
 }
 
-async function sendInvite(nombre: string, email: string, puesto: string, link: string): Promise<boolean> {
+export interface CorreoInvitacion { fromName: string; subject: string; text: string; html: string }
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs.at(-1)}`);
+
+/**
+ * La invitación se lee como una nota del dueño, no como publicidad: de su nombre, a la persona por su
+ * nombre, con lo que le toca, un solo enlace al mismo dominio y sin imágenes ni botones de campaña
+ * (Gmail manda a Promociones lo que parece campaña).
+ */
+export function inviteEmail(x: { de: string | null; empresa: string; para: string; puesto: string; sucursal: string | null; encargos: string[]; link: string }): CorreoInvitacion {
+  const de = x.de?.trim() || "El dueño";
+  const primero = x.para.trim().split(/\s+/)[0]!;
+  const donde = x.sucursal ? ` en ${x.sucursal}` : "";
+  const toca = x.encargos.length ? ` Ya te dejé listo lo tuyo: ${lista(x.encargos)}.` : "";
+  const lineas = [
+    `Hola ${primero}:`,
+    `Te sumé a ${x.empresa} en Improvement como ${x.puesto}${donde}.${toca}`,
+    "Al entrar te va a preguntar cómo es tu día y dónde se te atora el trabajo, para ayudarte justo con eso.",
+    `Entra con este enlace (vale 7 días): ${x.link}`,
+    de,
+  ];
+  return {
+    fromName: `${de.split(/\s+/)[0]} vía Improvement`,
+    subject: `${primero}, te sumé a ${x.empresa}`,
+    text: lineas.join("\n\n"),
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222">${lineas
+      .map((l, i) => (i === 3 ? `<p>Entra con este enlace (vale 7 días):<br><a href="${esc(x.link)}">${esc(x.link)}</a></p>` : `<p>${esc(l)}</p>`))
+      .join("")}</div>`,
+  };
+}
+
+async function sendInvite(email: string, replyTo: string | null, c: CorreoInvitacion): Promise<boolean> {
   if (!env.RESEND_API_KEY) return false;
   try {
     const r = await new Resend(env.RESEND_API_KEY).emails.send({
-      from: "Improvement <improvement@jotapuntoce.com>",
+      from: `${c.fromName} <improvement@jotapuntoce.com>`,
       to: email,
-      subject: `${nombre.split(" ")[0]}, tu agente de Improvement te espera`,
-      text: `Hola ${nombre}:\n\nTe invitaron a Improvement como ${puesto}. Ahí tienes un agente hecho para tu trabajo: te dice qué toca hoy y te quita lo que se repite.\n\nEntra aquí (vale 7 días): ${link}\n\nImprovement`,
+      ...(replyTo ? { replyTo } : {}),
+      subject: c.subject,
+      text: c.text,
+      html: c.html,
     });
     return !r.error;
   } catch {
