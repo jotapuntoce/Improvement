@@ -1,5 +1,6 @@
 // Inicio del negocio: portada y logo de su marca, las tarjetas fijas (junta, siguiente movimiento) y
 // debajo el tablero de cada persona: sus tarjetas, que agrega, acomoda y quita.
+import { loadMiAgente } from "@/server/equipo/agentes.ts";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSessionUserId, requireOrgMembership } from "@/server/auth/guard.ts";
@@ -33,6 +34,8 @@ export default async function OrgHome({ params, searchParams }: { params: Promis
   const isOwner = memberRow.role === "owner";
   // El dueño que se registró y no cerró su arranque lo retoma donde lo dejó.
   if (isOwner && (await needsOnboarding(memberRow.userId, orgId))) redirect(`/arranque/${orgId}/negocio`);
+  // El empleado que no ha contado su trabajo empieza por ahí: sin eso su agente no lo conoce.
+  if (!isOwner && (await loadMiAgente(memberRow.userId, orgId))?.conocido === false) redirect(`/${orgId}/mi-agente`);
   const [brand, cards, juntaPendiente] = await Promise.all([
     getBrand(memberRow.userId, orgId),
     seedDefaultCards(memberRow.userId, orgId),

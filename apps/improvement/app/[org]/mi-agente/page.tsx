@@ -26,7 +26,7 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   if (!mio.conocido) {
     return (
       <main className="arr-main mi-agente">
-        <p className="arr-why">Hola {nombre}. Soy tu agente de Improvement para {mio.puesto}{mio.sucursal ? ` en ${mio.sucursal}` : ""}. Antes de ayudarte quiero conocer tu trabajo.</p>
+        <p className="arr-why">Hola {nombre}. Soy tu agente de Improvement para {mio.puesto}{mio.sucursal ? ` en ${mio.sucursal}` : ""}. Antes de ayudarte quiero conocer todo tu trabajo: tu proceso de principio a fin y todas las tareas que te tocan.</p>
         <Entrevista action={contar} questions={EMPLEADO_QUESTIONS} label="Conocer tu trabajo" finish="Esto es lo que hago" pendingLabel="Guardando…" error={error} />
       </main>
     );
@@ -39,6 +39,13 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         {mio.respuestas.friccion && <p className="arr-why">Me dijiste que se te atora: “{mio.respuestas.friccion.slice(0, 280)}”. Por ahí empiezo.</p>}
         <ul className="mi-agente-ayuda">{helpFor(mio.respuestas).map((h) => <li key={h}>{h}</li>)}</ul>
       </section>
+      {mio.respuestas.aprendido && (
+        <section className="arr-alivio" aria-labelledby="ma-aprendido">
+          <h2 id="ma-aprendido">Lo que he aprendido de tu trabajo</h2>
+          <p className="arr-why">Lo voy sumando de lo que me cuentas en la burbuja.</p>
+          <ul className="mi-agente-ayuda">{mio.respuestas.aprendido.split("\n").map((x) => <li key={x}>{x}</li>)}</ul>
+        </section>
+      )}
       {mio.apps.length > 0 && (
         <section className="arr-alivio" aria-labelledby="ma-apps">
           <h2 id="ma-apps">Lo tuyo</h2>

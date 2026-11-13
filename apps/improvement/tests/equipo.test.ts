@@ -9,6 +9,8 @@ import { finishOnboarding, loadProposal } from "../server/registro/onboarding.ts
 import { saveInterview } from "../server/owner/diagnostico.ts";
 import { acceptInvitation } from "../server/invitations/mutations.ts";
 import { createRecord, moveRecord } from "../server/apps/records.ts";
+import { ask } from "../server/conversation/agent.ts";
+import type { SuggestionCompletion, SuggestionProvider } from "../server/ai/gateway.ts";
 import { agenteBrief, helpFor, inviteEmail, inviteTeam, loadMiAgente, saveConocerte, teamSuggestion } from "../server/equipo/agentes.ts";
 
 describe("en qué le facilita Improvement el trabajo", () => {
@@ -69,11 +71,25 @@ describe("el equipo y sus agentes", () => {
     // Acepta: el agente ya es suyo y Improvement lo conoce.
     expect((await acceptInvitation(token, emp, { fullName: "Luis Compras", phone: "8112345678", areaId: null, jobTitle: "Compras", responsibilities: "Los pedidos" })).ok).toBe(true);
     expect((await loadMiAgente(emp.id, orgId))?.conocido).toBe(false);
-    await saveConocerte(emp.id, orgId, { trabajo: "Hago los pedidos", friccion: "Me piden todo por WhatsApp" });
+    await saveConocerte(emp.id, orgId, { trabajo: "Hago los pedidos", tareas: "Diario: revisar faltantes. Martes: pedido", friccion: "Me piden todo por WhatsApp" });
     const mio = (await loadMiAgente(emp.id, orgId))!;
     expect(mio.conocido).toBe(true);
     expect(mio.apps.map((x) => x.key)).toEqual(["pedidos-a-proveedores"]);
     expect(agenteBrief(mio)).toContain("Dónde se le atora: Me piden todo por WhatsApp");
+    expect(agenteBrief(mio)).toContain("Todas sus tareas: Diario: revisar faltantes. Martes: pedido");
+
+    // Platicando con su burbuja cuenta algo nuevo de su puesto: el agente lo aprende una sola vez.
+    const prompts: string[] = [];
+    const ai: SuggestionProvider = {
+      async complete(_s, prompt): Promise<SuggestionCompletion> {
+        prompts.push(prompt);
+        return { text: JSON.stringify({ respuesta: "Va, te lo recuerdo.", aprendido: ["Los martes manda el pedido de tortillas"] }), usage: { inputTokens: 10, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 }, finishReason: "end_turn" };
+      },
+    };
+    expect((await ask(emp.id, orgId, "Ah, y los martes también pido las tortillas", ai)).ok).toBe(true);
+    expect((await ask(emp.id, orgId, "¿Qué me toca hoy?", ai)).ok).toBe(true);
+    expect(prompts[1]).toContain("Los martes manda el pedido de tortillas");
+    expect((await loadMiAgente(emp.id, orgId))!.respuestas.aprendido).toBe("Los martes manda el pedido de tortillas");
 
     // Se acaba la carne → nace su pedido → la tarea de mandarlo es de Luis, no del dueño.
     const carne = await createRecord(owner.id, orgId, "inventario", "Carne al pastor");

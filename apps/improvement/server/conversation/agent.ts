@@ -10,7 +10,7 @@ import { loadSidebar } from "../apps/sidebar.ts";
 import { listInbox } from "../tasks/inbox.ts";
 import { createTask } from "../tasks/inbox.ts";
 import { listOwnerMemory, ownerBrief } from "../owner/memory.ts";
-import { agenteBrief, loadMiAgente } from "../equipo/agentes.ts";
+import { agenteBrief, learnFromChat, loadMiAgente } from "../equipo/agentes.ts";
 import { extractStructured, type SuggestionProvider } from "../ai/gateway.ts";
 import { OWNER_SYSTEM_PROMPT, ROLE_SYSTEM_PROMPT, buildConversationPrompt, conversationSchema } from "../ai/prompts/conversation.ts";
 
@@ -75,6 +75,8 @@ export async function ask(userId: string, orgId: string, raw: unknown, provider?
     provider,
   });
   if (!r.ok) return fail("Improvement no pudo contestar ahora. Tu pregunta quedó guardada.", "AI_UNAVAILABLE");
+  // Lo nuevo que contó de su puesto se queda en su agente para la próxima.
+  if (me.role !== "owner" && r.data.parsed.aprendido?.length) await learnFromChat(userId, orgId, r.data.parsed.aprendido);
   const [row] = await db
     .insert(agentMessage)
     .values({ orgId, userId, role: "improvement", body: r.data.parsed.respuesta })
