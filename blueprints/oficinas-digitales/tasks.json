@@ -1,0 +1,1411 @@
+[
+  {
+    "id": "E1-T1",
+    "title": "Variables nuevas degradadas por paso",
+    "epic": "01-base",
+    "dependencies": [],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `apps/improvement/lib/env.ts` se importa con las seis variables nuevas vacías THE SYSTEM SHALL cargar sin lanzar y dejar cada una en `undefined`.",
+      "WHEN `requireEnv(\"AGENTS_API_SECRET\")` corre sin la variable THE SYSTEM SHALL lanzar un error cuyo mensaje contiene `AGENTS_API_SECRET no está configurada`.",
+      "WHEN se lee `.env.example` THE SYSTEM SHALL contener `TOKEN_ENCRYPTION_KEY=` y `STRIPE_SEATS_WEBHOOK_SECRET=` sin valor, y WHEN se lee `turbo.json` THE SYSTEM SHALL listar `AGENTS_API_SECRET` e `IMPROVEMENT_API_URL` en `globalEnv`."
+    ],
+    "verify": [
+      "grep -qx 'TOKEN_ENCRYPTION_KEY=' .env.example",
+      "grep -qx 'STRIPE_SEATS_WEBHOOK_SECRET=' .env.example",
+      "grep -q '\"AGENTS_API_SECRET\"' turbo.json",
+      "grep -q '\"IMPROVEMENT_API_URL\"' turbo.json",
+      "pnpm --filter improvement test tests/env-oficinas.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-01-od-entorno",
+    "files": [
+      "apps/improvement/lib/env.ts",
+      "turbo.json",
+      ".env.example",
+      "apps/improvement/tests/env-oficinas.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T2",
+    "title": "Catálogo de giros con categoría, base y plantilla de áreas",
+    "epic": "01-base",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se lee `INDUSTRIES` THE SYSTEM SHALL empezar con los 8 ids `restaurante`, `retail`, `servicios`, `salud`, `construccion`, `tecnologia`, `manufactura`, `otro` con sus etiquetas actuales y en ese orden.",
+      "WHEN `isIndustry` recibe `wedding_planner`, `clinica`, `hotel`, `despacho`, `taller`, `inmobiliaria` o `desarrolladora` THE SYSTEM SHALL devolver `true` para cada uno.",
+      "WHEN `buildingShape(\"clinica\")` y `buildingPalette(\"clinica\")` corren THE SYSTEM SHALL devolver la forma y la paleta de `salud`, su base.",
+      "WHEN se recorre `INDUSTRIES` THE SYSTEM SHALL tener ids únicos, una `category` de `INDUSTRY_CATEGORIES` y a lo más 12 áreas en cada plantilla."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/industries.test.ts",
+      "pnpm --filter improvement test tests/building-graph.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-02-od-giros",
+    "files": [
+      "packages/ui/src/building/industries.ts",
+      "packages/ui/src/building/palettes.ts",
+      "packages/ui/src/building/shapes.ts",
+      "packages/ui/src/building/AppIconLarge.tsx",
+      "apps/improvement/tests/industries.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T3",
+    "title": "Esquema de tema por org, giro libre y categorías de IA nuevas",
+    "epic": "01-base",
+    "dependencies": [
+      "E1-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se inserta un `organization` con `theme` y se lee de vuelta THE SYSTEM SHALL devolver el mismo objeto, y WHEN se inserta sin `theme` THE SYSTEM SHALL leerlo como `null`.",
+      "WHEN se inserta un `organization` con `industry_custom` de 81 caracteres THE SYSTEM SHALL rechazar el insert en la base.",
+      "WHEN se inserta un `ai_suggestion` con `category` `oficina` o `agente` THE SYSTEM SHALL aceptarlo, y WHEN la `category` es `inventada` THE SYSTEM SHALL rechazarlo.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'ADD COLUMN \"theme\" jsonb' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/tema-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-03-od-tema-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/tema-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T4",
+    "title": "Tema por org con contraste AA aplicado en el layout",
+    "epic": "01-base",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `contrastRatio(\"#777777\", \"#ffffff\")` y `contrastRatio(\"#767676\", \"#ffffff\")` corren THE SYSTEM SHALL devolver `4.48` y `4.54` redondeados a 2 decimales.",
+      "WHEN `themeIssues` recibe un tema con `textPrimary` `#6b7386` sobre `bg` `#05060b` THE SYSTEM SHALL devolver una entrada para `textPrimary` con `ratio` `4.26`, y WHEN recibe el tema verde de Improvement THE SYSTEM SHALL devolver `[]`.",
+      "WHEN un empleado llama `setOrgTheme` THE SYSTEM SHALL devolver `ok: false` con `NOT_FOUND` sin escribir, y WHEN el dueño guarda un tema que falla AA THE SYSTEM SHALL devolver `CONTRAST` y dejar `organization.theme` sin cambio.",
+      "WHEN el dueño guarda un tema válido y luego `null` THE SYSTEM SHALL dejar `organization.theme` con ese objeto y después en `null`.",
+      "WHEN `organization.theme` contiene un objeto que no valida THE SYSTEM SHALL hacer que `loadOrgTheme` devuelva `null`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/theme.test.ts",
+      "grep -q '\"./theme.ts\": \"./src/theme.ts\"' packages/ui/package.json",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-04-od-tema",
+    "files": [
+      "packages/ui/src/theme.ts",
+      "packages/ui/package.json",
+      "apps/improvement/server/companies/theme.ts",
+      "apps/improvement/app/[org]/layout.tsx",
+      "apps/improvement/tests/theme.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T5",
+    "title": "Pantalla de marca del dueño",
+    "epic": "01-base",
+    "dependencies": [
+      "E1-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño guarda un tema válido en `/[org]/marca` THE SYSTEM SHALL aplicar `--accent-1` con ese valor en el contenedor del layout del org.",
+      "WHEN el dueño guarda `textPrimary` `#6b7386` sobre `bg` `#05060b` THE SYSTEM SHALL mostrar una alerta `role=\"alert\"` con `4.26` y no cambiar el tema guardado.",
+      "WHEN un empleado abre `/[org]/marca` THE SYSTEM SHALL responder 404.",
+      "WHEN AxeBuilder analiza `/[org]/marca` THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e marca.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-05-od-marca",
+    "files": [
+      "apps/improvement/app/[org]/marca/page.tsx",
+      "apps/improvement/tests/e2e/marca.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T1",
+    "title": "Esquema de la oficina 2D, bucket privado y su RLS",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se insertan un `office_plan` en `draft` y una `office_zone` `area` ligada a un área THE SYSTEM SHALL aceptarlos, y WHEN se inserta un segundo `draft` para el mismo org THE SYSTEM SHALL rechazarlo.",
+      "WHEN se inserta una `office_zone` con `x` 35 y `w` 6, o una zona `recepcion` con `area_id` THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN un empleado del org consulta `office_plan` como rol `authenticated` THE SYSTEM SHALL ver el plano `confirmed` y no ver el `draft`, y WHEN consulta el dueño THE SYSTEM SHALL ver los dos.",
+      "WHEN un perfil sin membresía consulta `office_plan` u `office_zone` como `authenticated` THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN se consulta `storage.buckets` THE SYSTEM SHALL tener el bucket `espacios` con `public` en `false`.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q \"values ('espacios', 'espacios', false)\" packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/oficina-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-06-od-oficina-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/oficina-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T2",
+    "title": "Fotos del espacio en el bucket privado",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño sube 7 fotos, un `image/gif` o una foto de 6 MB THE SYSTEM SHALL devolver `ok: false` con `VALIDATION_ERROR` sin llamar a `upload`.",
+      "WHEN el dueño sube 2 fotos válidas THE SYSTEM SHALL devolver 2 rutas que empiezan con `<orgId>/` y terminan en la extensión de su tipo.",
+      "WHEN un empleado llama `uploadSpacePhotos` o `readSpacePhotos` THE SYSTEM SHALL devolver `ok: false` con `NOT_FOUND` sin tocar el storage.",
+      "WHEN `readSpacePhotos` recibe una ruta de otro org THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin descargarla."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/office-photos.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/office || status=$?; test \"$status\" -eq 1",
+      "status=0; grep -rn 'SUPABASE_SERVICE_ROLE_KEY' apps/improvement/server || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-07-od-fotos",
+    "files": [
+      "apps/improvement/server/office/photos.ts",
+      "apps/improvement/tests/office-photos.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T3",
+    "title": "Gateway con imágenes, propósitos nuevos y tope diario",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E1-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `generateStructured` recibe 2 imágenes THE SYSTEM SHALL pasar las 2 imágenes al proveedor y guardar una fila en `llm_calls` con `purpose` `oficina`.",
+      "WHEN `generateStructured` recibe 7 imágenes THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin llamar al proveedor.",
+      "WHEN el org ya tiene 100 filas de `llm_calls` en las últimas 24 horas THE SYSTEM SHALL devolver `RATE_LIMITED` sin llamar al proveedor.",
+      "WHEN `pnpm --filter improvement test tests/ai-gateway.test.ts` corre THE SYSTEM SHALL pasar sin cambios en ese archivo."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/ai-gateway-vision.test.ts",
+      "pnpm --filter improvement test tests/ai-gateway.test.ts",
+      "test \"$(grep -rl '@anthropic-ai/sdk' apps/improvement/server apps/improvement/app)\" = apps/improvement/server/ai/gateway.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-08-od-gateway",
+    "files": [
+      "apps/improvement/server/ai/gateway.ts",
+      "apps/improvement/tests/ai-gateway-vision.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T4",
+    "title": "Análisis de las fotos a un borrador validado",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T2",
+      "E2-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el proveedor falso devuelve una propuesta válida THE SYSTEM SHALL guardar un `office_plan` en `draft` con las rutas en `source_photos` y la propuesta en `proposal`.",
+      "WHEN se analiza dos veces el mismo org THE SYSTEM SHALL dejar un solo `draft` para ese org, el de la segunda corrida.",
+      "WHEN el proveedor devuelve dos veces un JSON que no cumple `officeProposalSchema` THE SYSTEM SHALL devolver `ok: false` con `VALIDATION_ERROR` sin escribir ningún `office_plan`.",
+      "WHEN un empleado llama `analyzeSpace` THE SYSTEM SHALL devolver `ok: false` con `NOT_FOUND` sin llamar al proveedor."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/office-analyze.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/office || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-09-od-analisis",
+    "files": [
+      "apps/improvement/server/ai/prompts/office.ts",
+      "apps/improvement/server/office/proposal.ts",
+      "apps/improvement/server/office/analyze.ts",
+      "apps/improvement/tests/office-analyze.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T5",
+    "title": "Acomodo puro de zonas por plantilla de giro",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E1-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `officeLayout` recibe la plantilla de `restaurante` y las áreas Ventas, Cocina y Caja THE SYSTEM SHALL devolver Cocina en (1,8,11,9), Caja en (13,8,11,9) y Ventas en (25,8,11,9).",
+      "WHEN `officeLayout` recibe de 1 a 12 áreas THE SYSTEM SHALL devolver zonas que caben en la cuadrícula de 40×24 y no se enciman entre sí ni con las tres zonas fijas.",
+      "WHEN `officeLayout` recibe 13 áreas THE SYSTEM SHALL lanzar `RangeError`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/office-layout.test.ts",
+      "grep -q '\"./building/officeLayout.ts\"' packages/ui/package.json",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-10-od-acomodo",
+    "files": [
+      "packages/ui/src/building/officeLayout.ts",
+      "packages/ui/package.json",
+      "apps/improvement/tests/office-layout.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T6",
+    "title": "Confirmar el plano y mantener las puertas del Lobby",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T4",
+      "E2-T5",
+      "E1-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el dueño confirma un borrador con las áreas Cocina y Caja en un org de giro `restaurante` sin áreas THE SYSTEM SHALL crear 2 `area`, sus `seat` y 5 `office_zone` (2 de área y 3 fijas) y dejar el plano en `confirmed`.",
+      "WHEN el org ya tiene un área llamada `cocina` THE SYSTEM SHALL reusar esa área en lugar de crear `Cocina` otra vez.",
+      "WHEN el borrador trae un tema que falla AA THE SYSTEM SHALL confirmar el plano sin escribir `organization.theme` y devolver `themeSkipped` en `true`.",
+      "WHEN se confirma un segundo borrador THE SYSTEM SHALL dejar un solo plano `confirmed` para el org, con las zonas del segundo.",
+      "WHEN un empleado llama `confirmOfficePlan` THE SYSTEM SHALL devolver `NOT_FOUND` sin escribir, y WHEN un miembro sin plano confirmado llama `loadOffice` THE SYSTEM SHALL recibir `null`.",
+      "WHEN el dueño de un org sin `section_labels` corre `loadLobby` THE SYSTEM SHALL devolver `sueltas` con exactamente los slugs `mapa`, `cobros`, `proyectos`, `postventa` y `direccion`, y `puertas` con exactamente `objetivos`, `equipo`, `clientes` y `powerups` — los mismos de antes del cambio, sin `oficina`, `canal`, `erp`, `agenda` ni `butacas`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/office-confirm.test.ts",
+      "pnpm --filter improvement test tests/lobby-oficinas.test.ts",
+      "grep -q 'OFICINAS_DIGITALES.has(s.slug)' apps/improvement/server/lobby/loadLobby.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/office || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-11-od-confirmar",
+    "files": [
+      "apps/improvement/server/office/confirm.ts",
+      "apps/improvement/server/office/loadOffice.ts",
+      "apps/improvement/tests/office-confirm.test.ts",
+      "apps/improvement/server/lobby/loadLobby.ts",
+      "apps/improvement/tests/lobby-oficinas.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T7",
+    "title": "Oficina pixel-art: modelo de escena y componente",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T5"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `officeScene` recibe la zona (1,8,11,9) con 3 personas THE SYSTEM SHALL colocarlas en los tiles (2,9), (4,9) y (6,9).",
+      "WHEN una zona de alto 2 y ancho 8 recibe 4 personas THE SYSTEM SHALL colocar 3 en la fila `y + 1` y reportar `overflow` 1 para esa área.",
+      "WHEN `officeScene` recibe una zona THE SYSTEM SHALL devolver su rectángulo en píxeles multiplicando por 16."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/office-scene.test.ts",
+      "grep -q '\"./building/Office.tsx\"' packages/ui/package.json",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-12-od-escena",
+    "files": [
+      "packages/ui/src/building/officeScene.ts",
+      "packages/ui/src/building/Office.tsx",
+      "packages/ui/package.json",
+      "apps/improvement/tests/office-scene.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T8",
+    "title": "Pantalla de la oficina: subir, revisar y confirmar",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T6",
+      "E2-T7",
+      "E1-T5"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/oficina` con un borrador y pulsa \"Confirmar oficina\" THE SYSTEM SHALL mostrar el plano con 5 elementos `[data-zone]`.",
+      "WHEN un empleado con `oficina` = `empresa` abre `/[org]/oficina` THE SYSTEM SHALL mostrar el plano confirmado sin el formulario de fotos.",
+      "WHEN un empleado sin permiso de `oficina` abre `/[org]/oficina` THE SYSTEM SHALL responder 404.",
+      "WHEN AxeBuilder analiza `/[org]/oficina` del dueño THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e oficina.spec.ts",
+      "pnpm --filter improvement test tests/permissions.test.ts tests/direccion-permissions.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-13-od-pantalla-oficina",
+    "files": [
+      "apps/improvement/app/[org]/oficina/page.tsx",
+      "apps/improvement/app/[org]/oficina/actions.ts",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/app/[org]/layout.tsx",
+      "apps/improvement/tests/e2e/oficina.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T9",
+    "title": "La oficina convive con el Lobby",
+    "epic": "02-oficina",
+    "dependencies": [
+      "E2-T8"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño de un org sin plano confirmado y sin `section_labels` entra a la recepción de `/empresas/<orgId>` THE SYSTEM SHALL mostrar `.jpc-reception-door` con exactamente los `href` `/<orgId>/mapa`, `/<orgId>/cobros`, `/<orgId>/proyectos`, `/<orgId>/postventa`, `/<orgId>/direccion`, `/<orgId>/necesidades` y `/<orgId>/improvement` — los mismos de antes del cambio.",
+      "WHEN un miembro entra a `/empresas/<orgId>` de un org con plano confirmado THE SYSTEM SHALL mostrar el `svg` de la oficina con sus zonas `[data-zone]`.",
+      "WHEN `pnpm --filter improvement test:e2e a11y.spec.ts` corre THE SYSTEM SHALL pasar sin cambios en ese archivo."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e oficina.spec.ts a11y.spec.ts",
+      "git diff --quiet HEAD -- packages/ui/src/building/Lobby.tsx",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-14-od-convivencia",
+    "files": [
+      "apps/improvement/app/empresas/[orgId]/page.tsx",
+      "apps/improvement/app/empresas/[orgId]/BuildingExperience.tsx",
+      "apps/improvement/tests/e2e/oficina.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T1",
+    "title": "Esquema de agentes, encargos y latido del worker",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E2-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se inserta un segundo `agent` `manager` para el mismo org, o un `especialista` sin `area_id` THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN se inserta un `agent_task` con `attempts` 4 o con `status` `perdido` THE SYSTEM SHALL rechazarlo.",
+      "WHEN quien pidió un encargo consulta `agent_task` como `authenticated` THE SYSTEM SHALL ver su encargo, y WHEN otro empleado del org consulta THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN un empleado consulta `agent` o `worker_heartbeat` como `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta el dueño `agent` THE SYSTEM SHALL ver los agentes de su org.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'create policy \"requesters and owners read encargos\"' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/agentes-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-15-od-agentes-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/agentes-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T2",
+    "title": "Esquema del canal con borrado suave y Realtime",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se inserta un `message` con los dos autores o con ninguno THE SYSTEM SHALL rechazar el insert en la base.",
+      "WHEN se marca `deleted_at` en un `message` sin vaciar `body` THE SYSTEM SHALL rechazar el update, y WHEN se vacía `body` en el mismo update THE SYSTEM SHALL aceptarlo.",
+      "WHEN un miembro del canal consulta `message` como `authenticated` THE SYSTEM SHALL ver los mensajes del canal, y WHEN consulta un empleado del mismo org que no es miembro THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN se consulta `pg_publication_tables` THE SYSTEM SHALL listar `message` en la publicación `supabase_realtime`.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'alter publication supabase_realtime add table message;' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/canal-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-16-od-canal-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/canal-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T3",
+    "title": "Agentes por org: manager, recepción y un especialista por jefe",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `areaHeads` recibe un área cuyo asiento raíz tiene titular y un asiento hijo de la misma área THE SYSTEM SHALL devolver como jefe al titular del asiento raíz.",
+      "WHEN el asiento superior de un área no tiene titular THE SYSTEM SHALL no devolver jefe para esa área.",
+      "WHEN el dueño corre `ensureAgents` dos veces en un org con dos áreas con jefe THE SYSTEM SHALL dejar exactamente 1 `manager`, 1 `recepcion`, 2 `especialista` y 1 canal `general` con todos los miembros.",
+      "WHEN el jefe de un área deja su asiento y se corre `ensureAgents` THE SYSTEM SHALL borrar el especialista de esa área.",
+      "WHEN un empleado llama `ensureAgents` o `updateAgent` THE SYSTEM SHALL devolver `NOT_FOUND` sin escribir."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/agents.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/agents || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-17-od-agentes",
+    "files": [
+      "apps/improvement/server/agents/heads.ts",
+      "apps/improvement/server/agents/agents.ts",
+      "apps/improvement/tests/agents.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T4",
+    "title": "Canal: publicar, listar y borrar suave",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN un miembro publica y luego lista THE SYSTEM SHALL devolver su mensaje con su autor.",
+      "WHEN un empleado del org que no es miembro del canal lista o publica THE SYSTEM SHALL devolver `NOT_FOUND` sin escribir.",
+      "WHEN el autor borra su mensaje THE SYSTEM SHALL conservar la fila con `deleted_at` y `body` vacío, y WHEN otro empleado intenta borrarlo THE SYSTEM SHALL devolver `NOT_FOUND`.",
+      "WHEN `ensureAgentChannel` corre dos veces para el mismo agente y perfil THE SYSTEM SHALL dejar un solo canal `agente` con ese perfil como único miembro."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/channels.test.ts",
+      "status=0; grep -n 'delete(message)' apps/improvement/server/channels/channels.ts || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-18-od-canal",
+    "files": [
+      "apps/improvement/server/channels/channels.ts",
+      "apps/improvement/tests/channels.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T5",
+    "title": "Recepción de encargos y su ruteo",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T3",
+      "E3-T4"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN un empleado pide un encargo con el `areaId` de un área con especialista THE SYSTEM SHALL asignarlo a ese especialista en estado `asignado`.",
+      "WHEN el encargo no trae `areaId` o el área no tiene especialista THE SYSTEM SHALL asignarlo al `manager`.",
+      "WHEN se crea un encargo THE SYSTEM SHALL publicar en su canal `agente` el mensaje del usuario y el de la recepción `Recibido. Lo atiende` seguido del nombre del agente.",
+      "WHEN el org no tiene `manager` THE SYSTEM SHALL devolver `NOT_READY` sin escribir, y WHEN un no miembro pide un encargo THE SYSTEM SHALL devolver `NOT_FOUND`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/agent-tasks.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-19-od-recepcion",
+    "files": [
+      "apps/improvement/server/agents/tasks.ts",
+      "apps/improvement/tests/agent-tasks.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T6",
+    "title": "Runtime protegido: latido, encargos y reporte matutino",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T5",
+      "E2-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN la ruta `POST /api/agentes/heartbeat` recibe un bearer incorrecto THE SYSTEM SHALL responder 401, y WHEN recibe el bearer correcto THE SYSTEM SHALL responder 200 y actualizar `worker_heartbeat`.",
+      "WHEN la ruta recibe la tarea `inventada` con el bearer correcto THE SYSTEM SHALL responder 404.",
+      "WHEN `runTarea(\"encargos\")` corre con un encargo `asignado` y un proveedor falso que responde `done` en `true` THE SYSTEM SHALL dejarlo en `hecho` y publicar la respuesta en su canal como el agente.",
+      "WHEN un encargo falla en su tercer intento THE SYSTEM SHALL dejarlo en `fallido` y publicar `No pude completar este encargo.`",
+      "WHEN `runTarea(\"reporte\")` corre dos veces el mismo día después de las 08:00 locales THE SYSTEM SHALL publicar un solo reporte en el canal `general`.",
+      "WHEN `workerStatus` lee un latido de hace 4 minutos THE SYSTEM SHALL devolver `stale` en `true`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/agents-runtime.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/agents || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-20-od-runtime",
+    "files": [
+      "apps/improvement/server/agents/tareas.ts",
+      "apps/improvement/server/agents/runtime.ts",
+      "apps/improvement/server/ai/prompts/agent.ts",
+      "apps/improvement/app/api/agentes/[tarea]/route.ts",
+      "apps/improvement/tests/agents-runtime.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T7",
+    "title": "Pantalla del canal con Realtime y aviso del worker caído",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T6",
+      "E2-T8"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño publica en el canal `general` THE SYSTEM SHALL mostrar el mensaje en la página abierta del empleado sin recargar en menos de 10 segundos.",
+      "WHEN el autor borra su mensaje THE SYSTEM SHALL mostrar \"Mensaje borrado\" en su lugar.",
+      "WHEN el empleado envía un encargo sin área THE SYSTEM SHALL mostrar en su canal `agente` el mensaje `Recibido. Lo atiende Improvement.`",
+      "WHEN un empleado sin permiso de `canal` abre `/[org]/canal` THE SYSTEM SHALL responder 404, y WHEN AxeBuilder analiza la página del dueño THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e canal.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-21-od-pantalla-canal",
+    "files": [
+      "apps/improvement/app/[org]/canal/page.tsx",
+      "apps/improvement/app/[org]/canal/ChannelLive.tsx",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/e2e/canal.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T8",
+    "title": "Worker de agentes: paquete y punto de entrada",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `node apps/agentes/src/main.ts --version` corre desde la raíz THE SYSTEM SHALL salir 0 e imprimir `0.1.0`, la `version` de `apps/agentes/package.json`.",
+      "WHEN `pnpm install --frozen-lockfile` corre después de este paso THE SYSTEM SHALL salir 0.",
+      "WHEN `pnpm --filter @jotapuntoce/agentes typecheck` corre THE SYSTEM SHALL salir 0 con `erasableSyntaxOnly` y `verbatimModuleSyntax` activos.",
+      "WHEN `pnpm lint` corre THE SYSTEM SHALL incluir `apps/agentes` con el config raíz y salir 0."
+    ],
+    "verify": [
+      "test \"$(node apps/agentes/src/main.ts --version)\" = 0.1.0",
+      "pnpm install --frozen-lockfile",
+      "pnpm --filter @jotapuntoce/agentes typecheck",
+      "grep -q '\"erasableSyntaxOnly\": true' apps/agentes/tsconfig.json",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-22-od-worker",
+    "files": [
+      "apps/agentes/package.json",
+      "apps/agentes/tsconfig.json",
+      "apps/agentes/vitest.config.ts",
+      "apps/agentes/src/main.ts",
+      "pnpm-lock.yaml"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E3-T9",
+    "title": "Worker: cadencia, cliente y unidad systemd",
+    "epic": "03-agentes",
+    "dependencies": [
+      "E3-T8"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `tareasDue` recibe `2026-11-18T10:00:00Z` THE SYSTEM SHALL devolver las 6 tareas, y WHEN recibe `2026-11-18T10:07:00Z` THE SYSTEM SHALL devolver solo `heartbeat`, `encargos` y `butacas`.",
+      "WHEN se compara `TAREAS_WORKER` con `TAREAS` de `apps/improvement/server/agents/tareas.ts` THE SYSTEM SHALL tener exactamente el mismo conjunto.",
+      "WHEN `callTarea` corre con un `fetch` falso THE SYSTEM SHALL hacer `POST` a `<baseUrl>/api/agentes/<tarea>` con `Authorization: Bearer <secret>`, y WHEN el `fetch` rechaza THE SYSTEM SHALL devolver `ok` en `false` sin lanzar.",
+      "WHEN `readConfig` recibe un entorno sin `AGENTS_API_SECRET` THE SYSTEM SHALL devolver `ok` en `false` con `AGENTS_API_SECRET` en `missing`.",
+      "WHEN se lee `apps/agentes/deploy/agentes.service` THE SYSTEM SHALL tener `ExecStart=/usr/bin/node src/main.ts` y `Restart=always`."
+    ],
+    "verify": [
+      "pnpm --filter @jotapuntoce/agentes test",
+      "test \"$(node apps/agentes/src/main.ts --version)\" = 0.1.0",
+      "grep -qx 'ExecStart=/usr/bin/node src/main.ts' apps/agentes/deploy/agentes.service",
+      "grep -qx 'Restart=always' apps/agentes/deploy/agentes.service",
+      "pnpm --filter @jotapuntoce/agentes typecheck",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-23-od-worker-ciclo",
+    "files": [
+      "apps/agentes/src/schedule.ts",
+      "apps/agentes/src/client.ts",
+      "apps/agentes/src/main.ts",
+      "apps/agentes/tests/schedule.test.ts",
+      "apps/agentes/deploy/agentes.service"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T1",
+    "title": "Esquema ERP: productos, movimientos de inventario y proveedores",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E3-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se inserta un `stock_move` `entrada` con `quantity` -3 o `salida` con `quantity` 2 THE SYSTEM SHALL rechazar cada insert en la base.",
+      "WHEN se insertan dos `product` del mismo org con el mismo `sku` THE SYSTEM SHALL rechazar el segundo, y WHEN los dos tienen `sku` nulo THE SYSTEM SHALL aceptar ambos.",
+      "WHEN un empleado con `erp` = `empresa` consulta `product` como `authenticated` THE SYSTEM SHALL ver los productos de su org, y WHEN consulta un empleado sin ese permiso THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'create policy \"members read stock moves their permission type allows\"' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/erp-inventario-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-24-od-inventario-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/erp-inventario-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T2",
+    "title": "Esquema ERP: órdenes de venta y de compra",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se inserta una `sale_order_line` con `quantity` 0 THE SYSTEM SHALL rechazarla en la base.",
+      "WHEN se borra un `product` que tiene una línea de venta THE SYSTEM SHALL rechazar el borrado.",
+      "WHEN se insertan dos `sale_order` del mismo org con el mismo `number` THE SYSTEM SHALL rechazar la segunda.",
+      "WHEN un empleado sin permiso de `erp` consulta `purchase_order` como `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN consulta el dueño THE SYSTEM SHALL ver las de su org.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'create policy \"members read purchase order lines their permission type allows\"' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/erp-ordenes-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-25-od-ordenes-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/erp-ordenes-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T3",
+    "title": "Motor de inventario con existencia calculada",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se registran una `entrada` de 10 y una `salida` de -4 THE SYSTEM SHALL listar el producto con `stock` 6.",
+      "WHEN una `salida` dejaría la existencia en negativo THE SYSTEM SHALL devolver `Sin existencia suficiente.` sin escribir el movimiento.",
+      "WHEN un empleado con `erp` = `empresa` registra un `ajuste` THE SYSTEM SHALL devolver `NOT_FOUND`, y WHEN lo registra el dueño THE SYSTEM SHALL aceptarlo.",
+      "WHEN un empleado sin permiso de `erp` lista productos THE SYSTEM SHALL devolver `NOT_FOUND`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/erp-inventory.test.ts",
+      "pnpm --filter improvement test tests/erp-projects.test.ts tests/postventa.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/erp || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-26-od-inventario",
+    "files": [
+      "apps/improvement/server/erp/inventory.ts",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/erp-inventory.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T4",
+    "title": "Motor de ventas y compras ligado al inventario",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se crea una orden de venta con 2 líneas (3 × 1500 y 1 × 2000 centavos) THE SYSTEM SHALL guardar `total_cents` 6500 en `borrador`.",
+      "WHEN se confirma una orden de venta con existencia suficiente THE SYSTEM SHALL pasarla a `confirmada` y bajar la existencia de cada producto en su cantidad.",
+      "WHEN una línea no alcanza existencia al confirmar THE SYSTEM SHALL devolver `Sin existencia suficiente.` y no escribir ningún movimiento de esa orden.",
+      "WHEN se recibe una orden de compra de 5 piezas THE SYSTEM SHALL subir la existencia del producto en 5 y dejar la orden en `recibida`.",
+      "WHEN se crea una orden de venta con un `clientId` de otro org THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin escribir."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/erp-orders.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/erp || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-27-od-ordenes",
+    "files": [
+      "apps/improvement/server/erp/sales.ts",
+      "apps/improvement/server/erp/purchases.ts",
+      "apps/improvement/tests/erp-orders.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T5",
+    "title": "CRM: resumen del pipeline y ficha 360",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T4"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN `pipelineSummary` recibe 2 tratos `ganado` y 1 `perdido` THE SYSTEM SHALL devolver `winRate` 0.67 y una fila por cada etapa de `DEAL_STAGES` en su orden.",
+      "WHEN `pipelineSummary` recibe solo tratos abiertos THE SYSTEM SHALL devolver `winRate` `null`.",
+      "WHEN un empleado con `clientes` pero sin `erp` carga la ficha 360 THE SYSTEM SHALL devolver tratos y tickets del cliente y una lista de órdenes vacía.",
+      "WHEN se pide la ficha de un cliente de otro org THE SYSTEM SHALL devolver `NOT_FOUND`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/crm-360.test.ts",
+      "pnpm --filter improvement test tests/crm.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-28-od-crm-360",
+    "files": [
+      "apps/improvement/server/crm/pipeline.ts",
+      "apps/improvement/server/crm/client360.ts",
+      "apps/improvement/tests/crm-360.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T6",
+    "title": "Pantallas del ERP: inventario, ventas y compras",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T4",
+      "E3-T7"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño da de alta un producto, registra una entrada de 10 y confirma una venta de 3 THE SYSTEM SHALL mostrar existencia 7 en `/[org]/erp`.",
+      "WHEN el dueño recibe una compra de 5 piezas THE SYSTEM SHALL mostrar la existencia aumentada en 5.",
+      "WHEN un empleado sin permiso de `erp` abre `/[org]/erp` THE SYSTEM SHALL responder 404.",
+      "WHEN AxeBuilder analiza `/[org]/erp`, `/[org]/erp/ventas` y `/[org]/erp/compras` THE SYSTEM SHALL reportar 0 violaciones en cada una."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e erp-v1.spec.ts",
+      "pnpm --filter improvement test tests/permissions.test.ts tests/erp-sections.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-29-od-pantallas-erp",
+    "files": [
+      "apps/improvement/app/[org]/erp/page.tsx",
+      "apps/improvement/app/[org]/erp/ventas/page.tsx",
+      "apps/improvement/app/[org]/erp/compras/page.tsx",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/e2e/erp-v1.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E4-T7",
+    "title": "Pantallas del CRM con diseño Flozzy",
+    "epic": "04-crm-erp",
+    "dependencies": [
+      "E4-T5",
+      "E4-T6"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño abre `/[org]/clientes/pipeline` con un trato `ganado` y uno `perdido` THE SYSTEM SHALL mostrar una columna por etapa y la tasa de cierre `50%` en el encabezado.",
+      "WHEN el dueño abre la ficha de un cliente con una orden de venta THE SYSTEM SHALL mostrar la orden en la pestaña Órdenes.",
+      "WHEN `pnpm --filter improvement test:e2e erp.spec.ts` corre THE SYSTEM SHALL pasar sin cambios en ese archivo.",
+      "WHEN AxeBuilder analiza el pipeline y la ficha 360 THE SYSTEM SHALL reportar 0 violaciones en cada una."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e crm-flozzy.spec.ts erp.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-30-od-crm-flozzy",
+    "files": [
+      "apps/improvement/app/[org]/clientes/pipeline/page.tsx",
+      "apps/improvement/app/[org]/clientes/[clienteId]/page.tsx",
+      "apps/improvement/tests/e2e/crm-flozzy.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T1",
+    "title": "Esquema de agenda, conexiones y reservas con RLS",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E4-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se insertan dos `booking` `confirmada` para la misma página y el mismo `starts_at` THE SYSTEM SHALL rechazar la segunda, y WHEN la primera está `cancelada` THE SYSTEM SHALL aceptar la nueva.",
+      "WHEN se inserta un `calendar_event` con `ends_at` igual a `starts_at` o un `booking_page` con `slug` `Mi Agenda` THE SYSTEM SHALL rechazar cada insert.",
+      "WHEN el dueño del org consulta `calendar_event` de un empleado como `authenticated` THE SYSTEM SHALL devolver 0 filas, y WHEN el empleado consulta los suyos THE SYSTEM SHALL verlos.",
+      "WHEN un usuario consulta `refresh_token_enc` de su propia `calendar_connection` como `authenticated` THE SYSTEM SHALL fallar por permiso, y WHEN consulta `status` THE SYSTEM SHALL devolverlo.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'revoke all on calendar_connection from anon, authenticated;' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/agenda-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-31-od-agenda-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/agenda-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T2",
+    "title": "Cifrado AES-256-GCM de tokens",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se cifra y descifra `1//refresh-de-prueba` con la misma llave THE SYSTEM SHALL devolver el texto original.",
+      "WHEN se cifra dos veces el mismo texto THE SYSTEM SHALL producir dos resultados distintos que empiezan con `v1.`",
+      "WHEN se cambia un carácter del cifrado o se usa otra llave THE SYSTEM SHALL devolver `BAD_TOKEN` sin lanzar.",
+      "WHEN la llave decodifica a 16 bytes THE SYSTEM SHALL devolver `BAD_KEY`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/calendar-crypto.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-32-od-cifrado",
+    "files": [
+      "apps/improvement/server/calendar/crypto.ts",
+      "apps/improvement/tests/calendar-crypto.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T3",
+    "title": "Reprogramación pura de pendientes",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E1-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `now` es `2026-11-18T16:10:00Z`, `busy` tiene `16:30Z–17:30Z` y hay una tarea pendiente vencida de 45 minutos THE SYSTEM SHALL moverla a `2026-11-18T17:30:00.000Z`–`2026-11-18T18:15:00.000Z`.",
+      "WHEN `now` es `2026-11-18T23:40:00Z` (17:40 local) y la tarea dura 45 minutos THE SYSTEM SHALL moverla a `2026-11-19T15:00:00.000Z`, las 09:00 locales del día siguiente.",
+      "WHEN hay dos tareas vencidas THE SYSTEM SHALL colocarlas sin encimarse entre sí, en el orden de su `startsAt` original.",
+      "WHEN una tarea está `hecho` o todavía no vence THE SYSTEM SHALL dejarla fuera de `moves`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/calendar-reschedule.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-33-od-reprogramar",
+    "files": [
+      "apps/improvement/server/calendar/reschedule.ts",
+      "apps/improvement/tests/calendar-reschedule.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T4",
+    "title": "Motor de agenda y disponibilidad",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E5-T1",
+      "E5-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `availableSlots` recibe el miércoles `2026-11-18` con horario `09:00–11:00`, duración 60 y `busy` `16:00Z–17:00Z` THE SYSTEM SHALL devolver solo `2026-11-18T15:00:00.000Z`.",
+      "WHEN un usuario corre `rescheduleMine` con una tarea vencida THE SYSTEM SHALL escribir su nuevo horario, y WHEN el dueño intenta leer o mover eventos de un empleado THE SYSTEM SHALL no devolverlos ni modificarlos.",
+      "WHEN dos usuarios guardan una página de reservas con el mismo `slug` THE SYSTEM SHALL devolver `SLUG_TAKEN` al segundo.",
+      "WHEN `createEvent` recibe un fin anterior al inicio THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin escribir."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/calendar-events.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/calendar || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-34-od-agenda",
+    "files": [
+      "apps/improvement/server/calendar/events.ts",
+      "apps/improvement/server/calendar/availability.ts",
+      "apps/improvement/tests/calendar-events.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T5",
+    "title": "Cliente de Google Calendar con fetch",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E5-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `googleAuthUrl` corre THE SYSTEM SHALL devolver una URL de `accounts.google.com/o/oauth2/v2/auth` con `access_type=offline`, `prompt=consent` y los dos scopes de calendario.",
+      "WHEN `exchangeCode` corre con un `fetch` falso THE SYSTEM SHALL hacer `POST` a `https://oauth2.googleapis.com/token` con `grant_type=authorization_code` en el cuerpo.",
+      "WHEN `listEvents` recibe dos páginas THE SYSTEM SHALL devolver los eventos de las dos y el `nextSyncToken` de la última.",
+      "WHEN `listEvents` recibe un 410 THE SYSTEM SHALL devolver `SYNC_TOKEN_GONE` sin lanzar."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/calendar-google.test.ts",
+      "status=0; grep -rn 'googleapis\"' apps/improvement/server apps/improvement/app || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-35-od-google",
+    "files": [
+      "apps/improvement/server/calendar/google.ts",
+      "apps/improvement/tests/calendar-google.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T6",
+    "title": "Conexión con Google y tareas agenda/google del runtime",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E5-T4",
+      "E5-T5",
+      "E3-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `connectGoogle` recibe un código válido del `fetch` falso THE SYSTEM SHALL guardar una `calendar_connection` `activa` cuyo `refresh_token_enc` empieza con `v1.` y descifra al token original.",
+      "WHEN `syncGoogleFor` recibe un 410 THE SYSTEM SHALL borrar los eventos `google` del usuario y rellenarlos con una sincronización completa sin `syncToken`.",
+      "WHEN el refresh del token responde 400 THE SYSTEM SHALL dejar la conexión en `error`.",
+      "WHEN el callback recibe un `state` distinto de la cookie `od-google-state` THE SYSTEM SHALL redirigir con `google=error` sin escribir ninguna conexión.",
+      "WHEN `runTarea(\"google\")` corre sin conexiones activas THE SYSTEM SHALL devolver `procesadas` 0."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/calendar-sync.test.ts",
+      "pnpm --filter improvement test tests/agents-runtime.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-36-od-google-sync",
+    "files": [
+      "apps/improvement/app/api/calendar/google/connect/route.ts",
+      "apps/improvement/app/api/calendar/google/callback/route.ts",
+      "apps/improvement/server/calendar/sync.ts",
+      "apps/improvement/server/agents/runtime.ts",
+      "apps/improvement/tests/calendar-sync.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T7",
+    "title": "Pantalla de agenda del usuario",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E5-T6",
+      "E4-T6"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el usuario crea una tarea vencida y pulsa \"Reprogramar pendientes\" THE SYSTEM SHALL mostrarla con un horario posterior a la hora actual.",
+      "WHEN el usuario guarda una página de reservas con slug válido THE SYSTEM SHALL mostrar su enlace `/agenda/<slug>`.",
+      "WHEN un empleado sin permiso de `agenda` abre `/[org]/agenda` THE SYSTEM SHALL responder 404.",
+      "WHEN AxeBuilder analiza `/[org]/agenda` THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e agenda.spec.ts",
+      "pnpm --filter improvement test tests/permissions.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-37-od-pantalla-agenda",
+    "files": [
+      "apps/improvement/app/[org]/agenda/page.tsx",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/e2e/agenda.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E5-T8",
+    "title": "Portal público de reservas",
+    "epic": "05-agenda",
+    "dependencies": [
+      "E5-T7"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN dos visitantes reservan el mismo horario al mismo tiempo THE SYSTEM SHALL confirmar exactamente una reserva y devolver `SLOT_TAKEN` a la otra.",
+      "WHEN un visitante reserva THE SYSTEM SHALL crear un `calendar_event` con `source` `reserva` en la agenda del dueño de la página.",
+      "WHEN se pide un horario fuera de `availableSlots` THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin escribir.",
+      "WHEN un visitante sin sesión abre `/agenda/<slug>` y reserva THE SYSTEM SHALL mostrar la confirmación, y WHEN otro visitante abre el mismo día THE SYSTEM SHALL no mostrar ese horario."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/booking.test.ts",
+      "pnpm --filter improvement test:e2e agenda.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-38-od-reservas",
+    "files": [
+      "apps/improvement/server/calendar/booking.ts",
+      "apps/improvement/app/agenda/[slug]/page.tsx",
+      "apps/improvement/tests/booking.test.ts",
+      "apps/improvement/tests/e2e/agenda.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T1",
+    "title": "Stripe en Improvement y la opción stripeAccount verificada",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E5-T8"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se lee `apps/improvement/package.json` THE SYSTEM SHALL declarar `\"stripe\": \"23.0.0\"` exacto.",
+      "WHEN se buscan los tipos del SDK instalado THE SYSTEM SHALL encontrar la opción `stripeAccount` en un archivo `.d.ts` de `apps/improvement/node_modules/stripe/`.",
+      "WHEN `getStripe()` corre sin `STRIPE_SECRET_KEY` THE SYSTEM SHALL lanzar un error cuyo mensaje contiene `STRIPE_SECRET_KEY no está configurada`.",
+      "WHEN `pnpm install --frozen-lockfile` corre después de este paso THE SYSTEM SHALL salir 0."
+    ],
+    "verify": [
+      "grep -q '\"stripe\": \"23.0.0\"' apps/improvement/package.json",
+      "grep -rq --include='*.d.ts' 'stripeAccount' apps/improvement/node_modules/stripe/",
+      "pnpm install --frozen-lockfile",
+      "pnpm --filter improvement test tests/stripe-client.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-39-od-stripe",
+    "files": [
+      "apps/improvement/package.json",
+      "pnpm-lock.yaml",
+      "apps/improvement/server/stripe/client.ts",
+      "apps/improvement/tests/stripe-client.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T2",
+    "title": "Esquema de mapas, funciones y apartados con RLS",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E5-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN se insertan dos `seat_booking` para la misma función y el mismo lugar THE SYSTEM SHALL rechazar la segunda.",
+      "WHEN se inserta un `seat_booking` `held` sin `hold_expires_at` THE SYSTEM SHALL rechazarlo.",
+      "WHEN un empleado con `butacas` = `empresa` consulta `seat_booking` como `authenticated` THE SYSTEM SHALL ver los de su org, y WHEN consulta un empleado sin ese permiso THE SYSTEM SHALL devolver 0 filas.",
+      "WHEN se consulta `pg_publication_tables` THE SYSTEM SHALL listar `seat_booking` en `supabase_realtime`.",
+      "WHEN `pnpm db:generate` corre después de aplicar la migración THE SYSTEM SHALL no agregar ningún archivo `.sql` nuevo a `packages/db/migrations/`."
+    ],
+    "verify": [
+      "grep -q 'alter publication supabase_realtime add table seat_booking;' packages/db/migrations/*.sql",
+      "pnpm --filter improvement test tests/butacas-schema.test.ts",
+      "pnpm --filter @jotapuntoce/db typecheck",
+      "n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test \"$(ls packages/db/migrations/*.sql | wc -l)\" -eq \"$n\"",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-40-od-butacas-esquema",
+    "files": [
+      "packages/db/src/schema.ts",
+      "packages/db/migrations/**",
+      "apps/improvement/tests/butacas-schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T3",
+    "title": "Mapas como datos: plantillas por tipo de lugar",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T2"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `generateLayout(\"teatro\", { rows: 3, seatsPerRow: 4 })` corre THE SYSTEM SHALL devolver 12 butacas de `A1` a `C4`.",
+      "WHEN `generateLayout(\"lotes\", { blocks: 2, lotsPerBlock: 3 })` corre THE SYSTEM SHALL devolver `M1-L1` a `M2-L3` con `kind` `lote`.",
+      "WHEN los parámetros darían más de 2000 lugares THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin escribir.",
+      "WHEN el dueño crea un mapa de `bodas` con 5 mesas THE SYSTEM SHALL guardar 5 `venue_seat` con `capacity` 10, y WHEN un empleado sin `butacas` lo intenta THE SYSTEM SHALL devolver `NOT_FOUND`."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seats-venues.test.ts",
+      "status=0; grep -rEn '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' apps/improvement/server/seats || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-41-od-mapas",
+    "files": [
+      "apps/improvement/server/seats/layouts.ts",
+      "apps/improvement/server/seats/venues.ts",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/seats-venues.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T4",
+    "title": "Apartado atómico con prueba de concurrencia",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T3"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN dos apartados del mismo lugar corren al mismo tiempo THE SYSTEM SHALL dejar exactamente uno con `ok` en `true` y el otro con `SEATS_TAKEN`.",
+      "WHEN dos apartados de `[A1, A2]` y `[A2, A3]` corren al mismo tiempo THE SYSTEM SHALL dejar apartados todos los lugares de uno y ninguno del otro.",
+      "WHEN un lugar tiene un apartado vencido THE SYSTEM SHALL permitir apartarlo de nuevo con un `hold_token` nuevo.",
+      "WHEN se piden 11 lugares o la función está en `borrador` THE SYSTEM SHALL devolver `VALIDATION_ERROR` sin escribir.",
+      "WHEN `releaseExpired` corre THE SYSTEM SHALL liberar solo los apartados vencidos hace más de 10 minutos."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seats-hold.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-42-od-apartado",
+    "files": [
+      "apps/improvement/server/seats/hold.ts",
+      "apps/improvement/tests/seats-hold.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T5",
+    "title": "Checkout directo en la cuenta conectada",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T4",
+      "E6-T1"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN el org tiene `charges_enabled` en `true` THE SYSTEM SHALL crear la sesión de Checkout con la opción `stripeAccount` igual al `stripe_account_id` del org y sin `application_fee_amount`.",
+      "WHEN se crea la sesión de Checkout THE SYSTEM SHALL mandar `expires_at` igual, en segundos, al `hold_expires_at` del apartado.",
+      "WHEN el org no tiene `charges_enabled` THE SYSTEM SHALL responder 409 con `TAQUILLA_ONLY` sin apartar ningún lugar.",
+      "WHEN Stripe lanza un error THE SYSTEM SHALL liberar el apartado y responder 503.",
+      "WHEN la ruta recibe 11 lugares THE SYSTEM SHALL responder 400 sin apartar."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seats-checkout.test.ts",
+      "status=0; grep -rn 'application_fee' apps/improvement/server/seats || status=$?; test \"$status\" -eq 1",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-43-od-checkout",
+    "files": [
+      "apps/improvement/server/seats/checkout.ts",
+      "apps/improvement/app/api/butacas/[sessionId]/apartar/route.ts",
+      "apps/improvement/tests/seats-checkout.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T6",
+    "title": "Webhook de butacas y barrido de apartados vencidos",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T5",
+      "E5-T6"
+    ],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN llega un `checkout.session.completed` con firma válida de un apartado vigente THE SYSTEM SHALL marcar sus lugares `sold` con el nombre y correo del comprador.",
+      "WHEN la firma no es válida THE SYSTEM SHALL responder 400 sin escribir.",
+      "WHEN el lugar ya lo apartó otro comprador con otro `hold_token` THE SYSTEM SHALL dejar el apartado nuevo intacto y registrar `seat_paid_after_expiry`.",
+      "WHEN llega un `checkout.session.expired` THE SYSTEM SHALL liberar los lugares de ese apartado.",
+      "WHEN `runTarea(\"butacas\")` corre con un apartado vencido hace 11 minutos THE SYSTEM SHALL liberarlo y devolver `procesadas` 1."
+    ],
+    "verify": [
+      "pnpm --filter improvement test tests/seats-webhook.test.ts",
+      "pnpm --filter improvement test tests/agents-runtime.test.ts tests/calendar-sync.test.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-44-od-webhook",
+    "files": [
+      "apps/improvement/app/api/stripe/butacas/route.ts",
+      "apps/improvement/server/seats/webhook.ts",
+      "apps/improvement/server/agents/runtime.ts",
+      "apps/improvement/tests/seats-webhook.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T7",
+    "title": "Taquilla con Realtime",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T6",
+      "E5-T7"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN el dueño crea un mapa `teatro` de 2×3, publica una función y vende `A1` en taquilla THE SYSTEM SHALL mostrar `A1` como Vendido.",
+      "WHEN el dueño vende un lugar THE SYSTEM SHALL mostrarlo como Vendido en la página abierta de un empleado con `butacas` = `empresa` sin recargar en menos de 10 segundos.",
+      "WHEN un empleado sin permiso de `butacas` abre `/[org]/butacas` THE SYSTEM SHALL responder 404.",
+      "WHEN AxeBuilder analiza `/[org]/butacas` THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e butacas.spec.ts",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-45-od-taquilla",
+    "files": [
+      "apps/improvement/server/seats/boxOffice.ts",
+      "apps/improvement/app/[org]/butacas/page.tsx",
+      "apps/improvement/app/[org]/butacas/SeatMapLive.tsx",
+      "apps/improvement/server/permissions/sections.ts",
+      "apps/improvement/tests/e2e/butacas.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E6-T8",
+    "title": "Página pública de butacas",
+    "epic": "06-butacas",
+    "dependencies": [
+      "E6-T7"
+    ],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN un visitante sin sesión abre `/butacas/<sessionId>` después de que la taquilla vendió `A1` THE SYSTEM SHALL mostrar `A1` como ocupado.",
+      "WHEN el visitante intenta comprar en una función de un org sin `charges_enabled` THE SYSTEM SHALL mostrar `Esta función se vende solo en taquilla.`",
+      "WHEN se pide `GET /api/butacas/<sessionId>/estado` THE SYSTEM SHALL responder sin el nombre ni el correo de ningún comprador.",
+      "WHEN AxeBuilder analiza `/butacas/<sessionId>` THE SYSTEM SHALL reportar 0 violaciones."
+    ],
+    "verify": [
+      "pnpm --filter improvement test:e2e butacas.spec.ts",
+      "test \"$(git tag -l 'step-*-od-*' | wc -l)\" -eq 45",
+      "pnpm build",
+      "pnpm lint",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "checkpoint": "step-46-od-butacas-publico",
+    "files": [
+      "apps/improvement/server/seats/publicState.ts",
+      "apps/improvement/app/api/butacas/[sessionId]/estado/route.ts",
+      "apps/improvement/app/butacas/[sessionId]/page.tsx",
+      "apps/improvement/app/butacas/[sessionId]/SeatPicker.tsx",
+      "apps/improvement/tests/e2e/butacas.spec.ts"
+    ],
+    "status": "pending"
+  }
+]
