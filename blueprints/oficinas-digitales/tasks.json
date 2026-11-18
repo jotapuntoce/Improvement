@@ -27,7 +27,7 @@
       ".env.example",
       "apps/improvement/tests/env-oficinas.test.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E1-T2",

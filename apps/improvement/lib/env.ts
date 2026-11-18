@@ -25,6 +25,13 @@ const schema = z.object({
   CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 9 — bearer del cron de Vercel
   NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   NEXT_PUBLIC_SUMMUM_URL: z.preprocess(emptyToUndefined, z.string().url().optional()), // enlace "Cobros" a apps/summum
+  // Oficinas digitales (blueprints/oficinas-digitales §10) — cada una se exige desde su paso.
+  AGENTS_API_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 20 — bearer del worker de agentes
+  GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 36 — Google Calendar
+  GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 36 — Google Calendar
+  TOKEN_ENCRYPTION_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 36 — cifrado de refresh tokens
+  STRIPE_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 43 — Checkout de butacas
+  STRIPE_SEATS_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 44 — webhook de butacas
 });
 
 export const env = schema.parse(process.env);
