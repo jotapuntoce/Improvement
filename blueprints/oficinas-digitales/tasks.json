@@ -27,7 +27,7 @@
       ".env.example",
       "apps/improvement/tests/env-oficinas.test.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E1-T2",
@@ -58,7 +58,7 @@
       "packages/ui/src/building/AppIconLarge.tsx",
       "apps/improvement/tests/industries.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T3",

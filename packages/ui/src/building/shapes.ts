@@ -11,7 +11,7 @@
 //
 // Igual que la paleta: se elige por GIRO, que es un dato de la fila, nunca por nombre de empresa
 // (motor genérico, Non-negotiable #2 de CLAUDE.md).
-import { isIndustry, type Industry } from "./industries.ts";
+import { baseIndustry, type BaseIndustry } from "./industries.ts";
 
 export interface BuildingShape {
   /** Ventanas a lo ancho. */
@@ -24,7 +24,7 @@ export interface BuildingShape {
  * El tope es 10 columnas y 9 filas: más ancho no cabe en el viewBox de 660 y más alto se sale por
  * arriba, porque el suelo está fijo (el edificio crece hacia el cielo, nunca hacia abajo).
  */
-const SHAPES: Record<Industry, BuildingShape> = {
+const SHAPES: Record<BaseIndustry, BuildingShape> = {
   // Un local, no un edificio: chaparro y compacto.
   restaurante: { cols: 6, rows: 4 },
   // Fachada de tienda: ancha y baja, todo el frente a la calle.
@@ -43,5 +43,5 @@ const SHAPES: Record<Industry, BuildingShape> = {
 };
 
 export function buildingShape(industry: string | null | undefined): BuildingShape {
-  return SHAPES[isIndustry(industry) ? industry : "otro"];
+  return SHAPES[baseIndustry(industry)];
 }
