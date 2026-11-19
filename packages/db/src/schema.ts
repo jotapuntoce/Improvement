@@ -1956,6 +1956,75 @@ export const officeZone = pgTable(
   ],
 );
 
+// ─── Oficinas digitales: agentes ────────────────────────────────────────────────────────────────
+// Improvement es el manager y el agente del dueño; un especialista por área (de su jefe); la
+// recepción es la única entrada. RLS en agentes_rls: `agent` solo lo lee el dueño (sus instrucciones
+// pueden llevar memoria del dueño); un encargo, quien lo pidió y el dueño.
+
+export const AGENT_KINDS = ["manager", "especialista", "recepcion"] as const;
+export const AGENT_TASK_STATUSES = ["recibido", "asignado", "en_proceso", "hecho", "fallido"] as const;
+
+export const agent = pgTable(
+  "agent",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: AGENT_KINDS }).notNull(),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    // El dueño para manager y recepcion; el jefe del área para especialista.
+    ownerProfileId: uuid("owner_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    instructions: text("instructions").notNull().default(""),
+    skills: jsonb("skills").notNull().default(sql`'[]'::jsonb`),
+    lastReportOn: date("last_report_on"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("agent_kind_check", sql`${t.kind} in ('manager','especialista','recepcion')`),
+    check("agent_area_kind_check", sql`(${t.kind} = 'especialista') = (${t.areaId} is not null)`),
+    uniqueIndex("uq_agent_org_manager").on(t.orgId).where(sql`${t.kind} = 'manager'`),
+    uniqueIndex("uq_agent_org_recepcion").on(t.orgId).where(sql`${t.kind} = 'recepcion'`),
+    uniqueIndex("uq_agent_area").on(t.areaId).where(sql`${t.kind} = 'especialista'`),
+  ],
+);
+
+export const agentTask = pgTable(
+  "agent_task",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").references(() => agent.id, { onDelete: "set null" }),
+    requestedBy: uuid("requested_by").references(() => profile.id, { onDelete: "set null" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    status: text("status", { enum: AGENT_TASK_STATUSES }).notNull().default("recibido"),
+    attempts: integer("attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    result: text("result"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("agent_task_status_check", sql`${t.status} in ('recibido','asignado','en_proceso','hecho','fallido')`),
+    check("agent_task_attempts_range", sql`${t.attempts} between 0 and 3`),
+    check("agent_task_body_length", sql`char_length(${t.body}) between 1 and 2000`),
+    index("idx_agent_task_status_lock").on(t.status, t.lockedUntil),
+  ],
+);
+
+// El worker de apps/agentes avisa que sigue vivo. Sin política RLS: solo el servidor lo escribe y lee.
+export const workerHeartbeat = pgTable("worker_heartbeat", {
+  worker: text("worker").primaryKey(),
+  seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
 

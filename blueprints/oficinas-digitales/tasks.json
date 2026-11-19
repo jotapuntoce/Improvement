@@ -457,7 +457,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/agentes-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T2",
