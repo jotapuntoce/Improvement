@@ -707,7 +707,7 @@
       "apps/agentes/tests/schedule.test.ts",
       "apps/agentes/deploy/agentes.service"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T1",
