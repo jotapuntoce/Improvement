@@ -891,7 +891,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/e2e/erp-v1.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T7",
