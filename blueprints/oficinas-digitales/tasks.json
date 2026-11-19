@@ -1006,7 +1006,7 @@
       "apps/improvement/server/calendar/reschedule.ts",
       "apps/improvement/tests/calendar-reschedule.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T4",
