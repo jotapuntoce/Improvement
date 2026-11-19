@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./tokens.css": "./src/tokens.css",
+    "./theme.ts": "./src/theme.ts",
     "./building.css": "./src/building.css",
     "./building/Building.tsx": "./src/building/Building.tsx",
     "./building/Reception.tsx": "./src/building/Reception.tsx",

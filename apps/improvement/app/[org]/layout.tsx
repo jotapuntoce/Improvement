@@ -7,6 +7,8 @@ import Link from "next/link";
 import { BackLink } from "@/components/BackLink.tsx";
 import { getSessionUserId } from "@/server/auth/guard.ts";
 import { loadDireccionNav } from "@/server/direccion/nav.ts";
+import { loadOrgTheme } from "@/server/companies/theme.ts";
+import { themeStyle } from "@jotapuntoce/ui/theme.ts";
 
 export default async function OrgLayout({
   children,
@@ -18,9 +20,11 @@ export default async function OrgLayout({
   const { org } = await params;
   const userId = await getSessionUserId();
   const direccion = userId ? await loadDireccionNav(userId, org) : [];
+  // Tema propio del org (solo si pasa AA, ver packages/ui/src/theme.ts); null = tokens base.
+  const theme = userId ? await loadOrgTheme(userId, org) : null;
 
   return (
-    <>
+    <div style={theme ? themeStyle(theme) : undefined}>
       <BackLink href={`/empresas/${org}`} label="Volver al edificio" />
       {direccion.length > 0 && (
         <nav aria-label="Dirección" className="direccion-nav">
@@ -30,6 +34,6 @@ export default async function OrgLayout({
         </nav>
       )}
       {children}
-    </>
+    </div>
   );
 }
