@@ -27,19 +27,24 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { Building } from "@jotapuntoce/ui/building/Building.tsx";
 import { Lobby, type LobbyPuerta, type LobbyZona } from "@jotapuntoce/ui/building/Lobby.tsx";
+import { Office } from "@jotapuntoce/ui/building/Office.tsx";
 import { paletteStyle } from "@jotapuntoce/ui/building/palettes.ts";
 import type { BuildingGraph } from "@/server/building/buildingGraph.ts";
 import type { LobbyGraph } from "@/server/lobby/loadLobby.ts";
+import type { OfficeView } from "@/server/office/loadOffice.ts";
 
 export function BuildingExperience({
   orgId,
   graph,
   lobby,
+  office,
   esDueno,
 }: {
   orgId: string;
   graph: BuildingGraph;
   lobby: LobbyGraph;
+  /** El plano confirmado de la oficina 2D: con él se dibuja en el lugar del Lobby; null = lo de siempre. */
+  office: OfficeView | null;
   esDueno: boolean;
 }) {
   const [adentro, setAdentro] = useState(false);
@@ -61,6 +66,17 @@ export function BuildingExperience({
         <Link href="/empresas" className="jpc-back-link">
           ← Volver a mis empresas
         </Link>
+      </div>
+    );
+  }
+
+  if (office) {
+    return (
+      <div className="jpc-scene" style={sceneStyle}>
+        <Office orgName={graph.companyName} zones={office.zones} people={office.people} />
+        <button type="button" className="jpc-back-link" onClick={() => setAdentro(false)}>
+          ← Salir a la calle
+        </button>
       </div>
     );
   }

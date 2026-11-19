@@ -14,6 +14,7 @@ import { refreshNextMove } from "@/server/ai/nextMove.ts";
 import { loadBuilding } from "@/server/building/loadBuilding.ts";
 import { isMeetingPending } from "@/server/direccion/meetings/meetings.ts";
 import { loadLobby } from "@/server/lobby/loadLobby.ts";
+import { loadOffice } from "@/server/office/loadOffice.ts";
 import { BuildingExperience } from "./BuildingExperience.tsx";
 
 const NEXT_MOVE_ERROR = "Improvement no pudo pensar la jugada ahora; ves la más urgente.";
@@ -21,10 +22,11 @@ const NEXT_MOVE_ERROR = "Improvement no pudo pensar la jugada ahora; ves la más
 export default async function EmpresaBuildingPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
   const memberRow = await requireOrgMembership(orgId);
-  const [graph, lobby, juntaPendiente] = await Promise.all([
+  const [graph, lobby, juntaPendiente, office] = await Promise.all([
     loadBuilding(memberRow.userId, orgId),
     loadLobby(memberRow.userId, orgId),
     isMeetingPending(memberRow.userId, orgId),
+    loadOffice(memberRow.userId, orgId),
   ]);
 
   async function pedirMovimiento() {
@@ -63,6 +65,7 @@ export default async function EmpresaBuildingPage({ params }: { params: Promise<
         orgId={orgId}
         graph={graph}
         lobby={lobby}
+        office={office}
         esDueno={memberRow.role === "owner"}
       />
     </>

@@ -425,7 +425,7 @@
       "apps/improvement/app/empresas/[orgId]/BuildingExperience.tsx",
       "apps/improvement/tests/e2e/oficina.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T1",
