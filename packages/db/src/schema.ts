@@ -46,6 +46,11 @@ export const organization = pgTable(
     // validado en el borde por server/companyRequests/*.ts (apps/improvement). null o cualquier valor
     // fuera de esa lista = AppIconLarge usa su glyph default (la cuadrícula), nunca lanza.
     industry: text("industry"),
+    // Tema propio del org ({bg,textPrimary,accent1,accent2}, hex). null = tokens base. Solo se aplica si
+    // pasa AA (packages/ui/src/theme.ts); el hex del cliente vive aquí, nunca en código.
+    theme: jsonb("theme"),
+    // Giro libre cuando industry = "otro" — de aquí la IA propone las áreas (blueprint oficinas-digitales).
+    industryCustom: text("industry_custom"),
     // Cómo llama el dueño a cada sección de SU empresa digital, y cuáles apagó:
     // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
     // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
@@ -69,6 +74,10 @@ export const organization = pgTable(
     index("idx_organization_parent_org_id").on(t.parentOrgId),
     check("organization_kind_check", sql`${t.kind} in ('muelle','barco')`),
     check("organization_muelle_sin_padre", sql`${t.kind} <> 'muelle' or ${t.parentOrgId} is null`),
+    check(
+      "organization_industry_custom_length",
+      sql`${t.industryCustom} is null or char_length(${t.industryCustom}) between 1 and 80`,
+    ),
   ],
 );
 
@@ -605,7 +614,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento','oficina','agente')`),
   ],
 );
 
