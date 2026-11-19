@@ -74,6 +74,22 @@ export async function setIndustryCustom(
   return { ok: true, data: parsed.data };
 }
 
+/** Lo que la pantalla /[org]/marca muestra; `null` si quien pregunta no es el dueño. */
+export async function loadBrand(
+  userId: string,
+  orgId: string,
+): Promise<{ industry: string | null; industryCustom: string | null; theme: OrgTheme | null } | null> {
+  if (!(await findOwnerMembership(userId, orgId))) return null;
+  const [row] = await db
+    .select({ industry: organization.industry, industryCustom: organization.industryCustom, theme: organization.theme })
+    .from(organization)
+    .where(eq(organization.id, orgId))
+    .limit(1);
+  if (!row) return null;
+  const theme = orgThemeSchema.safeParse(row.theme);
+  return { industry: row.industry, industryCustom: row.industryCustom, theme: theme.success ? theme.data : null };
+}
+
 /** El tema del org para el layout; `null` sin membresía, sin tema o con un tema que no valida. Nunca lanza. */
 export async function loadOrgTheme(userId: string, orgId: string): Promise<OrgTheme | null> {
   try {

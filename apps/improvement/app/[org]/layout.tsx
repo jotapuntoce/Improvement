@@ -25,7 +25,10 @@ export default async function OrgLayout({
 
   return (
     <div style={theme ? themeStyle(theme) : undefined}>
-      <BackLink href={`/empresas/${org}`} label="Volver al edificio" />
+      {/* En un landmark: axe (regla region) no quiere contenido suelto fuera de ellos. */}
+      <nav aria-label="Regresar">
+        <BackLink href={`/empresas/${org}`} label="Volver al edificio" />
+      </nav>
       {direccion.length > 0 && (
         <nav aria-label="Dirección" className="direccion-nav">
           <Link href={`/${org}/direccion`} className="jpc-back-link jpc-back-link--fixed">

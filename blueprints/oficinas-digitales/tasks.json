@@ -148,7 +148,7 @@
       "apps/improvement/app/[org]/marca/page.tsx",
       "apps/improvement/tests/e2e/marca.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T1",
