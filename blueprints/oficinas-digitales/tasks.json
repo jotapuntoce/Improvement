@@ -952,7 +952,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/agenda-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T2",

@@ -2268,6 +2268,119 @@ export const stockMove = pgTable(
   ],
 );
 
+// ─── Agenda: eventos, conexión con Google y reservas públicas ───────────────────────────────────
+// La agenda es personal: cada quien ve lo suyo, ni el dueño lee la de otro (RLS en agenda_rls).
+
+export const CALENDAR_EVENT_KINDS = ["tarea", "evento", "bloqueo"] as const;
+export const CALENDAR_EVENT_STATUSES = ["pendiente", "hecho"] as const;
+export const CALENDAR_EVENT_SOURCES = ["improvement", "google", "reserva"] as const;
+export const CALENDAR_CONNECTION_STATUSES = ["activa", "revocada", "error"] as const;
+export const BOOKING_STATUSES = ["confirmada", "cancelada"] as const;
+
+export const calendarEvent = pgTable(
+  "calendar_event",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    kind: text("kind", { enum: CALENDAR_EVENT_KINDS }).notNull(),
+    status: text("status", { enum: CALENDAR_EVENT_STATUSES }).notNull().default("pendiente"),
+    source: text("source", { enum: CALENDAR_EVENT_SOURCES }).notNull().default("improvement"),
+    googleEventId: text("google_event_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("calendar_event_kind_check", sql`${t.kind} in ('tarea','evento','bloqueo')`),
+    check("calendar_event_status_check", sql`${t.status} in ('pendiente','hecho')`),
+    check("calendar_event_source_check", sql`${t.source} in ('improvement','google','reserva')`),
+    check("calendar_event_range_check", sql`${t.endsAt} > ${t.startsAt}`),
+    uniqueIndex("uq_calendar_event_google").on(t.userId, t.googleEventId).where(sql`${t.googleEventId} is not null`),
+    index("idx_calendar_event_user_starts").on(t.userId, t.startsAt),
+  ],
+);
+
+export const calendarConnection = pgTable(
+  "calendar_connection",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    providerEmail: text("provider_email"),
+    calendarId: text("calendar_id").notNull().default("primary"),
+    // Cifrado con server/calendar/crypto.ts; `authenticated` no tiene grant sobre esta columna.
+    refreshTokenEnc: text("refresh_token_enc").notNull(),
+    syncToken: text("sync_token"),
+    status: text("status", { enum: CALENDAR_CONNECTION_STATUSES }).notNull().default("activa"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("calendar_connection_status_check", sql`${t.status} in ('activa','revocada','error')`)],
+);
+
+export const bookingPage = pgTable(
+  "booking_page",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    // Único global: es una URL pública (/agenda/<slug>).
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(30),
+    weeklyHours: jsonb("weekly_hours").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("booking_page_duration_check", sql`${t.durationMinutes} between 15 and 240`),
+    check("booking_page_slug_format", sql`${t.slug} ~ '^[a-z0-9-]{3,40}$'`),
+  ],
+);
+
+export const booking = pgTable(
+  "booking",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    bookingPageId: uuid("booking_page_id")
+      .notNull()
+      .references(() => bookingPage.id, { onDelete: "cascade" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    guestName: text("guest_name").notNull(),
+    guestEmail: text("guest_email").notNull(),
+    status: text("status", { enum: BOOKING_STATUSES }).notNull().default("confirmada"),
+    cancelToken: text("cancel_token").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("booking_status_check", sql`${t.status} in ('confirmada','cancelada')`),
+    // La base impide la doble reserva del mismo horario.
+    uniqueIndex("uq_booking_page_slot").on(t.bookingPageId, t.startsAt).where(sql`status = 'confirmada'`),
+  ],
+);
+
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
 
