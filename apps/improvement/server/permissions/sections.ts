@@ -24,6 +24,7 @@ export const SECTION_SLUGS = [
   "postventa",
   "oficina",
   "canal",
+  "erp",
 ] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
 
@@ -60,6 +61,7 @@ export const SECTIONS: Section[] = [
   { slug: "postventa", label: "Postventa", hint: "Lo que pasa después de entregar", scopes: ["empresa"] },
   { slug: "oficina", label: "Oficina", hint: "El plano 2D de tu empresa con su gente.", scopes: ["empresa"] },
   { slug: "canal", label: "Canal", hint: "Mensajes del equipo y encargos a los agentes.", scopes: ["empresa"] },
+  { slug: "erp", label: "ERP", hint: "Inventario, ventas y compras.", scopes: ["empresa"] },
 ];
 
 export function sectionBySlug(slug: string): Section | undefined {

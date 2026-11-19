@@ -800,7 +800,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/erp-inventory.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T4",
