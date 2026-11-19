@@ -2097,6 +2097,74 @@ export const message = pgTable(
   ],
 );
 
+// ─── ERP v1: inventario y proveedores (oficinas-digitales paso 24) ─────────────────────────────
+// Lo ven el dueño y quien tenga la sección `erp` = empresa (erp_inventario_rls).
+
+export const STOCK_MOVE_KINDS = ["entrada", "salida", "ajuste"] as const;
+
+export const product = pgTable(
+  "product",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    sku: text("sku"),
+    name: text("name").notNull(),
+    unit: text("unit").notNull().default("pieza"),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull().default(0),
+    costCents: bigint("cost_cents", { mode: "number" }).notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("product_price_nonneg", sql`${t.priceCents} >= 0`),
+    check("product_cost_nonneg", sql`${t.costCents} >= 0`),
+    uniqueIndex("uq_product_org_sku").on(t.orgId, t.sku).where(sql`sku is not null`),
+  ],
+);
+
+export const supplier = pgTable("supplier", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  notes: text("notes"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const stockMove = pgTable(
+  "stock_move",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: STOCK_MOVE_KINDS }).notNull(),
+    // Con signo: entrada > 0, salida < 0, ajuste ≠ 0. La existencia es la suma.
+    quantity: integer("quantity").notNull(),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("stock_move_kind_check", sql`${t.kind} in ('entrada','salida','ajuste')`),
+    check(
+      "stock_move_sign_check",
+      sql`(${t.kind} = 'entrada' and ${t.quantity} > 0) or (${t.kind} = 'salida' and ${t.quantity} < 0) or (${t.kind} = 'ajuste' and ${t.quantity} <> 0)`,
+    ),
+    index("idx_stock_move_product").on(t.productId),
+  ],
+);
+
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
 

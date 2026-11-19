@@ -738,7 +738,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/erp-inventario-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T2",

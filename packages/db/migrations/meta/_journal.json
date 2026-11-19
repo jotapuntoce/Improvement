@@ -456,6 +456,20 @@
       "when": 1795106564099,
       "tag": "0064_canal_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1795109781668,
+      "tag": "0065_wooden_caretaker",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1795109793705,
+      "tag": "0066_erp_inventario_rls",
+      "breakpoints": true
     }
   ]
 }
