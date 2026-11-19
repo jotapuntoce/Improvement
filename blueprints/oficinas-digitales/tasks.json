@@ -335,7 +335,7 @@
       "apps/improvement/server/lobby/loadLobby.ts",
       "apps/improvement/tests/lobby-oficinas.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T7",
