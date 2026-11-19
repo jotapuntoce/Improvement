@@ -210,7 +210,7 @@
       "apps/improvement/server/office/photos.ts",
       "apps/improvement/tests/office-photos.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",
