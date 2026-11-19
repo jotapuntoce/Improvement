@@ -5,10 +5,31 @@
 // platform admin en /planos) o sin ninguna de las cuatro secciones, simplemente no se dibuja.
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink.tsx";
-import { getSessionUserId } from "@/server/auth/guard.ts";
+import { z } from "zod";
+import { findMembership, getSessionUserId, resolveSection } from "@/server/auth/guard.ts";
 import { loadDireccionNav } from "@/server/direccion/nav.ts";
 import { loadOrgTheme } from "@/server/companies/theme.ts";
+import { OFICINAS_SLUGS, sectionBySlug } from "@/server/permissions/sections.ts";
 import { themeStyle } from "@jotapuntoce/ui/theme.ts";
+
+/** Enlaces de Oficinas digitales que esta persona ve. Nunca lanza (mismo criterio que loadDireccionNav). */
+async function loadOficinasNav(userId: string, orgId: string): Promise<{ href: string; label: string }[]> {
+  if (!z.uuid().safeParse(orgId).success) return [];
+  try {
+    const m = await findMembership(userId, orgId);
+    if (!m) return [];
+    const links: { href: string; label: string }[] = [];
+    for (const slug of OFICINAS_SLUGS) {
+      if ((await resolveSection(userId, orgId, slug)).scope !== "ninguno") {
+        links.push({ href: `/${orgId}/${slug}`, label: sectionBySlug(slug)?.label ?? slug });
+      }
+    }
+    if (m.role === "owner") links.push({ href: `/${orgId}/marca`, label: "Marca" });
+    return links;
+  } catch {
+    return [];
+  }
+}
 
 export default async function OrgLayout({
   children,
@@ -20,6 +41,7 @@ export default async function OrgLayout({
   const { org } = await params;
   const userId = await getSessionUserId();
   const direccion = userId ? await loadDireccionNav(userId, org) : [];
+  const oficinas = userId ? await loadOficinasNav(userId, org) : [];
   // Tema propio del org (solo si pasa AA, ver packages/ui/src/theme.ts); null = tokens base.
   const theme = userId ? await loadOrgTheme(userId, org) : null;
 
@@ -34,6 +56,15 @@ export default async function OrgLayout({
           <Link href={`/${org}/direccion`} className="jpc-back-link jpc-back-link--fixed">
             Dirección
           </Link>
+        </nav>
+      )}
+      {oficinas.length > 0 && (
+        <nav aria-label="Oficinas digitales" className="oficinas-nav">
+          {oficinas.map((l) => (
+            <Link key={l.href} href={l.href} className="jpc-back-link">
+              {l.label}
+            </Link>
+          ))}
         </nav>
       )}
       {children}
