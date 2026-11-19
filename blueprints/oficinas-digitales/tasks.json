@@ -920,7 +920,7 @@
       "apps/improvement/app/[org]/clientes/[clienteId]/page.tsx",
       "apps/improvement/tests/e2e/crm-flozzy.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T1",
