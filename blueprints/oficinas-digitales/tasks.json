@@ -239,7 +239,7 @@
       "apps/improvement/server/ai/gateway.ts",
       "apps/improvement/tests/ai-gateway-vision.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T4",

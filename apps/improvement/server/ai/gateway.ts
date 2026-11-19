@@ -2,7 +2,7 @@
 // verificado por grep en el Verify de esta tarea). Model id resuelto vía la skill claude-api antes
 // de escribir esta llamada (blueprint §17) — vive en MODEL_ID, nunca inline en el call site.
 import Anthropic from "@anthropic-ai/sdk";
-import { and, eq, gte, isNotNull } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, objective, orgNeed, client, aiSuggestion, llmCalls } from "@jotapuntoce/db/schema";
@@ -26,6 +26,19 @@ const MODEL_ID = "claude-opus-5";
 const PRICING_USD_PER_MTOK = { input: 5.0, output: 25.0 };
 const MAX_SUGGESTIONS_PER_HOUR = 10;
 const MAX_OUTPUT_TOKENS = 1024;
+export const MAX_IMAGES_PER_CALL = 6;
+export const MAX_CALLS_PER_ORG_PER_DAY = 100;
+
+/** Una imagen en base64 para el proveedor (fotos del espacio). */
+export interface GatewayImage {
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  data: string;
+}
+
+export interface CompleteOptions {
+  images?: readonly GatewayImage[];
+  maxTokens?: number;
+}
 
 export class ProviderRateLimitError extends Error {
   readonly retryable = true as const;
@@ -62,7 +75,7 @@ export interface SuggestionCompletion {
  * (criterios #1 y #3, "proveedor simulado en el test").
  */
 export interface SuggestionProvider {
-  complete(system: string, prompt: string): Promise<SuggestionCompletion>;
+  complete(system: string, prompt: string, options?: CompleteOptions): Promise<SuggestionCompletion>;
 }
 
 /**
@@ -78,14 +91,24 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async complete(system: string, prompt: string): Promise<SuggestionCompletion> {
+  async complete(system: string, prompt: string, options?: CompleteOptions): Promise<SuggestionCompletion> {
+    const images = options?.images ?? [];
+    const content: Anthropic.MessageParam["content"] = images.length
+      ? [
+          ...images.map((i) => ({
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: i.mediaType, data: i.data },
+          })),
+          { type: "text" as const, text: prompt },
+        ]
+      : prompt;
     let response: Anthropic.Message;
     try {
       response = await this.client.messages.create({
         model: MODEL_ID,
-        max_tokens: MAX_OUTPUT_TOKENS,
+        max_tokens: options?.maxTokens ?? MAX_OUTPUT_TOKENS,
         system,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content }],
       });
     } catch (err) {
       if (err instanceof Anthropic.RateLimitError) throw new ProviderRateLimitError();
@@ -147,6 +170,16 @@ async function hasReachedHourlyLimit(orgId: string, purpose = "suggestion"): Pro
       ),
     );
   return rows.length >= MAX_SUGGESTIONS_PER_HOUR;
+}
+
+/** WHEN el org ya hizo 100 llamadas de IA (de cualquier propósito) en 24 h THE SYSTEM SHALL frenar. */
+async function hasReachedDailyLimit(orgId: string): Promise<boolean> {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [row] = await db
+    .select({ n: count() })
+    .from(llmCalls)
+    .where(and(eq(llmCalls.orgId, orgId), gte(llmCalls.createdAt, dayAgo)));
+  return (row?.n ?? 0) >= MAX_CALLS_PER_ORG_PER_DAY;
 }
 
 /**
@@ -273,19 +306,30 @@ export type StructuredResult<T> =
 
 export async function generateStructured<T>(args: {
   orgId: string;
-  purpose: "atencion_cliente" | "siguiente_movimiento";
-  category: "servicio_cliente" | "siguiente_movimiento";
+  purpose: "atencion_cliente" | "siguiente_movimiento" | "oficina" | "agente" | "reporte";
+  category: "servicio_cliente" | "siguiente_movimiento" | "oficina" | "agente";
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
   toText: (parsed: T) => string;
   basedOn: Record<string, string[]>;
+  images?: readonly GatewayImage[];
+  maxOutputTokens?: number;
   provider?: SuggestionProvider;
 }): Promise<StructuredResult<T>> {
   if (await hasReachedHourlyLimit(args.orgId, args.purpose)) {
     return {
       ok: false,
       error: { code: "RATE_LIMITED", retryable: false, message: "Este org ya hizo 10 solicitudes de este tipo en la última hora." },
+    };
+  }
+  if ((args.images?.length ?? 0) > MAX_IMAGES_PER_CALL) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", retryable: false, message: "Máximo 6 imágenes por análisis." } };
+  }
+  if (await hasReachedDailyLimit(args.orgId)) {
+    return {
+      ok: false,
+      error: { code: "RATE_LIMITED", retryable: false, message: "Tope diario de IA alcanzado para esta empresa." },
     };
   }
 
@@ -297,7 +341,10 @@ export async function generateStructured<T>(args: {
   // Un solo reintento en fallo de validación (regla ia-gateway.md), después falla explícito.
   for (let attempt = 0; attempt < 2 && parsed === null; attempt++) {
     try {
-      completion = await resolvedProvider.complete(args.system, args.prompt);
+      completion = await resolvedProvider.complete(args.system, args.prompt, {
+        images: args.images,
+        maxTokens: args.maxOutputTokens,
+      });
     } catch (err) {
       if (err instanceof ProviderRateLimitError) {
         return { ok: false, error: { code: "PROVIDER_RATE_LIMIT", retryable: true, message: err.message } };
