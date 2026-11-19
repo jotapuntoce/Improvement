@@ -489,7 +489,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/canal-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T3",

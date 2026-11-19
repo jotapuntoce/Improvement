@@ -2008,6 +2008,7 @@ export const agentTask = pgTable(
     attempts: integer("attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     result: text("result"),
+    channelId: uuid("channel_id").references((): AnyPgColumn => channel.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -2024,6 +2025,77 @@ export const workerHeartbeat = pgTable("worker_heartbeat", {
   worker: text("worker").primaryKey(),
   seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Oficinas digitales: canal ──────────────────────────────────────────────────────────────────
+// Chat del org: general, por área, directo y con un agente. Se lee si hay fila propia en
+// channel_member (canal_rls). Borrado suave: deleted_at + body vacío, para que el UPDATE llegue por
+// Realtime filtrado por RLS (un DELETE no se filtra).
+
+export const CHANNEL_KINDS = ["general", "area", "directo", "agente"] as const;
+
+export const channel = pgTable(
+  "channel",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: CHANNEL_KINDS }).notNull(),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").references(() => agent.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id").references(() => profile.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("channel_kind_check", sql`${t.kind} in ('general','area','directo','agente')`),
+    check(
+      "channel_agent_kind_check",
+      sql`(${t.kind} = 'agente') = (${t.agentId} is not null and ${t.profileId} is not null)`,
+    ),
+    uniqueIndex("uq_channel_org_general").on(t.orgId).where(sql`${t.kind} = 'general'`),
+    uniqueIndex("uq_channel_agent_profile").on(t.agentId, t.profileId).where(sql`${t.kind} = 'agente'`),
+  ],
+);
+
+export const channelMember = pgTable(
+  "channel_member",
+  {
+    id: id(),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => channel.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_channel_member").on(t.channelId, t.profileId)],
+);
+
+export const message = pgTable(
+  "message",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => channel.id, { onDelete: "cascade" }),
+    authorProfileId: uuid("author_profile_id").references(() => profile.id, { onDelete: "cascade" }),
+    authorAgentId: uuid("author_agent_id").references(() => agent.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("message_one_author_check", sql`num_nonnulls(${t.authorProfileId}, ${t.authorAgentId}) = 1`),
+    check("message_deleted_blank_check", sql`${t.deletedAt} is null or ${t.body} = ''`),
+    check("message_body_length", sql`char_length(${t.body}) <= 4000`),
+    index("idx_message_channel_created").on(t.channelId, t.createdAt),
+  ],
+);
 
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
