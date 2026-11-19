@@ -609,7 +609,7 @@
       "apps/improvement/app/api/agentes/[tarea]/route.ts",
       "apps/improvement/tests/agents-runtime.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T7",
