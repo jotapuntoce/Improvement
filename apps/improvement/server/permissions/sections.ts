@@ -23,6 +23,7 @@ export const SECTION_SLUGS = [
   "proyectos",
   "postventa",
   "oficina",
+  "canal",
 ] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
 
@@ -30,7 +31,7 @@ export type SectionSlug = (typeof SECTION_SLUGS)[number];
 export const DIRECCION_SLUGS = ["vision", "scorecard", "issues", "junta"] as const;
 
 /** Secciones de Oficinas digitales: navegan por su propio <nav> en el layout de [org], no por el Lobby. */
-export const OFICINAS_SLUGS = ["oficina"] as const;
+export const OFICINAS_SLUGS = ["oficina", "canal"] as const;
 export type DireccionSlug = (typeof DIRECCION_SLUGS)[number];
 
 export interface Section {
@@ -58,6 +59,7 @@ export const SECTIONS: Section[] = [
   { slug: "proyectos", label: "Proyectos", hint: "Autorización y avance de obra", scopes: ["empresa"] },
   { slug: "postventa", label: "Postventa", hint: "Lo que pasa después de entregar", scopes: ["empresa"] },
   { slug: "oficina", label: "Oficina", hint: "El plano 2D de tu empresa con su gente.", scopes: ["empresa"] },
+  { slug: "canal", label: "Canal", hint: "Mensajes del equipo y encargos a los agentes.", scopes: ["empresa"] },
 ];
 
 export function sectionBySlug(slug: string): Section | undefined {

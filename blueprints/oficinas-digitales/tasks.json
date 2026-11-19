@@ -639,7 +639,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/e2e/canal.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T8",
