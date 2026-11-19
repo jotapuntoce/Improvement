@@ -1895,6 +1895,67 @@ export const seat = pgTable(
   (t) => [index("idx_seat_org_parent").on(t.orgId, t.parentSeatId)],
 );
 
+// ─── Oficinas digitales: oficina 2D ─────────────────────────────────────────────────────────────
+// Un plano por org en borrador (fotos + propuesta de la IA) y uno confirmado. Nada cambia hasta que
+// el dueño confirma. RLS en la migración oficina_rls: el borrador solo lo lee el dueño.
+
+export const OFFICE_PLAN_STATUSES = ["draft", "confirmed"] as const;
+export const OFFICE_ZONE_KINDS = ["area", "recepcion", "direccion", "sala"] as const;
+
+export const officePlan = pgTable(
+  "office_plan",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    status: text("status", { enum: OFFICE_PLAN_STATUSES }).notNull().default("draft"),
+    // Rutas `{orgId}/{uuid}.{ext}` del bucket privado `espacios` — nunca URLs públicas.
+    sourcePhotos: text("source_photos").array().notNull().default(sql`'{}'::text[]`),
+    proposal: jsonb("proposal").notNull(),
+    logo: jsonb("logo"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: uuid("confirmed_by").references(() => profile.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("office_plan_status_check", sql`${t.status} in ('draft','confirmed')`),
+    check("office_plan_photos_max", sql`cardinality(${t.sourcePhotos}) <= 6`),
+    uniqueIndex("uq_office_plan_org_status").on(t.orgId, t.status),
+  ],
+);
+
+export const officeZone = pgTable(
+  "office_zone",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => officePlan.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: OFFICE_ZONE_KINDS }).notNull(),
+    label: text("label").notNull(),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    w: integer("w").notNull(),
+    h: integer("h").notNull(),
+  },
+  (t) => [
+    check("office_zone_kind_check", sql`${t.kind} in ('area','recepcion','direccion','sala')`),
+    check(
+      "office_zone_grid_check",
+      sql`${t.x} >= 0 and ${t.y} >= 0 and ${t.w} >= 1 and ${t.h} >= 1 and ${t.x} + ${t.w} <= 40 and ${t.y} + ${t.h} <= 24`,
+    ),
+    check("office_zone_area_kind_check", sql`(${t.kind} = 'area') = (${t.areaId} is not null)`),
+    index("idx_office_zone_plan").on(t.planId),
+  ],
+);
+
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
 

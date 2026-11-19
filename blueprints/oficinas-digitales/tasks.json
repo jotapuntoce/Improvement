@@ -181,7 +181,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/oficina-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T2",
