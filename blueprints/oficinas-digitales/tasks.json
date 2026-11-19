@@ -770,7 +770,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/erp-ordenes-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E4-T3",

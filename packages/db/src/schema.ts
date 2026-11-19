@@ -2138,6 +2138,107 @@ export const supplier = pgTable("supplier", {
   updatedAt: updatedAt(),
 });
 
+// ─── ERP v1: órdenes de venta y de compra (paso 25) ────────────────────────────────────────────
+
+export const SALE_ORDER_STATUSES = ["borrador", "confirmada", "entregada", "cancelada"] as const;
+export const PURCHASE_ORDER_STATUSES = ["borrador", "confirmada", "recibida", "cancelada"] as const;
+
+export const saleOrder = pgTable(
+  "sale_order",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    clientId: uuid("client_id").references(() => client.id, { onDelete: "set null" }),
+    dealId: uuid("deal_id").references(() => deal.id, { onDelete: "set null" }),
+    status: text("status", { enum: SALE_ORDER_STATUSES }).notNull().default("borrador"),
+    totalCents: bigint("total_cents", { mode: "number" }).notNull().default(0),
+    currency: text("currency").notNull().default("mxn"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("sale_order_status_check", sql`${t.status} in ('borrador','confirmada','entregada','cancelada')`),
+    check("sale_order_total_nonneg", sql`${t.totalCents} >= 0`),
+    uniqueIndex("uq_sale_order_org_number").on(t.orgId, t.number),
+  ],
+);
+
+export const saleOrderLine = pgTable(
+  "sale_order_line",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    saleOrderId: uuid("sale_order_id")
+      .notNull()
+      .references(() => saleOrder.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull(),
+    unitPriceCents: bigint("unit_price_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    check("sale_order_line_quantity_pos", sql`${t.quantity} > 0`),
+    check("sale_order_line_price_nonneg", sql`${t.unitPriceCents} >= 0`),
+  ],
+);
+
+export const purchaseOrder = pgTable(
+  "purchase_order",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => supplier.id, { onDelete: "restrict" }),
+    status: text("status", { enum: PURCHASE_ORDER_STATUSES }).notNull().default("borrador"),
+    totalCents: bigint("total_cents", { mode: "number" }).notNull().default(0),
+    currency: text("currency").notNull().default("mxn"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("purchase_order_status_check", sql`${t.status} in ('borrador','confirmada','recibida','cancelada')`),
+    check("purchase_order_total_nonneg", sql`${t.totalCents} >= 0`),
+    uniqueIndex("uq_purchase_order_org_number").on(t.orgId, t.number),
+  ],
+);
+
+export const purchaseOrderLine = pgTable(
+  "purchase_order_line",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrder.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull(),
+    unitCostCents: bigint("unit_cost_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    check("purchase_order_line_quantity_pos", sql`${t.quantity} > 0`),
+    check("purchase_order_line_cost_nonneg", sql`${t.unitCostCents} >= 0`),
+  ],
+);
+
 export const stockMove = pgTable(
   "stock_move",
   {
@@ -2152,6 +2253,8 @@ export const stockMove = pgTable(
     // Con signo: entrada > 0, salida < 0, ajuste ≠ 0. La existencia es la suma.
     quantity: integer("quantity").notNull(),
     note: text("note"),
+    saleOrderId: uuid("sale_order_id").references(() => saleOrder.id, { onDelete: "set null" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrder.id, { onDelete: "set null" }),
     createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },

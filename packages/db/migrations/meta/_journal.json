@@ -470,6 +470,20 @@
       "when": 1795109793705,
       "tag": "0066_erp_inventario_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795110074112,
+      "tag": "0067_free_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795110077212,
+      "tag": "0068_erp_ordenes_rls",
+      "breakpoints": true
     }
   ]
 }
