@@ -15,6 +15,8 @@
     "./building/greeting.ts": "./src/building/greeting.ts",
     "./building/industries.ts": "./src/building/industries.ts",
     "./building/officeLayout.ts": "./src/building/officeLayout.ts",
+    "./building/officeScene.ts": "./src/building/officeScene.ts",
+    "./building/Office.tsx": "./src/building/Office.tsx",
     "./building/palettes.ts": "./src/building/palettes.ts",
     "./building/shapes.ts": "./src/building/shapes.ts",
     "./building/buildStages.ts": "./src/building/buildStages.ts",
