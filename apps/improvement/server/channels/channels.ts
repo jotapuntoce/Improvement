@@ -133,19 +133,21 @@ export async function postAgentMessage(agentId: string, channelId: string, body:
   return row ?? null;
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /** El canal privado agente ↔ persona, con esa persona como único miembro. Idempotente. */
-export async function ensureAgentChannel(agentId: string, profileId: string): Promise<{ id: string } | null> {
-  const [a] = await db.select({ orgId: agent.orgId, name: agent.name }).from(agent).where(eq(agent.id, agentId));
+export async function ensureAgentChannel(agentId: string, profileId: string, tx: Tx | typeof db = db): Promise<{ id: string } | null> {
+  const [a] = await tx.select({ orgId: agent.orgId, name: agent.name }).from(agent).where(eq(agent.id, agentId));
   if (!a) return null;
-  await db
+  await tx
     .insert(channel)
     .values({ orgId: a.orgId, kind: "agente", agentId, profileId, name: a.name })
     .onConflictDoNothing();
-  const [c] = await db
+  const [c] = await tx
     .select({ id: channel.id })
     .from(channel)
     .where(and(eq(channel.kind, "agente"), eq(channel.agentId, agentId), eq(channel.profileId, profileId)));
   if (!c) return null;
-  await db.insert(channelMember).values({ channelId: c.id, profileId }).onConflictDoNothing();
+  await tx.insert(channelMember).values({ channelId: c.id, profileId }).onConflictDoNothing();
   return c;
 }

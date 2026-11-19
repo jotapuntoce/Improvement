@@ -575,7 +575,7 @@
       "apps/improvement/server/agents/tasks.ts",
       "apps/improvement/tests/agent-tasks.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E3-T6",
