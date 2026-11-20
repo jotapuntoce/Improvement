@@ -8,6 +8,7 @@ import { agent, agentTask, channel, ownerMemory, workerHeartbeat } from "@jotapu
 import { generateStructured, type SuggestionProvider } from "../ai/gateway.ts";
 import { buildEncargoPrompt, buildEncargoSystem, buildReportPrompt, REPORT_SYSTEM_PROMPT } from "../ai/prompts/agent.ts";
 import { postAgentMessage } from "../channels/channels.ts";
+import { rescheduleAll, syncAllGoogle } from "../calendar/sync.ts";
 import type { Tarea } from "./tareas.ts";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest();
@@ -21,6 +22,7 @@ export function isAuthorizedBearer(header: string | null | undefined, secret: st
 interface Deps {
   provider?: SuggestionProvider;
   orgId?: string;
+  fetchImpl?: typeof fetch;
 }
 
 export async function runTarea(tarea: Tarea, now: Date, deps: Deps = {}): Promise<Record<string, unknown>> {
@@ -36,9 +38,11 @@ export async function runTarea(tarea: Tarea, now: Date, deps: Deps = {}): Promis
     case "reporte":
       return { publicados: await morningReports(now, deps) };
     case "agenda":
+      return rescheduleAll(now, deps);
     case "google":
+      return syncAllGoogle(now, deps);
     case "butacas":
-      return { procesadas: 0 }; // pasos 36 y 44
+      return { procesadas: 0 }; // paso 44
   }
 }
 
