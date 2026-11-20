@@ -2381,6 +2381,114 @@ export const booking = pgTable(
   ],
 );
 
+// ─── Butacas: mapas de recinto, funciones y apartados ───────────────────────────────────────────
+// `seat` es el Accountability Chart y no se toca: los lugares de un recinto son `venue_seat`.
+
+export const VENUE_KINDS = ["teatro", "restaurante", "antro", "bodas", "eventos", "lotes"] as const;
+export const VENUE_SEAT_KINDS = ["butaca", "mesa", "lugar", "lote"] as const;
+export const VENUE_SESSION_STATUSES = ["borrador", "a_la_venta", "cerrada"] as const;
+export const SEAT_BOOKING_STATUSES = ["held", "sold", "released"] as const;
+export const SEAT_BOOKING_CHANNELS = ["web", "taquilla"] as const;
+
+export const venueMap = pgTable(
+  "venue_map",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: VENUE_KINDS }).notNull(),
+    // Los parámetros del generador (server/seats/templates.ts), no la lista de lugares.
+    layout: jsonb("layout").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("venue_map_kind_check", sql`${t.kind} in ('teatro','restaurante','antro','bodas','eventos','lotes')`)],
+);
+
+export const venueSeat = pgTable(
+  "venue_seat",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => venueMap.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    section: text("section"),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    kind: text("kind", { enum: VENUE_SEAT_KINDS }).notNull(),
+    capacity: integer("capacity").notNull().default(1),
+  },
+  (t) => [
+    check("venue_seat_kind_check", sql`${t.kind} in ('butaca','mesa','lugar','lote')`),
+    check("venue_seat_capacity_check", sql`${t.capacity} >= 1`),
+    uniqueIndex("uq_venue_seat_map_label").on(t.mapId, t.label),
+  ],
+);
+
+export const venueSession = pgTable(
+  "venue_session",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => venueMap.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    status: text("status", { enum: VENUE_SESSION_STATUSES }).notNull().default("borrador"),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("venue_session_status_check", sql`${t.status} in ('borrador','a_la_venta','cerrada')`),
+    check("venue_session_price_check", sql`${t.priceCents} >= 0`),
+  ],
+);
+
+export const seatBooking = pgTable(
+  "seat_booking",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => venueSession.id, { onDelete: "cascade" }),
+    seatId: uuid("seat_id")
+      .notNull()
+      .references(() => venueSeat.id, { onDelete: "cascade" }),
+    status: text("status", { enum: SEAT_BOOKING_STATUSES }).notNull(),
+    holdToken: uuid("hold_token"),
+    holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull(),
+    buyerName: text("buyer_name"),
+    buyerEmail: text("buyer_email"),
+    channel: text("channel", { enum: SEAT_BOOKING_CHANNELS }).notNull(),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // Una fila por lugar y función; se re-aparta con upsert (solo holdSeats escribe `held`).
+    unique("uq_seat_booking_session_seat").on(t.sessionId, t.seatId),
+    check("seat_booking_status_check", sql`${t.status} in ('held','sold','released')`),
+    check("seat_booking_channel_check", sql`${t.channel} in ('web','taquilla')`),
+    check("seat_booking_price_check", sql`${t.priceCents} >= 0`),
+    check("seat_booking_hold_check", sql`${t.status} <> 'held' or (${t.holdToken} is not null and ${t.holdExpiresAt} is not null)`),
+    index("idx_seat_booking_hold_token").on(t.holdToken),
+  ],
+);
+
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────
 // Base NOM-035: el check-in es un dato personal; lo ven la persona y el dueño del org, nadie más.
 

@@ -1222,7 +1222,7 @@
       "packages/db/migrations/**",
       "apps/improvement/tests/butacas-schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T3",
