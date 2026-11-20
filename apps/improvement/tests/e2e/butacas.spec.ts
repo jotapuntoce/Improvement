@@ -51,6 +51,8 @@ async function as(context: BrowserContext, quien: Quien, baseURL: string | undef
   await context.addCookies([{ name: "imp-access-token", value: tokens[quien], url: baseURL ?? "http://localhost:3200" }]);
 }
 
+// Vender es una acción del servidor contra la base remota: con la suite en paralelo pasa de 5 s.
+const LENTO = { timeout: 20_000 };
 const seat = (page: import("@playwright/test").Page, label: string) => page.locator(`[data-seat="${label}"]`);
 
 test("WHEN el dueño crea un teatro 2×3, publica una función y vende A1 THE SYSTEM SHALL mostrar A1 como Vendido", async ({ page, context, baseURL }) => {
@@ -75,7 +77,7 @@ test("WHEN el dueño crea un teatro 2×3, publica una función y vende A1 THE SY
   await expect(page.getByRole("form", { name: "Taquilla" })).toBeVisible();
   await seat(page, "A1").getByRole("checkbox").check();
   await page.getByRole("button", { name: "Vender en taquilla" }).click();
-  await expect(seat(page, "A1")).toContainText("Vendido");
+  await expect(seat(page, "A1")).toContainText("Vendido", LENTO);
   await expect(seat(page, "A2")).toContainText("Disponible");
 });
 
@@ -92,7 +94,7 @@ test("WHEN el dueño vende un lugar THE SYSTEM SHALL mostrarlo Vendido al taquil
   await expect(ownerPage.locator('[data-realtime="SUBSCRIBED"]')).toHaveCount(1, { timeout: 15_000 }); // hidratada
   await seat(ownerPage, "B2").getByRole("checkbox").check();
   await ownerPage.getByRole("button", { name: "Vender en taquilla" }).click();
-  await expect(seat(ownerPage, "B2")).toContainText("Vendido");
+  await expect(seat(ownerPage, "B2")).toContainText("Vendido", LENTO);
 
   await expect(seat(page, "B2")).toContainText("Vendido", { timeout: 10_000 });
   await ownerContext.close();
