@@ -47,6 +47,8 @@ async function as(context: BrowserContext, quien: Quien, baseURL: string | undef
   await context.addCookies([{ name: "imp-access-token", value: tokens[quien], url: baseURL ?? "http://localhost:3200" }]);
 }
 
+// Cada acción del ERP escribe en una transacción contra la base remota: con la suite en paralelo pasa de 5 s.
+const LENTO = { timeout: 20_000 };
 const stockDe = (page: Page, producto: string) => page.getByRole("row", { name: new RegExp(producto) }).locator("[data-stock]");
 
 test("WHEN el dueño da de alta, mete 10 y confirma una venta de 3 THE SYSTEM SHALL mostrar existencia 7", async ({ page, context, baseURL }) => {
@@ -55,20 +57,20 @@ test("WHEN el dueño da de alta, mete 10 y confirma una venta de 3 THE SYSTEM SH
   await page.getByLabel("Nombre del producto").fill("Harina");
   await page.getByLabel("Precio (MXN)").fill("25");
   await page.getByRole("button", { name: "Agregar producto" }).click();
-  await expect(stockDe(page, "Harina")).toHaveText("0");
+  await expect(stockDe(page, "Harina")).toHaveText("0", LENTO);
 
   await page.getByLabel("Tipo").selectOption("entrada");
   await page.getByLabel("Cantidad").fill("10");
   await page.getByRole("button", { name: "Registrar" }).click();
-  await expect(stockDe(page, "Harina")).toHaveText("10");
+  await expect(stockDe(page, "Harina")).toHaveText("10", LENTO);
 
   await page.getByRole("link", { name: "Ventas" }).click();
   await page.getByLabel("Producto de la línea 1").selectOption({ label: "Harina ($25.00)" });
   await page.getByLabel("Cantidad de la línea 1").fill("3");
   await page.getByRole("button", { name: "Crear orden de venta" }).click();
-  await expect(page.getByRole("row", { name: /\$75\.00/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /\$75\.00/ })).toBeVisible(LENTO);
   await page.getByRole("button", { name: "Confirmar orden 1" }).click();
-  await expect(page.getByRole("cell", { name: "Confirmada" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Confirmada" })).toBeVisible(LENTO);
 
   await page.goto(`/${orgId}/erp`);
   await expect(stockDe(page, "Harina")).toHaveText("7");
@@ -79,7 +81,7 @@ test("WHEN el dueño recibe una compra de 5 THE SYSTEM SHALL subir la existencia
   await page.goto(`/${orgId}/erp`);
   await page.getByLabel("Nombre del proveedor").fill("Molinos");
   await page.getByRole("button", { name: "Agregar proveedor" }).click();
-  await expect(page.getByText("Molinos")).toBeVisible();
+  await expect(page.getByText("Molinos")).toBeVisible(LENTO);
 
   await page.getByRole("link", { name: "Compras" }).click();
   await page.getByLabel("Producto de la línea 1").selectOption({ label: "Harina" });
@@ -87,7 +89,7 @@ test("WHEN el dueño recibe una compra de 5 THE SYSTEM SHALL subir la existencia
   await page.getByRole("button", { name: "Crear orden de compra" }).click();
   await page.getByRole("button", { name: "Confirmar orden 1" }).click();
   await page.getByRole("button", { name: "Recibir orden 1" }).click();
-  await expect(page.getByRole("cell", { name: "Recibida" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Recibida" })).toBeVisible(LENTO);
 
   await page.goto(`/${orgId}/erp`);
   await expect(stockDe(page, "Harina")).toHaveText("12");
