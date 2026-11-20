@@ -9,6 +9,7 @@ import { generateStructured, type SuggestionProvider } from "../ai/gateway.ts";
 import { buildEncargoPrompt, buildEncargoSystem, buildReportPrompt, REPORT_SYSTEM_PROMPT } from "../ai/prompts/agent.ts";
 import { postAgentMessage } from "../channels/channels.ts";
 import { rescheduleAll, syncAllGoogle } from "../calendar/sync.ts";
+import { releaseExpired } from "../seats/hold.ts";
 import type { Tarea } from "./tareas.ts";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest();
@@ -42,7 +43,7 @@ export async function runTarea(tarea: Tarea, now: Date, deps: Deps = {}): Promis
     case "google":
       return syncAllGoogle(now, deps);
     case "butacas":
-      return { procesadas: 0 }; // paso 44
+      return { procesadas: await releaseExpired(now) };
   }
 }
 

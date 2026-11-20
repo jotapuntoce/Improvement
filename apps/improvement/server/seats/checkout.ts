@@ -52,7 +52,8 @@ export async function startSeatCheckout(
         })),
         customer_email: input.buyer.email,
         expires_at: Math.floor(expiresAt.getTime() / 1000),
-        metadata: { hold_token: holdToken, venue_session_id: input.sessionId, buyer_name: input.buyer.name },
+        // seat_count: el webhook vende todo el apartado o nada (un lugar re-apartado por otro no cuenta).
+        metadata: { hold_token: holdToken, venue_session_id: input.sessionId, seat_count: String(lines.length), buyer_name: input.buyer.name },
         success_url: `${base}?pago=ok`,
         cancel_url: `${base}?pago=cancelado`,
       },
