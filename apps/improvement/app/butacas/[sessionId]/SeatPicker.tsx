@@ -2,6 +2,7 @@
 // Elige hasta 10 lugares libres, pide nombre y correo y manda al Checkout de Stripe. El estado se vuelve a
 // leer de la ruta pública cada 5 s.
 import { useEffect, useState } from "react";
+import { SeatGrid } from "@/components/SeatGrid.tsx";
 import type { PublicSeatState } from "@/server/seats/publicState.ts";
 
 const MAX = 10;
@@ -45,36 +46,24 @@ export function SeatPicker({ sessionId, initial }: { sessionId: string; initial:
     setMessage(body?.error?.code === "TAQUILLA_ONLY" ? TAQUILLA : (body?.error?.message ?? "No se pudo apartar. Intenta de nuevo."));
   }
 
-  const cols = Math.max(...state.seats.map((s) => s.x)) + 1;
   return (
     <form action={comprar} className="config-form config-card" aria-label="Comprar lugares">
       <fieldset className="space-y-2">
         <legend className="config-card-title">Elige hasta {MAX} lugares</legend>
-        <ul className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(4.5rem, 1fr))` }}>
-          {state.seats.map((s) => (
-            <li
-              key={s.id}
-              data-seat={s.label}
-              data-status={s.status}
-              style={{
-                gridColumnStart: s.x + 1,
-                gridRowStart: s.y + 1,
-                border: `2px solid ${s.status === "libre" ? "var(--success)" : "var(--border)"}`,
-                borderRadius: "var(--radius-sm)",
-                padding: "0.25rem 0.5rem",
-              }}
-            >
-              {s.status === "libre" ? (
-                <label className="flex items-center gap-1">
-                  <input type="checkbox" checked={chosen.includes(s.id)} onChange={() => toggle(s.id)} />
-                  <span>{s.label} · Libre</span>
-                </label>
-              ) : (
-                <span>{s.label} · Ocupado</span>
-              )}
-            </li>
-          ))}
-        </ul>
+        <SeatGrid
+          seats={state.seats}
+          border={(s) => (s.status === "libre" ? "var(--success)" : "var(--border)")}
+          cell={(s) =>
+            s.status === "libre" ? (
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={chosen.includes(s.id)} onChange={() => toggle(s.id)} />
+                <span>{s.label} · Libre</span>
+              </label>
+            ) : (
+              <span>{s.label} · Ocupado</span>
+            )
+          }
+        />
       </fieldset>
       <label className="permiso-field">
         <span>Tu nombre</span>

@@ -5,15 +5,14 @@ import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { bookingPage, CALENDAR_EVENT_KINDS, calendarConnection, calendarEvent } from "@jotapuntoce/db/schema";
 import { findMembership } from "../auth/guard.ts";
+import { isUniqueViolation } from "../db/pgError.ts";
+import { firstIssue } from "../validation.ts";
 import { reschedule } from "./reschedule.ts";
 import { weeklyHoursSchema } from "./availability.ts";
 
 type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR" | "SLUG_TAKEN"; message: string } };
 const notFound: Failure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
 const invalid = (message: string): Failure => ({ ok: false, error: { code: "VALIDATION_ERROR", message } });
-const firstIssue = (e: z.ZodError) => e.issues[0]?.message ?? "Datos inválidos.";
-const isUniqueViolation = (e: unknown) =>
-  (e as { cause?: { code?: string } })?.cause?.code === "23505" || (e as { code?: string })?.code === "23505";
 
 export async function listMyEvents(userId: string, orgId: string, { from, to }: { from: Date; to: Date }) {
   if (!(await findMembership(userId, orgId))) return notFound;

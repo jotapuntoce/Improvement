@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { agent, area, channel, channelMember, membership, organization, profile, seat } from "@jotapuntoce/db/schema";
 import { areaHeads } from "../server/agents/heads.ts";
-import { ensureAgents, updateAgent } from "../server/agents/agents.ts";
+import { ensureAgents } from "../server/agents/agents.ts";
 
 const s = (id: string, areaId: string | null, parentSeatId: string | null, holderProfileId: string | null, position = 0, title = id) => ({
   id,
@@ -89,18 +89,9 @@ describe("ensureAgents", () => {
     expect(especialistas[0]?.areaId).not.toBe(areaA);
   });
 
-  it("WHEN un empleado llama ensureAgents o updateAgent THE SYSTEM SHALL dar NOT_FOUND sin escribir", async () => {
-    const { orgId, owner, jefaA } = await orgConDosAreas();
+  it("WHEN un empleado llama ensureAgents THE SYSTEM SHALL dar NOT_FOUND sin escribir", async () => {
+    const { orgId, jefaA } = await orgConDosAreas();
     expect(await ensureAgents(jefaA, orgId)).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
     expect(await kinds(orgId)).toEqual([]);
-    const listo = await ensureAgents(owner, orgId);
-    if (!listo.ok) throw new Error(listo.error.message);
-    const manager = listo.data.find((a) => a.kind === "manager")!;
-    expect(await updateAgent(jefaA, orgId, manager.id, { instructions: "x", skills: [] })).toMatchObject({
-      ok: false,
-      error: { code: "NOT_FOUND" },
-    });
-    const [row] = await db.select().from(agent).where(eq(agent.id, manager.id));
-    expect(row?.instructions).toBe("");
   });
 });

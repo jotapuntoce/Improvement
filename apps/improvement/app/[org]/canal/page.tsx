@@ -11,8 +11,8 @@ import { listAreasByOrg } from "@/server/areas/listAreas.ts";
 import { getSessionAccessToken, getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { deleteMessage, listChannels, listMessages, postMessage } from "@/server/channels/channels.ts";
 import { ChannelLive } from "./ChannelLive.tsx";
+import { field } from "@/lib/format.ts";
 
-const field = (formData: FormData, name: string) => formData.get(name)?.toString() ?? "";
 
 function back(orgId: string, c: string, error?: string): never {
   const query = new URLSearchParams();

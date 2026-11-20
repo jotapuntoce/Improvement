@@ -4,10 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { createProduct, createSupplier, listProducts, listSuppliers, recordMove } from "@/server/erp/inventory.ts";
+import { field, money } from "@/lib/format.ts";
 
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
 const toCents = (pesos: string) => (pesos ? Math.round(Number(pesos) * 100) : 0);
-const money = (cents: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(cents / 100);
 
 function back(orgId: string, error?: string): never {
   revalidatePath(`/${orgId}/erp`);

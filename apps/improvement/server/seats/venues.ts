@@ -3,19 +3,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { VENUE_KINDS, venueMap, venueSeat, venueSession } from "@jotapuntoce/db/schema";
-import { findMembership, resolveSection } from "../auth/guard.ts";
+import { empresaAccess } from "../permissions/empresaAccess.ts";
+import { firstIssue } from "../validation.ts";
 import { generateLayout, seatsInvalid, type SeatsFailure } from "./layouts.ts";
 
 export const seatsNotFound: SeatsFailure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
 
-/** La membresía si la persona tiene `butacas` = empresa; si no, null. Nunca lanza. */
-export async function seatsAccess(userId: string, orgId: string) {
-  if (!z.uuid().safeParse(orgId).success || !(await findMembership(userId, orgId))) return null;
-  const { membership, scope } = await resolveSection(userId, orgId, "butacas");
-  return scope === "empresa" ? membership : null;
-}
-
-const firstIssue = (e: z.ZodError) => e.issues[0]?.message ?? "Datos inválidos.";
+export const seatsAccess = (userId: string, orgId: string) => empresaAccess(userId, orgId, "butacas");
 
 const mapSchema = z.object({
   name: z.string().trim().min(1, "Ponle nombre al mapa.").max(80),

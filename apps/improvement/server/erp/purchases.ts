@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { product, purchaseOrder, purchaseOrderLine, stockMove, supplier } from "@jotapuntoce/db/schema";
 import { erpAccess, erpInvalid, erpNotFound } from "./inventory.ts";
+import { firstIssue } from "../validation.ts";
 
 const createSchema = z.object({
   supplierId: z.uuid("Elige un proveedor."),
@@ -23,7 +24,7 @@ const createSchema = z.object({
 export async function createPurchaseOrder(userId: string, orgId: string, input: unknown) {
   if (!(await erpAccess(userId, orgId))) return erpNotFound;
   const parsed = createSchema.safeParse(input);
-  if (!parsed.success) return erpInvalid(parsed.error.issues[0]?.message ?? "Datos inválidos.");
+  if (!parsed.success) return erpInvalid(firstIssue(parsed.error));
   const { supplierId, lines } = parsed.data;
 
   return db.transaction(async (tx) => {

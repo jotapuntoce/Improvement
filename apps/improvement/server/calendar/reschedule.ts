@@ -1,5 +1,6 @@
 // Reprogramación pura de pendientes vencidos: cada tarea `pendiente` cuyo fin ya pasó se mueve al siguiente
 // hueco libre dentro del horario laboral. Sin base ni reloj propio: todo entra por parámetro.
+import { UTC_OFFSET_MINUTES } from "./availability.ts";
 
 type Block = { startsAt: Date; endsAt: Date };
 export type RescheduleTask = Block & { id: string; kind: string; status: string };
@@ -7,41 +8,20 @@ export type RescheduleResult = { moves: { id: string; startsAt: Date; endsAt: Da
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
-const minutes = (hhmm: string) => {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-};
+// Horario laboral 09:00-18:00 local, pasos de 15 min, hasta 14 días adelante.
+const WORK_START = 9 * 60 * MIN;
+const WORK_END = 18 * 60 * MIN;
+const STEP = 15 * MIN;
+const HORIZON_DAYS = 14;
 
-export function reschedule({
-  tasks,
-  busy,
-  now,
-  workStart = "09:00",
-  workEnd = "18:00",
-  // ponytail: offset fijo, usa Intl si el negocio opera en una zona con horario de verano
-  utcOffsetMinutes = -360,
-  stepMinutes = 15,
-  horizonDays = 14,
-}: {
-  tasks: RescheduleTask[];
-  busy: Block[];
-  now: Date;
-  workStart?: string;
-  workEnd?: string;
-  utcOffsetMinutes?: number;
-  stepMinutes?: number;
-  horizonDays?: number;
-}): RescheduleResult {
-  const step = stepMinutes * MIN;
-  const off = utcOffsetMinutes * MIN;
-  const ws = minutes(workStart) * MIN;
-  const we = minutes(workEnd) * MIN;
-  const ceil = (t: number) => Math.ceil(t / step) * step;
+export function reschedule({ tasks, busy, now }: { tasks: RescheduleTask[]; busy: Block[]; now: Date }): RescheduleResult {
+  const off = UTC_OFFSET_MINUTES * MIN;
+  const ceil = (t: number) => Math.ceil(t / STEP) * STEP;
   // Medianoche local del día de `t`, expresada en UTC.
   const dayBase = (t: number) => Math.floor((t + off) / DAY) * DAY - off;
 
   const occupied = busy.map((b) => ({ s: b.startsAt.getTime(), e: b.endsAt.getTime() }));
-  const limit = now.getTime() + horizonDays * DAY;
+  const limit = now.getTime() + HORIZON_DAYS * DAY;
   const result: RescheduleResult = { moves: [], unplaced: [] };
 
   const due = tasks
@@ -54,12 +34,12 @@ export function reschedule({
     let placed = false;
     while (start + dur <= limit) {
       const base = dayBase(start);
-      if (start < base + ws) {
-        start = base + ws;
+      if (start < base + WORK_START) {
+        start = base + WORK_START;
         continue;
       }
-      if (start + dur > base + we) {
-        start = base + DAY + ws;
+      if (start + dur > base + WORK_END) {
+        start = base + DAY + WORK_START;
         continue;
       }
       const clash = occupied.find((b) => b.s < start + dur && b.e > start);

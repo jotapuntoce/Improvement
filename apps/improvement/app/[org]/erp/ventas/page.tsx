@@ -6,11 +6,10 @@ import { getSessionUserId, requireSection, resolveSection } from "@/server/auth/
 import { listClients } from "@/server/clients/mutations.ts";
 import { listProducts } from "@/server/erp/inventory.ts";
 import { cancelSaleOrder, confirmSaleOrder, createSaleOrder, listSaleOrders } from "@/server/erp/sales.ts";
+import { field, money } from "@/lib/format.ts";
 
 const LINEAS = 3;
 const ESTADO: Record<string, string> = { borrador: "Borrador", confirmada: "Confirmada", entregada: "Entregada", cancelada: "Cancelada" };
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
-const money = (cents: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(cents / 100);
 
 function back(orgId: string, error?: string): never {
   revalidatePath(`/${orgId}/erp`, "layout");

@@ -6,15 +6,15 @@ import { and, eq, gt, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { booking, bookingPage, calendarEvent } from "@jotapuntoce/db/schema";
-import { availableSlots, weeklyHoursSchema } from "./availability.ts";
+import { isUniqueViolation } from "../db/pgError.ts";
+import { firstIssue } from "../validation.ts";
+import { availableSlots, UTC_OFFSET_MINUTES, weeklyHoursSchema } from "./availability.ts";
 
 type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR" | "SLOT_TAKEN"; message: string } };
 const notFound: Failure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
 const invalid = (message: string): Failure => ({ ok: false, error: { code: "VALIDATION_ERROR", message } });
 const slotTaken: Failure = { ok: false, error: { code: "SLOT_TAKEN", message: "Ese horario ya no está disponible." } };
 // El único unique que puede chocar aquí es uq_booking_page_slot (cancel_token es aleatorio de 192 bits).
-const isSlotViolation = (e: unknown) =>
-  (e as { cause?: { code?: string } })?.cause?.code === "23505" || (e as { code?: string })?.code === "23505";
 const DAY = 86_400_000;
 
 async function activePage(slug: string) {
@@ -72,10 +72,10 @@ export async function createBooking(slug: string, input: unknown, now: Date) {
   const page = await activePage(slug);
   if (!page) return notFound;
   const parsed = bookingSchema.safeParse(input);
-  if (!parsed.success) return invalid(parsed.error.issues[0]?.message ?? "Datos inválidos.");
+  if (!parsed.success) return invalid(firstIssue(parsed.error));
   const startsAt = new Date(parsed.data.startsAt);
-  // El día local (UTC-6 fijo, ver availability.ts) del horario pedido.
-  const date = new Date(startsAt.getTime() - 6 * 3_600_000).toISOString().slice(0, 10);
+  // El día local del horario pedido.
+  const date = new Date(startsAt.getTime() + UTC_OFFSET_MINUTES * 60_000).toISOString().slice(0, 10);
   const slots = await slotsFor(page, date, now);
   if (!slots.includes(startsAt.toISOString())) return invalid("Ese horario no está disponible.");
   const endsAt = new Date(startsAt.getTime() + page.durationMinutes * 60_000);
@@ -102,7 +102,7 @@ export async function createBooking(slug: string, input: unknown, now: Date) {
       });
     });
   } catch (e) {
-    if (isSlotViolation(e)) return slotTaken;
+    if (isUniqueViolation(e)) return slotTaken;
     throw e;
   }
   return { ok: true as const, data: { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), cancelToken } };

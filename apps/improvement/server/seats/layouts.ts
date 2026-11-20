@@ -2,6 +2,7 @@
 // el dueño elige tipo y parámetros, y el resultado se guarda como filas de venue_seat.
 import { z } from "zod";
 import type { VENUE_KINDS, VENUE_SEAT_KINDS } from "@jotapuntoce/db/schema";
+import { firstIssue } from "../validation.ts";
 
 export type VenueKind = (typeof VENUE_KINDS)[number];
 export type SeatsFailure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR"; message: string } };
@@ -23,7 +24,7 @@ function rowName(i: number): string {
 }
 
 function build(kind: VenueKind, params: unknown): { ok: true; data: GeneratedSeat[] } | SeatsFailure {
-  const fail = (e: z.ZodError) => seatsInvalid(e.issues[0]?.message ?? "Parámetros inválidos.");
+  const fail = (e: z.ZodError) => seatsInvalid(firstIssue(e, "Parámetros inválidos."));
   if (kind === "teatro") {
     const p = theaterSchema.safeParse(params);
     if (!p.success) return fail(p.error);

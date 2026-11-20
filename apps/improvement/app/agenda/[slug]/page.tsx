@@ -5,15 +5,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cancelBooking, createBooking, loadPublicBookingPage } from "@/server/calendar/booking.ts";
+import { dayKey, dayLabel, field, timeLabel } from "@/lib/format.ts";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
-const TZ = "America/Mexico_City";
 const DAY = 86_400_000;
-const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
-const dayLabel = new Intl.DateTimeFormat("es-MX", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
-const timeLabel = new Intl.DateTimeFormat("es-MX", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
 const shift = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 
 export default async function ReservasPage({

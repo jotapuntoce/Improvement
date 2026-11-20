@@ -10,6 +10,8 @@ export const weeklyHoursSchema = z.partialRecord(z.enum(["1", "2", "3", "4", "5"
 export type WeeklyHours = z.infer<typeof weeklyHoursSchema>;
 
 const MIN = 60_000;
+// ponytail: offset fijo (America/Mexico_City sin horario de verano desde 2022), usa Intl si cambia.
+export const UTC_OFFSET_MINUTES = -360;
 
 export function availableSlots({
   date,
@@ -17,20 +19,17 @@ export function availableSlots({
   durationMinutes,
   busy,
   now,
-  // ponytail: offset fijo (America/Mexico_City sin horario de verano desde 2022), usa Intl si cambia.
-  utcOffsetMinutes = -360,
 }: {
   date: string; // YYYY-MM-DD, día local
   weeklyHours: WeeklyHours;
   durationMinutes: number;
   busy: { startsAt: Date; endsAt: Date }[];
   now: Date;
-  utcOffsetMinutes?: number;
 }): string[] {
   const midnightUtc = Date.parse(`${date}T00:00:00Z`);
   if (Number.isNaN(midnightUtc)) return [];
   const isoDay = String(((new Date(midnightUtc).getUTCDay() + 6) % 7) + 1) as keyof WeeklyHours;
-  const base = midnightUtc - utcOffsetMinutes * MIN; // medianoche local en UTC
+  const base = midnightUtc - UTC_OFFSET_MINUTES * MIN; // medianoche local en UTC
   const dur = durationMinutes * MIN;
   const slots: string[] = [];
   for (const [from, to] of weeklyHours[isoDay] ?? []) {

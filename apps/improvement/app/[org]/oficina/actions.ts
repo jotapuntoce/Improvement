@@ -7,8 +7,8 @@ import { getSessionUserId } from "@/server/auth/guard.ts";
 import { analyzeSpace } from "@/server/office/analyze.ts";
 import { confirmOfficePlan } from "@/server/office/confirm.ts";
 import { uploadSpacePhotos } from "@/server/office/photos.ts";
+import { field } from "@/lib/format.ts";
 
-const field = (formData: FormData, name: string) => formData.get(name)?.toString() ?? "";
 
 function back(orgId: string, error?: string): never {
   const pagina = `/${orgId}/oficina`;

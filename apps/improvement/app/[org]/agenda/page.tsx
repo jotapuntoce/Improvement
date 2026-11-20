@@ -6,8 +6,8 @@ import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { createEvent, listMyEvents, loadAgendaSettings, markDone, rescheduleMine, upsertBookingPage } from "@/server/calendar/events.ts";
 import { disconnectGoogle } from "@/server/calendar/sync.ts";
+import { dayKey, dayLabel, field, timeLabel } from "@/lib/format.ts";
 
-const TZ = "America/Mexico_City";
 // ponytail: offset fijo UTC-6 (sin horario de verano desde 2022), igual que server/calendar/reschedule.ts.
 const OFFSET = "-06:00";
 const DAY = 86_400_000;
@@ -22,11 +22,7 @@ const DIAS = [
   { key: "7", label: "Domingo" },
 ] as const;
 
-const dayLabel = new Intl.DateTimeFormat("es-MX", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
-const timeLabel = new Intl.DateTimeFormat("es-MX", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
-const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
 
 // A nivel de módulo: una Server Action no puede cerrar sobre una función.
 function finish(pagina: string, result: { ok: true } | { ok: false; error: { message: string } }): never {

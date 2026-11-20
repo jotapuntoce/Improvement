@@ -4,11 +4,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadPublicSeatState } from "@/server/seats/publicState.ts";
 import { SeatPicker } from "./SeatPicker.tsx";
+import { money } from "@/lib/format.ts";
 
 export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 const when = new Intl.DateTimeFormat("es-MX", { timeZone: "America/Mexico_City", dateStyle: "full", timeStyle: "short" });
-const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
 export default async function ButacasPublicPage({
   params,
@@ -26,7 +26,7 @@ export default async function ButacasPublicPage({
     <main className="config-page" style={{ maxWidth: "56rem" }}>
       <h1 className="config-title">{state.title}</h1>
       <p className="config-hint">
-        {when.format(new Date(state.startsAt))} · {money.format(state.priceCents / 100)} por lugar
+        {when.format(new Date(state.startsAt))} · {money(state.priceCents)} por lugar
       </p>
       {pago === "ok" && (
         <p role="status" className="config-hint">

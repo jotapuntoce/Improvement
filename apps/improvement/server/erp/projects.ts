@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { client, profile, project, projectStage, STAGE_STATUSES } from "@jotapuntoce/db/schema";
 import { assertMembership, findMembership, findOwnerMembership } from "../auth/guard.ts";
+import type { Tx } from "../db/tx.ts";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
@@ -16,7 +17,6 @@ function fail(message: string, code = "VALIDATION_ERROR"): Result<never> {
   return { ok: false, error: { code, message } };
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StageRow = typeof projectStage.$inferSelect;
 
 export interface ProjectBoardItem {

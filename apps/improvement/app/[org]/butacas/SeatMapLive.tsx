@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { SeatGrid } from "@/components/SeatGrid.tsx";
 
 type Seat = { id: string; label: string; x: number; y: number; kind: string; capacity: number; status: "libre" | "apartado" | "vendido" };
 const TEXT = { libre: "Disponible", apartado: "Apartado", vendido: "Vendido" } as const;
@@ -54,19 +55,15 @@ export function SeatMapLive({
     };
   }, [sessionId, accessToken, url, anonKey, router]);
 
-  const cols = Math.max(...seats.map((s) => s.x)) + 1;
   return (
     <fieldset className="space-y-2">
       <legend className="config-hint">Lugares (marca los que vas a vender)</legend>
       <span hidden data-realtime={status} />
-      <ul className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(4.5rem, 1fr))` }}>
-        {seats.map((s) => (
-          <li
-            key={s.id}
-            data-seat={s.label}
-            data-status={s.status}
-            style={{ gridColumnStart: s.x + 1, gridRowStart: s.y + 1, border: `2px solid ${BORDER[s.status]}`, borderRadius: "var(--radius-sm)", padding: "0.25rem 0.5rem" }}
-          >
+      <SeatGrid
+        seats={seats}
+        border={(s) => BORDER[s.status]}
+        cell={(s) => (
+          <>
             {s.status === "libre" ? (
               <label className="flex items-center gap-1">
                 <input type="checkbox" name="seatId" value={s.id} />
@@ -80,9 +77,9 @@ export function SeatMapLive({
               </span>
             )}
             {s.kind === "mesa" && <span className="block text-sm">{s.capacity} personas</span>}
-          </li>
-        ))}
-      </ul>
+          </>
+        )}
+      />
     </fieldset>
   );
 }

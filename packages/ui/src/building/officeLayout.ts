@@ -22,7 +22,7 @@ export const FIXED_ZONES: readonly OfficeZoneLayout[] = [
   { kind: "recepcion", label: "Recepción", x: 14, y: 18, w: 12, h: 5 },
 ];
 
-const normalize = (s: string) =>
+export const normalize = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export function officeLayout(
@@ -31,14 +31,9 @@ export function officeLayout(
 ): OfficeZoneLayout[] {
   if (areas.length > 12) throw new RangeError("officeLayout: máximo 12 áreas");
   const rank = new Map(template.map((t, i) => [normalize(t), i] as const));
-  const ordered = [...areas].sort((a, b) => {
-    const ra = rank.get(normalize(a.name));
-    const rb = rank.get(normalize(b.name));
-    if (ra !== undefined && rb !== undefined) return ra - rb;
-    if (ra !== undefined) return -1;
-    if (rb !== undefined) return 1;
-    return a.name.localeCompare(b.name, "es");
-  });
+  // Primero las del giro en su orden; las demás, alfabéticas (Infinity - Infinity = NaN cae al localeCompare).
+  const pos = (name: string) => rank.get(normalize(name)) ?? Infinity;
+  const ordered = [...areas].sort((a, b) => pos(a.name) - pos(b.name) || a.name.localeCompare(b.name, "es"));
 
   const n = ordered.length;
   const r = Math.ceil(n / 4);

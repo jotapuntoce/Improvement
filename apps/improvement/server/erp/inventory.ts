@@ -4,24 +4,18 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { product, STOCK_MOVE_KINDS, stockMove, supplier } from "@jotapuntoce/db/schema";
-import { findMembership, resolveSection } from "../auth/guard.ts";
+import { isUniqueViolation } from "../db/pgError.ts";
+import type { Tx } from "../db/tx.ts";
+import { empresaAccess } from "../permissions/empresaAccess.ts";
+import { firstIssue } from "../validation.ts";
 
 export type ErpFailure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR"; message: string } };
 export const erpNotFound: ErpFailure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
 export const erpInvalid = (message: string): ErpFailure => ({ ok: false, error: { code: "VALIDATION_ERROR", message } });
 export const SIN_EXISTENCIA = "Sin existencia suficiente.";
 
-export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export const erpAccess = (userId: string, orgId: string) => empresaAccess(userId, orgId, "erp");
 
-/** La membresía si la persona tiene `erp` = empresa; si no, null. Nunca lanza (resolveSection sí, sin membresía). */
-export async function erpAccess(userId: string, orgId: string) {
-  if (!z.uuid().safeParse(orgId).success || !(await findMembership(userId, orgId))) return null;
-  const { membership, scope } = await resolveSection(userId, orgId, "erp");
-  return scope === "empresa" ? membership : null;
-}
-
-const firstIssue = (e: z.ZodError) => e.issues[0]?.message ?? "Datos inválidos.";
-const isUniqueViolation = (e: unknown) => (e as { code?: string; cause?: { code?: string } })?.cause?.code === "23505" || (e as { code?: string })?.code === "23505";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El producto lleva nombre.").max(120),
@@ -43,25 +37,6 @@ export async function createProduct(userId: string, orgId: string, input: unknow
   try {
     const [row] = await db.insert(product).values({ orgId, ...parsed.data }).returning();
     return { ok: true as const, data: row! };
-  } catch (e) {
-    if (isUniqueViolation(e)) return erpInvalid("Ya existe un producto con ese SKU.");
-    throw e;
-  }
-}
-
-const productUpdateSchema = productSchema.partial().extend({ active: z.boolean().optional() });
-
-export async function updateProduct(userId: string, orgId: string, productId: string, input: unknown) {
-  if (!(await erpAccess(userId, orgId))) return erpNotFound;
-  const parsed = productUpdateSchema.safeParse(input);
-  if (!parsed.success) return erpInvalid(firstIssue(parsed.error));
-  try {
-    const [row] = await db
-      .update(product)
-      .set({ ...parsed.data, updatedAt: new Date() })
-      .where(and(eq(product.id, productId), eq(product.orgId, orgId)))
-      .returning();
-    return row ? { ok: true as const, data: row } : erpNotFound;
   } catch (e) {
     if (isUniqueViolation(e)) return erpInvalid("Ya existe un producto con ese SKU.");
     throw e;

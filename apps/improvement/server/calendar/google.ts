@@ -88,28 +88,6 @@ export function revokeToken(token: string, fetchImpl: Fetch = fetch) {
   return call<Record<string, never>>(fetchImpl, REVOKE_URL, form({ token }));
 }
 
-export function freeBusy(
-  { accessToken, timeMin, timeMax, calendarId }: { accessToken: string; timeMin: string; timeMax: string; calendarId: string },
-  fetchImpl: Fetch = fetch,
-) {
-  return call<{ calendars?: Record<string, { busy?: { start: string; end: string }[] }> }>(
-    fetchImpl,
-    `${API}/freeBusy`,
-    bearer(accessToken, { method: "POST", body: JSON.stringify({ timeMin, timeMax, items: [{ id: calendarId }] }) }),
-  );
-}
-
-export function insertEvent(
-  { accessToken, calendarId, summary, start, end }: { accessToken: string; calendarId: string; summary: string; start: string; end: string },
-  fetchImpl: Fetch = fetch,
-) {
-  return call<GoogleEvent>(
-    fetchImpl,
-    cal(calendarId),
-    bearer(accessToken, { method: "POST", body: JSON.stringify({ summary, start: { dateTime: start }, end: { dateTime: end } }) }),
-  );
-}
-
 /** Recorre todas las páginas; un 410 (syncToken vencido) → `SYNC_TOKEN_GONE`. */
 export async function listEvents(
   { accessToken, calendarId, syncToken }: { accessToken: string; calendarId: string; syncToken?: string | null },

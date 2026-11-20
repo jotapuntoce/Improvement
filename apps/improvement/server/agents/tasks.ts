@@ -1,10 +1,11 @@
 // Recepción única de encargos: todo encargo entra aquí y se rutea al especialista del área o al manager.
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { agent, agentTask, area, message } from "@jotapuntoce/db/schema";
 import { findMembership } from "../auth/guard.ts";
 import { ensureAgentChannel } from "../channels/channels.ts";
+import { firstIssue } from "../validation.ts";
 
 type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR" | "NOT_READY"; message: string } };
 const notFound: Failure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
@@ -33,7 +34,7 @@ export async function createEncargo(
 ): Promise<{ ok: true; data: { id: string } } | Failure> {
   if (!(await findMembership(userId, orgId))) return notFound;
   const parsed = encargoSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]!.message } };
+  if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: firstIssue(parsed.error) } };
   const { body, areaId } = parsed.data;
 
   const [agents, areaRows] = await Promise.all([
@@ -61,16 +62,4 @@ export async function createEncargo(
     return task!.id;
   });
   return { ok: true, data: { id } };
-}
-
-/** Los encargos propios; el dueño ve todos los del org. */
-export async function listEncargos(userId: string, orgId: string) {
-  const m = await findMembership(userId, orgId);
-  if (!m) return notFound;
-  const data = await db
-    .select()
-    .from(agentTask)
-    .where(and(eq(agentTask.orgId, orgId), m.role === "owner" ? undefined : eq(agentTask.requestedBy, userId)))
-    .orderBy(desc(agentTask.createdAt));
-  return { ok: true as const, data };
 }

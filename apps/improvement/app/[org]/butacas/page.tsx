@@ -8,8 +8,8 @@ import { getSessionAccessToken, getSessionUserId, requireSection } from "@/serve
 import { listVenueMaps, loadSeatMap, sellAtBox } from "@/server/seats/boxOffice.ts";
 import { closeSession, createVenueMap, createVenueSession, listSessions, publishSession } from "@/server/seats/venues.ts";
 import { SeatMapLive } from "./SeatMapLive.tsx";
+import { TZ, field, money } from "@/lib/format.ts";
 
-const TZ = "America/Mexico_City";
 // ponytail: offset fijo UTC-6 (sin horario de verano desde 2022), igual que la agenda.
 const OFFSET = "-06:00";
 const KIND_LABEL: Record<string, string> = {
@@ -22,9 +22,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 const STATUS_LABEL: Record<string, string> = { borrador: "Borrador", a_la_venta: "A la venta", cerrada: "Cerrada" };
 const when = new Intl.DateTimeFormat("es-MX", { timeZone: TZ, dateStyle: "medium", timeStyle: "short" });
-const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
 
 // A nivel de módulo: una Server Action no puede cerrar sobre una función.
 function finish(pagina: string, result: { ok: true } | { ok: false; error: { message: string } }, ok = pagina): never {
@@ -138,7 +136,7 @@ export default async function ButacasPage({
               <Link href={`${pagina}?s=${f.id}`} aria-current={f.id === actual?.id ? "page" : undefined} className="panel-btn-ghost">
                 {f.title}
               </Link>{" "}
-              · {when.format(f.startsAt)} · {f.mapName} · {money.format(f.priceCents / 100)} · {STATUS_LABEL[f.status] ?? f.status}
+              · {when.format(f.startsAt)} · {f.mapName} · {money(f.priceCents)} · {STATUS_LABEL[f.status] ?? f.status}
               {f.status !== "cerrada" && (
                 <form action={f.status === "borrador" ? publicar : cerrar} className="inline">
                   <input type="hidden" name="sessionId" value={f.id} />{" "}

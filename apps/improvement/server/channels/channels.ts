@@ -1,11 +1,13 @@
 // El canal del org: listar, publicar y borrar suave. Se lee y escribe solo si hay fila propia en
 // channel_member — la misma regla que la política RLS de canal_rls. Un mensaje nunca se borra:
 // se vacía y se marca `deleted_at`, porque Realtime no filtra los DELETE por RLS.
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { agent, channel, channelMember, message, profile } from "@jotapuntoce/db/schema";
 import { findMembership } from "../auth/guard.ts";
+import type { Tx } from "../db/tx.ts";
+import { firstIssue } from "../validation.ts";
 
 type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR"; message: string } };
 const notFound: Failure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
@@ -44,7 +46,6 @@ export async function listMessages(
   userId: string,
   orgId: string,
   channelId: string,
-  { before, limit = 50 }: { before?: Date; limit?: number } = {},
 ): Promise<{ ok: true; data: ChannelMessage[] } | Failure> {
   if (!(await findMembership(userId, orgId))) return notFound;
   if (!(await isChannelMember(userId, orgId, channelId))) return notFound;
@@ -63,9 +64,9 @@ export async function listMessages(
     .from(message)
     .leftJoin(profile, eq(profile.id, message.authorProfileId))
     .leftJoin(agent, eq(agent.id, message.authorAgentId))
-    .where(and(eq(message.channelId, channelId), before ? lt(message.createdAt, before) : undefined))
+    .where(eq(message.channelId, channelId))
     .orderBy(desc(message.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 200));
+    .limit(50);
   const data = rows.reverse().map((r) => ({
     id: r.id,
     body: r.deletedAt ? "" : r.body,
@@ -89,7 +90,7 @@ export async function postMessage(
   if (!(await findMembership(userId, orgId))) return notFound;
   if (!(await isChannelMember(userId, orgId, channelId))) return notFound;
   const parsed = bodySchema.safeParse(body);
-  if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]!.message } };
+  if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: firstIssue(parsed.error) } };
   const [row] = await db
     .insert(message)
     .values({ orgId, channelId, authorProfileId: userId, body: parsed.data })
@@ -132,8 +133,6 @@ export async function postAgentMessage(agentId: string, channelId: string, body:
     .returning({ id: message.id });
   return row ?? null;
 }
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** El canal privado agente ↔ persona, con esa persona como único miembro. Idempotente. */
 export async function ensureAgentChannel(agentId: string, profileId: string, tx: Tx | typeof db = db): Promise<{ id: string } | null> {

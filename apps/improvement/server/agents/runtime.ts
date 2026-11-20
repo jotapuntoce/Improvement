@@ -110,22 +110,17 @@ async function drainEncargos(now: Date, { provider, orgId }: Deps): Promise<numb
         });
         if (res.ok) reply = res.data.parsed;
       } catch {
-        reply = null;
+        // La IA falló: cuenta como intento y se reintenta abajo.
       }
     }
 
-    if (reply && a && task.channel_id) {
-      await postAgentMessage(a.id, task.channel_id, reply.reply);
-      await db
-        .update(agentTask)
-        .set({ status: reply.done ? "hecho" : "asignado", result: reply.reply, lockedUntil: null, updatedAt: now })
-        .where(eq(agentTask.id, task.id));
-    } else if (task.attempts >= MAX_ATTEMPTS || !a || !task.channel_id) {
-      if (a && task.channel_id) await postAgentMessage(a.id, task.channel_id, "No pude completar este encargo.");
-      await db.update(agentTask).set({ status: "fallido", lockedUntil: null, updatedAt: now }).where(eq(agentTask.id, task.id));
-    } else {
-      await db.update(agentTask).set({ status: "asignado", lockedUntil: null, updatedAt: now }).where(eq(agentTask.id, task.id));
-    }
+    const failed = !reply && (task.attempts >= MAX_ATTEMPTS || !a || !task.channel_id);
+    const text = reply ? reply.reply : failed ? "No pude completar este encargo." : null;
+    if (text && a && task.channel_id) await postAgentMessage(a.id, task.channel_id, text);
+    await db
+      .update(agentTask)
+      .set({ status: reply?.done ? "hecho" : failed ? "fallido" : "asignado", result: reply?.reply, lockedUntil: null, updatedAt: now })
+      .where(eq(agentTask.id, task.id));
   }
   return claimed.length;
 }

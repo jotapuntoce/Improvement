@@ -5,11 +5,10 @@ import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { listProducts, listSuppliers } from "@/server/erp/inventory.ts";
 import { confirmPurchaseOrder, createPurchaseOrder, listPurchaseOrders, receivePurchaseOrder } from "@/server/erp/purchases.ts";
+import { field, money } from "@/lib/format.ts";
 
 const LINEAS = 3;
 const ESTADO: Record<string, string> = { borrador: "Borrador", confirmada: "Confirmada", recibida: "Recibida", cancelada: "Cancelada" };
-const field = (formData: FormData, name: string) => formData.get(name)?.toString().trim() ?? "";
-const money = (cents: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(cents / 100);
 
 function back(orgId: string, error?: string): never {
   revalidatePath(`/${orgId}/erp`, "layout");

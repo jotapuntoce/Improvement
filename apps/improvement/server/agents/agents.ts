@@ -1,14 +1,13 @@
 // Los agentes de un org: Improvement (manager y agente del dueño), la Recepción (única entrada) y un
 // especialista por jefe de área. Todo se deriva de los datos (seat, area, membership); idempotente.
 import { and, eq, notInArray, sql } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { agent, area, channel, channelMember, membership, seat } from "@jotapuntoce/db/schema";
 import { findOwnerMembership } from "../auth/guard.ts";
 import { areaHeads } from "./heads.ts";
 
 type AgentRow = typeof agent.$inferSelect;
-type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR"; message: string } };
+type Failure = { ok: false; error: { code: "NOT_FOUND"; message: string } };
 const notFound: Failure = { ok: false, error: { code: "NOT_FOUND", message: "No encontrado." } };
 
 export async function ensureAgents(userId: string, orgId: string): Promise<{ ok: true; data: AgentRow[] } | Failure> {
@@ -78,33 +77,4 @@ export async function ensureAgents(userId: string, orgId: string): Promise<{ ok:
     return tx.select().from(agent).where(eq(agent.orgId, orgId));
   });
   return { ok: true, data };
-}
-
-export async function listAgents(userId: string, orgId: string): Promise<AgentRow[] | null> {
-  if (!(await findOwnerMembership(userId, orgId))) return null;
-  return db.select().from(agent).where(eq(agent.orgId, orgId));
-}
-
-const agentInputSchema = z.object({
-  instructions: z.string().max(4000),
-  skills: z.array(z.string().trim().min(1).max(60)).max(20),
-});
-
-export async function updateAgent(
-  userId: string,
-  orgId: string,
-  agentId: string,
-  input: unknown,
-): Promise<{ ok: true; data: AgentRow } | Failure> {
-  if (!(await findOwnerMembership(userId, orgId))) return notFound;
-  const parsed = agentInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Datos inválidos." } };
-  }
-  const [row] = await db
-    .update(agent)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(and(eq(agent.id, agentId), eq(agent.orgId, orgId)))
-    .returning();
-  return row ? { ok: true, data: row } : notFound;
 }

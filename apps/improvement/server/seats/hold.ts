@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { SEAT_BOOKING_CHANNELS, seatBooking, venueSeat, venueSession } from "@jotapuntoce/db/schema";
 import { seatsInvalid, type SeatsFailure } from "./layouts.ts";
+import { firstIssue } from "../validation.ts";
 
 export const HOLD_MINUTES = 31;
 /** Gracia antes de liberar un apartado vencido: un webhook de pago tardío todavía lo encuentra. */
@@ -32,7 +33,7 @@ export async function holdSeats(input: {
   now: Date;
 }): Promise<{ ok: true; data: { holdToken: string; expiresAt: Date } } | HoldFailure> {
   const parsed = holdSchema.safeParse(input);
-  if (!parsed.success) return seatsInvalid(parsed.error.issues[0]?.message ?? "Datos inválidos.");
+  if (!parsed.success) return seatsInvalid(firstIssue(parsed.error));
   const { sessionId, channel, now } = parsed.data;
   const seatIds = [...new Set(parsed.data.seatIds)].sort();
 

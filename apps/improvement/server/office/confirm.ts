@@ -4,15 +4,13 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { area, officePlan, officeZone, organization, seat } from "@jotapuntoce/db/schema";
 import { industryAreas } from "@jotapuntoce/ui/building/industries.ts";
-import { officeLayout, type OfficeZoneLayout } from "@jotapuntoce/ui/building/officeLayout.ts";
+import { normalize, officeLayout, type OfficeZoneLayout } from "@jotapuntoce/ui/building/officeLayout.ts";
 import { themeIssues } from "@jotapuntoce/ui/theme.ts";
 import { findOwnerMembership } from "../auth/guard.ts";
+import { firstIssue } from "../validation.ts";
 import { officeProposalSchema } from "./proposal.ts";
 
 type Failure = { ok: false; error: { code: "NOT_FOUND" | "VALIDATION_ERROR"; message: string } };
-
-const normalize = (s: string) =>
-  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
 export async function confirmOfficePlan(
   userId: string,
@@ -29,7 +27,7 @@ export async function confirmOfficePlan(
   if (!plan) return notFound;
   const parsed = officeProposalSchema.safeParse(edited);
   if (!parsed.success) {
-    return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Propuesta inválida." } };
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: firstIssue(parsed.error, "Propuesta inválida.") } };
   }
   const proposal = parsed.data;
   const themeOk = proposal.theme !== null && themeIssues(proposal.theme).length === 0;

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { agent, agentTask, area, membership, message, organization, profile } from "@jotapuntoce/db/schema";
-import { createEncargo, listEncargos, routeEncargo } from "../server/agents/tasks.ts";
+import { createEncargo, routeEncargo } from "../server/agents/tasks.ts";
 
 describe("routeEncargo", () => {
   const agents = [
@@ -78,8 +78,6 @@ describe("createEncargo", () => {
     if (!sinArea.ok || !otraArea.ok) throw new Error("encargo falló");
     expect((await taskOf(sinArea.data.id)).agentId).toBe(o.manager);
     expect((await taskOf(otraArea.data.id)).agentId).toBe(o.manager);
-    const propios = await listEncargos(o.empleado, o.orgId);
-    expect(propios.ok && propios.data).toHaveLength(2);
   });
 
   it("WHEN no hay manager THE SYSTEM SHALL dar NOT_READY sin escribir; un no miembro recibe NOT_FOUND", async () => {
