@@ -1158,7 +1158,7 @@
       "apps/improvement/tests/booking.test.ts",
       "apps/improvement/tests/e2e/agenda.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T1",

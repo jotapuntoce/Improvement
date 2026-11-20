@@ -79,6 +79,40 @@ test("WHEN el usuario guarda una página de reservas THE SYSTEM SHALL mostrar su
   await expect(page.getByRole("link", { name: `/agenda/${SLUG}` })).toHaveAttribute("href", `/agenda/${SLUG}`);
 });
 
+// Un lunes a más de una semana: lejos de la tarea reprogramada arriba (cae hoy o mañana).
+function lunesLejano() {
+  const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(new Date());
+  const t = Date.parse(`${hoy}T12:00:00Z`);
+  const dow = new Date(t).getUTCDay(); // 0 = domingo
+  return new Date(t + (((8 - dow) % 7 || 7) + 7) * 86_400_000).toISOString().slice(0, 10);
+}
+
+test("WHEN un visitante sin sesión reserva THE SYSTEM SHALL mostrar la confirmación", async ({ page, context }) => {
+  await context.clearCookies();
+  expect((await page.goto(`/agenda/${SLUG}?d=${lunesLejano()}`))?.status()).toBe(200);
+  await page.getByRole("link", { name: "09:00", exact: true }).click();
+  await page.getByLabel("Tu nombre").fill("Ana Visitante");
+  await page.getByLabel("Tu correo").fill("ana@example.com");
+  await page.getByRole("button", { name: "Reservar" }).click();
+  await expect(page.getByRole("heading", { name: "Reserva confirmada" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "cancelar mi reserva" })).toBeVisible();
+});
+
+test("WHEN otro visitante abre el mismo día THE SYSTEM SHALL no mostrar el horario ya reservado", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto(`/agenda/${SLUG}?d=${lunesLejano()}`);
+  const horarios = page.getByRole("list", { name: "Horarios libres" });
+  await expect(horarios.getByRole("link", { name: "09:30", exact: true })).toBeVisible();
+  await expect(horarios.getByRole("link", { name: "09:00", exact: true })).toHaveCount(0);
+});
+
+test("WHEN AxeBuilder analiza /agenda/<slug> THE SYSTEM SHALL reportar 0 violaciones", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto(`/agenda/${SLUG}?d=${lunesLejano()}`);
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
+
 test("WHEN un empleado sin agenda abre la agenda THE SYSTEM SHALL responder 404", async ({ page, context, baseURL }) => {
   await as(context, "sinPermiso", baseURL);
   expect((await page.goto(`/${orgId}/agenda`))?.status()).toBe(404);
