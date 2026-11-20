@@ -78,7 +78,8 @@ test("WHEN el dueño confirma el borrador THE SYSTEM SHALL mostrar el plano con 
   await expect(page.getByLabel("Nombre del área 1")).toHaveValue("Cocina");
   await page.getByRole("button", { name: "Confirmar oficina" }).click();
   await page.waitForURL(`**/${orgId}/oficina`);
-  await expect(page.locator("[data-zone]")).toHaveCount(5);
+  // La confirmación son varias escrituras en una transacción contra la base remota: puede pasar de 5 s.
+  await expect(page.locator("[data-zone]")).toHaveCount(5, { timeout: 20_000 });
   await expect(page.getByRole("button", { name: "Confirmar oficina" })).toHaveCount(0);
 });
 

@@ -56,7 +56,8 @@ test("WHEN el dueño activa agentes THE SYSTEM SHALL mostrar el canal General", 
   await as(context, "owner", baseURL);
   expect((await page.goto(`/${orgId}/canal`))?.status()).toBe(200);
   await page.getByRole("button", { name: "Activar agentes" }).click();
-  await expect(page.getByRole("navigation", { name: "Canales" }).getByRole("link", { name: "General" })).toBeVisible();
+  // Activar crea agentes, canal y miembros contra la base remota: con la suite en paralelo pasa de 5 s.
+  await expect(page.getByRole("navigation", { name: "Canales" }).getByRole("link", { name: "General" })).toBeVisible({ timeout: 20_000 });
 });
 
 test("WHEN el dueño publica en General THE SYSTEM SHALL mostrarlo al empleado sin recargar", async ({ browser, page, context, baseURL }) => {
