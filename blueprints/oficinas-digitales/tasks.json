@@ -1280,7 +1280,7 @@
       "apps/improvement/server/seats/hold.ts",
       "apps/improvement/tests/seats-hold.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T5",
