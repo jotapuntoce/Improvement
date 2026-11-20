@@ -27,8 +27,9 @@ describe("crypto de tokens", () => {
 
   it("WHEN se altera el cifrado o se usa otra llave THE SYSTEM SHALL devolver BAD_TOKEN sin lanzar", () => {
     const blob = cifra();
-    const last = blob.at(-1) === "A" ? "B" : "A";
-    const alterado = blob.slice(0, -1) + last;
+    // El primer carácter del tag lleva 6 bits reales; el último de un segmento puede ser solo relleno.
+    const [v, iv, tag, enc] = blob.split(".");
+    const alterado = [v, iv, (tag!.startsWith("A") ? "B" : "A") + tag!.slice(1), enc].join(".");
     expect(decryptToken(alterado, KEY)).toMatchObject({ ok: false, error: { code: "BAD_TOKEN" } });
     expect(decryptToken(blob, randomBytes(32).toString("base64"))).toMatchObject({ ok: false, error: { code: "BAD_TOKEN" } });
     expect(decryptToken("v2.a.b.c", KEY)).toMatchObject({ ok: false, error: { code: "BAD_TOKEN" } });
