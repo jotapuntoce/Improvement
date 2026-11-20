@@ -1190,7 +1190,7 @@
       "apps/improvement/server/stripe/client.ts",
       "apps/improvement/tests/stripe-client.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T2",
