@@ -3,7 +3,7 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { bookingPage, CALENDAR_EVENT_KINDS, calendarEvent } from "@jotapuntoce/db/schema";
+import { bookingPage, CALENDAR_EVENT_KINDS, calendarConnection, calendarEvent } from "@jotapuntoce/db/schema";
 import { findMembership } from "../auth/guard.ts";
 import { reschedule } from "./reschedule.ts";
 import { weeklyHoursSchema } from "./availability.ts";
@@ -69,6 +69,21 @@ export async function rescheduleMine(userId: string, orgId: string, now: Date) {
       .where(and(eq(calendarEvent.id, m.id), eq(calendarEvent.userId, userId)));
   }
   return { ok: true as const, data: { moved: moves.length, unplaced } };
+}
+
+/** Lo que la pantalla de agenda muestra del usuario: estado de Google (sin token) y su página de reservas. */
+export async function loadAgendaSettings(userId: string, orgId: string) {
+  if (!(await findMembership(userId, orgId))) return notFound;
+  const [connection] = await db
+    .select({ status: calendarConnection.status, providerEmail: calendarConnection.providerEmail, lastSyncedAt: calendarConnection.lastSyncedAt })
+    .from(calendarConnection)
+    .where(and(eq(calendarConnection.orgId, orgId), eq(calendarConnection.userId, userId)));
+  const [page] = await db
+    .select()
+    .from(bookingPage)
+    .where(and(eq(bookingPage.orgId, orgId), eq(bookingPage.userId, userId)))
+    .limit(1);
+  return { ok: true as const, data: { connection: connection ?? null, bookingPage: page ?? null } };
 }
 
 const bookingPageSchema = z.object({

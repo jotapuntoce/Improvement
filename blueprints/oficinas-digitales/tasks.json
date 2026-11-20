@@ -1128,7 +1128,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/e2e/agenda.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E5-T8",
