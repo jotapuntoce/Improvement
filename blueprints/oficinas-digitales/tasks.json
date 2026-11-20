@@ -1374,7 +1374,7 @@
       "apps/improvement/server/permissions/sections.ts",
       "apps/improvement/tests/e2e/butacas.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T8",

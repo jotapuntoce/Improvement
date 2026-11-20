@@ -34,7 +34,7 @@ export type SectionSlug = (typeof SECTION_SLUGS)[number];
 export const DIRECCION_SLUGS = ["vision", "scorecard", "issues", "junta"] as const;
 
 /** Secciones de Oficinas digitales: navegan por su propio <nav> en el layout de [org], no por el Lobby. */
-export const OFICINAS_SLUGS = ["oficina", "canal", "erp", "agenda"] as const;
+export const OFICINAS_SLUGS = ["oficina", "canal", "erp", "agenda", "butacas"] as const;
 export type DireccionSlug = (typeof DIRECCION_SLUGS)[number];
 
 export interface Section {
