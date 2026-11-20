@@ -4133,8 +4133,9 @@ n=$(ls packages/db/migrations/*.sql | wc -l) && pnpm db:generate && test "$(ls p
 # expect: exit 0 — esquema y migraciones coinciden: nada pendiente de generar
 git diff --quiet "$(git merge-base summum-improvement HEAD)" HEAD -- apps/admin apps/summum apps/improvement/vercel.json apps/improvement/server/auth apps/improvement/server/kpis packages/ui/src/tokens.css packages/ui/src/building/Lobby.tsx
 # expect: exit 0 — non-goals e interfaces congeladas sin tocar
-git diff --quiet --diff-filter=MD "$(git merge-base summum-improvement HEAD)" HEAD -- packages/db/migrations
-# expect: exit 0 — ninguna migración existente (0000-0057) se modificó ni se borró; solo se agregaron
+git diff --quiet --diff-filter=MD "$(git merge-base summum-improvement HEAD)" HEAD -- packages/db/migrations ':(exclude)packages/db/migrations/meta/_journal.json'
+# expect: exit 0 — ninguna migración existente (0000-0057) ni su snapshot se modificó ni se borró; solo se agregaron.
+# `meta/_journal.json` queda fuera: `pnpm db:generate` le agrega una entrada por migración nueva, así que siempre sale modificado.
 ```
 
 `pnpm db:migrate` no está en este gate: pide aprobación y cada migración ya se aplicó en su paso.
