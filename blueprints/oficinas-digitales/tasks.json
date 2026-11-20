@@ -1311,7 +1311,7 @@
       "apps/improvement/app/api/butacas/[sessionId]/apartar/route.ts",
       "apps/improvement/tests/seats-checkout.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E6-T6",
