@@ -1406,6 +1406,6 @@
       "apps/improvement/app/butacas/[sessionId]/SeatPicker.tsx",
       "apps/improvement/tests/e2e/butacas.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   }
 ]

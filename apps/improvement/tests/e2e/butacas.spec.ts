@@ -1,10 +1,10 @@
 // Butacas contra el build de producción: mapa 2×3, función publicada, venta en taquilla, mapa en vivo para
-// otro taquillero por Realtime, 404 sin permiso y axe.
+// otro taquillero por Realtime, 404 sin permiso, axe y la página pública sin sesión.
 import { test, expect, type BrowserContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
-import { membership, organization, permissionType, profile, venueSession } from "@jotapuntoce/db/schema";
+import { membership, organization, permissionType, profile, seatBooking, venueSession } from "@jotapuntoce/db/schema";
 import { createTestAuthUser, deleteTestAuthUser, signInTestUser } from "@jotapuntoce/db/test-fixtures";
 
 test.describe.configure({ mode: "serial" });
@@ -106,6 +106,35 @@ test("WHEN un empleado sin butacas abre la página THE SYSTEM SHALL responder 40
 test("WHEN AxeBuilder analiza /butacas THE SYSTEM SHALL reportar 0 violaciones", async ({ page, context, baseURL }) => {
   await as(context, "owner", baseURL);
   await page.goto(`/${orgId}/butacas?s=${sessionId}`);
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("WHEN un visitante sin sesión abre /butacas/<id> THE SYSTEM SHALL ver A1 ocupado sin datos de compradores", async ({ page, context, request }) => {
+  await db.update(seatBooking).set({ buyerName: "Comprador Secreto", buyerEmail: `secreto-${stamp}@example.com` }).where(eq(seatBooking.sessionId, sessionId));
+  await context.clearCookies();
+  expect((await page.goto(`/butacas/${sessionId}`))?.status()).toBe(200);
+  await expect(seat(page, "A1")).toContainText("Ocupado");
+  await expect(seat(page, "A2")).toContainText("Libre");
+
+  const res = await request.get(`/api/butacas/${sessionId}/estado`);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["cache-control"]).toContain("no-store");
+  const raw = await res.text();
+  expect(raw).not.toContain("Comprador Secreto");
+  expect(raw).not.toContain(`secreto-${stamp}`);
+  expect((await request.get(`/api/butacas/${crypto.randomUUID()}/estado`)).status()).toBe(404);
+});
+
+test("WHEN el org no tiene cobro en línea THE SYSTEM SHALL decir que se vende solo en taquilla, con 0 violaciones de axe", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto(`/butacas/${sessionId}`);
+  const form = page.getByRole("form", { name: "Comprar lugares" });
+  await seat(page, "A2").getByRole("checkbox").check();
+  await form.getByLabel("Tu nombre").fill("Vera Visitante");
+  await form.getByLabel("Tu correo").fill(`vera-${stamp}@example.com`);
+  await form.getByRole("button", { name: /Comprar/ }).click();
+  await expect(form.getByRole("status")).toHaveText("Esta función se vende solo en taquilla.");
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 });
