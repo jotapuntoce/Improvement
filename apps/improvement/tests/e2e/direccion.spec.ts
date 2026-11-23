@@ -344,6 +344,6 @@ test.describe("Hub y navegación", () => {
     await as(context, ownerToken, baseURL);
     await page.goto(`/${orgId}/objetivos`);
     const nav = page.getByRole("navigation", { name: "Aplicaciones" });
-    await expect(nav.getByRole("link", { name: "Dirección" })).toHaveAttribute("href", `/${orgId}/direccion`);
+    await expect(nav.getByRole("link", { name: "Dirección", exact: true })).toHaveAttribute("href", `/${orgId}/direccion`);
   });
 });

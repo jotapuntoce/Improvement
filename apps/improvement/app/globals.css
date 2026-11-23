@@ -597,7 +597,7 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 /* Formulario de un campo por renglón (ficha, bitácora, marca): los campos a todo lo ancho. */
 .config-form-stack { flex-direction: column; align-items: stretch; }
 .config-form-stack > button { align-self: flex-start; }
-.permiso-actions { display: flex; gap: 10px; }
+.permiso-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* --- Enlace de invitación (/[org]/equipo/invitar) — se muestra una sola vez. --- */
 .invite-link {
@@ -682,6 +682,9 @@ a.pendiente-link:focus-visible { outline: 2px solid var(--accent-2); outline-off
 .shell-preview { margin-top: auto; display: flex; gap: 0.5rem; align-items: end; color: var(--text-secondary); font-size: 0.875rem; }
 .shell-preview label { display: grid; gap: 0.25rem; }
 .shell-main { min-width: 0; }
+/* Dentro del shell el fondo es negro (#000): el gris tenue de .jpc-back-link (11.5px) no llega a AA. */
+.shell-main .jpc-back-link { color: var(--text-secondary); }
+.shell-main .jpc-back-link:hover { color: var(--text-primary); }
 @media (max-width: 767px) {
   .shell { grid-template-columns: 1fr; }
   .shell-sidebar { position: static; height: auto; }

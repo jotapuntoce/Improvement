@@ -11,7 +11,10 @@ paths:
   (incluidos los `--brand-*` de la marca madre). Si genuinamente no existe, se
   agrega a `packages/ui/src/tokens.css`, nunca inline.
 - El tema es oscuro fijo — no agregues lógica de `prefers-color-scheme` ni un segundo set de tokens
-  claros sin que el usuario lo pida explícitamente (decisión ya tomada, ver blueprint §7).
+  claros sin que el usuario lo pida explícitamente (decisión ya tomada, ver blueprint §7). Única excepción,
+  aprobada por Jose Carlos: el tema por org de Oficinas digitales (`organization.theme`), que sobrescribe
+  cuatro tokens en `app/[org]/layout.tsx` solo si pasa AA (`packages/ui/src/theme.ts`; ver
+  `.claude/rules/oficinas-digitales.md`).
 - Toda animación respeta `@media (prefers-reduced-motion: reduce)` — especialmente crítico en la
   escena 3D (`apps/improvement/app/[org]/dashboard/Scene3D.tsx`) y el `app-icon` heredado de
   `apps/admin`.

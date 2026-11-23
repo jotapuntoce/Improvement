@@ -76,6 +76,21 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
 
+  apps/agentes:
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
+
   apps/improvement:
     dependencies:
       '@anthropic-ai/sdk':
@@ -114,6 +129,9 @@ importers:
       resend:
         specifier: ^6.25.0
         version: 6.25.0
+      stripe:
+        specifier: 23.0.0
+        version: 23.0.0(@types/node@24.13.3)
       zod:
         specifier: ^4.5.4
         version: 4.5.4

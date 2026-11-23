@@ -47,6 +47,11 @@ export const organization = pgTable(
     // validado en el borde por server/companyRequests/*.ts (apps/improvement). null o cualquier valor
     // fuera de esa lista = AppIconLarge usa su glyph default (la cuadrícula), nunca lanza.
     industry: text("industry"),
+    // Tema propio del org ({bg,textPrimary,accent1,accent2}, hex). null = tokens base. Solo se aplica si
+    // pasa AA (packages/ui/src/theme.ts); el hex del cliente vive aquí, nunca en código.
+    theme: jsonb("theme"),
+    // Giro libre cuando industry = "otro" — de aquí la IA propone las áreas (blueprint oficinas-digitales).
+    industryCustom: text("industry_custom"),
     // Cómo llama el dueño a cada sección de SU empresa digital, y cuáles apagó:
     // {"clientes":{"label":"Obras"},"powerups":{"hidden":true}}. Una columna y no una tabla: son
     // cinco llaves por empresa que solo se leen completas, nunca se consultan ni se ordenan.
@@ -70,6 +75,10 @@ export const organization = pgTable(
     index("idx_organization_parent_org_id").on(t.parentOrgId),
     check("organization_kind_check", sql`${t.kind} in ('muelle','barco')`),
     check("organization_muelle_sin_padre", sql`${t.kind} <> 'muelle' or ${t.parentOrgId} is null`),
+    check(
+      "organization_industry_custom_length",
+      sql`${t.industryCustom} is null or char_length(${t.industryCustom}) between 1 and 80`,
+    ),
   ],
 );
 
@@ -610,7 +619,7 @@ export const aiSuggestion = pgTable(
   },
   (t) => [
     index("idx_ai_suggestion_org_id").on(t.orgId),
-    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento','alerta')`),
+    check("ai_suggestion_category_check", sql`${t.category} in ('upgrade','servicio_cliente','siguiente_movimiento','alerta','oficina','agente')`),
   ],
 );
 
@@ -1889,6 +1898,600 @@ export const seat = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("idx_seat_org_parent").on(t.orgId, t.parentSeatId)],
+);
+
+// ─── Oficinas digitales: oficina 2D ─────────────────────────────────────────────────────────────
+// Un plano por org en borrador (fotos + propuesta de la IA) y uno confirmado. Nada cambia hasta que
+// el dueño confirma. RLS en la migración oficina_rls: el borrador solo lo lee el dueño.
+
+export const OFFICE_PLAN_STATUSES = ["draft", "confirmed"] as const;
+export const OFFICE_ZONE_KINDS = ["area", "recepcion", "direccion", "sala"] as const;
+
+export const officePlan = pgTable(
+  "office_plan",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    status: text("status", { enum: OFFICE_PLAN_STATUSES }).notNull().default("draft"),
+    // Rutas `{orgId}/{uuid}.{ext}` del bucket privado `espacios` — nunca URLs públicas.
+    sourcePhotos: text("source_photos").array().notNull().default(sql`'{}'::text[]`),
+    proposal: jsonb("proposal").notNull(),
+    logo: jsonb("logo"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: uuid("confirmed_by").references(() => profile.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("office_plan_status_check", sql`${t.status} in ('draft','confirmed')`),
+    check("office_plan_photos_max", sql`cardinality(${t.sourcePhotos}) <= 6`),
+    uniqueIndex("uq_office_plan_org_status").on(t.orgId, t.status),
+  ],
+);
+
+export const officeZone = pgTable(
+  "office_zone",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => officePlan.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: OFFICE_ZONE_KINDS }).notNull(),
+    label: text("label").notNull(),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    w: integer("w").notNull(),
+    h: integer("h").notNull(),
+  },
+  (t) => [
+    check("office_zone_kind_check", sql`${t.kind} in ('area','recepcion','direccion','sala')`),
+    check(
+      "office_zone_grid_check",
+      sql`${t.x} >= 0 and ${t.y} >= 0 and ${t.w} >= 1 and ${t.h} >= 1 and ${t.x} + ${t.w} <= 40 and ${t.y} + ${t.h} <= 24`,
+    ),
+    check("office_zone_area_kind_check", sql`(${t.kind} = 'area') = (${t.areaId} is not null)`),
+    index("idx_office_zone_plan").on(t.planId),
+  ],
+);
+
+// ─── Oficinas digitales: agentes ────────────────────────────────────────────────────────────────
+// Improvement es el manager y el agente del dueño; un especialista por área (de su jefe); la
+// recepción es la única entrada. RLS en agentes_rls: `agent` solo lo lee el dueño (sus instrucciones
+// pueden llevar memoria del dueño); un encargo, quien lo pidió y el dueño.
+
+export const AGENT_KINDS = ["manager", "especialista", "recepcion"] as const;
+export const AGENT_TASK_STATUSES = ["recibido", "asignado", "en_proceso", "hecho", "fallido"] as const;
+
+export const agent = pgTable(
+  "agent",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: AGENT_KINDS }).notNull(),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    // El dueño para manager y recepcion; el jefe del área para especialista.
+    ownerProfileId: uuid("owner_profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    instructions: text("instructions").notNull().default(""),
+    skills: jsonb("skills").notNull().default(sql`'[]'::jsonb`),
+    lastReportOn: date("last_report_on"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("agent_kind_check", sql`${t.kind} in ('manager','especialista','recepcion')`),
+    check("agent_area_kind_check", sql`(${t.kind} = 'especialista') = (${t.areaId} is not null)`),
+    uniqueIndex("uq_agent_org_manager").on(t.orgId).where(sql`${t.kind} = 'manager'`),
+    uniqueIndex("uq_agent_org_recepcion").on(t.orgId).where(sql`${t.kind} = 'recepcion'`),
+    uniqueIndex("uq_agent_area").on(t.areaId).where(sql`${t.kind} = 'especialista'`),
+  ],
+);
+
+export const agentTask = pgTable(
+  "agent_task",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").references(() => agent.id, { onDelete: "set null" }),
+    requestedBy: uuid("requested_by").references(() => profile.id, { onDelete: "set null" }),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    status: text("status", { enum: AGENT_TASK_STATUSES }).notNull().default("recibido"),
+    attempts: integer("attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    result: text("result"),
+    channelId: uuid("channel_id").references((): AnyPgColumn => channel.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("agent_task_status_check", sql`${t.status} in ('recibido','asignado','en_proceso','hecho','fallido')`),
+    check("agent_task_attempts_range", sql`${t.attempts} between 0 and 3`),
+    check("agent_task_body_length", sql`char_length(${t.body}) between 1 and 2000`),
+    index("idx_agent_task_status_lock").on(t.status, t.lockedUntil),
+  ],
+);
+
+// El worker de apps/agentes avisa que sigue vivo. Sin política RLS: solo el servidor lo escribe y lee.
+export const workerHeartbeat = pgTable("worker_heartbeat", {
+  worker: text("worker").primaryKey(),
+  seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Oficinas digitales: canal ──────────────────────────────────────────────────────────────────
+// Chat del org: general, por área, directo y con un agente. Se lee si hay fila propia en
+// channel_member (canal_rls). Borrado suave: deleted_at + body vacío, para que el UPDATE llegue por
+// Realtime filtrado por RLS (un DELETE no se filtra).
+
+export const CHANNEL_KINDS = ["general", "area", "directo", "agente"] as const;
+
+export const channel = pgTable(
+  "channel",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: CHANNEL_KINDS }).notNull(),
+    areaId: uuid("area_id").references(() => area.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").references(() => agent.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id").references(() => profile.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("channel_kind_check", sql`${t.kind} in ('general','area','directo','agente')`),
+    check(
+      "channel_agent_kind_check",
+      sql`(${t.kind} = 'agente') = (${t.agentId} is not null and ${t.profileId} is not null)`,
+    ),
+    uniqueIndex("uq_channel_org_general").on(t.orgId).where(sql`${t.kind} = 'general'`),
+    uniqueIndex("uq_channel_agent_profile").on(t.agentId, t.profileId).where(sql`${t.kind} = 'agente'`),
+  ],
+);
+
+export const channelMember = pgTable(
+  "channel_member",
+  {
+    id: id(),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => channel.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_channel_member").on(t.channelId, t.profileId)],
+);
+
+export const message = pgTable(
+  "message",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => channel.id, { onDelete: "cascade" }),
+    authorProfileId: uuid("author_profile_id").references(() => profile.id, { onDelete: "cascade" }),
+    authorAgentId: uuid("author_agent_id").references(() => agent.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("message_one_author_check", sql`num_nonnulls(${t.authorProfileId}, ${t.authorAgentId}) = 1`),
+    check("message_deleted_blank_check", sql`${t.deletedAt} is null or ${t.body} = ''`),
+    check("message_body_length", sql`char_length(${t.body}) <= 4000`),
+    index("idx_message_channel_created").on(t.channelId, t.createdAt),
+  ],
+);
+
+// ─── ERP v1: inventario y proveedores (oficinas-digitales paso 24) ─────────────────────────────
+// Lo ven el dueño y quien tenga la sección `erp` = empresa (erp_inventario_rls).
+
+export const STOCK_MOVE_KINDS = ["entrada", "salida", "ajuste"] as const;
+
+export const product = pgTable(
+  "product",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    sku: text("sku"),
+    name: text("name").notNull(),
+    unit: text("unit").notNull().default("pieza"),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull().default(0),
+    costCents: bigint("cost_cents", { mode: "number" }).notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("product_price_nonneg", sql`${t.priceCents} >= 0`),
+    check("product_cost_nonneg", sql`${t.costCents} >= 0`),
+    uniqueIndex("uq_product_org_sku").on(t.orgId, t.sku).where(sql`sku is not null`),
+  ],
+);
+
+export const supplier = pgTable("supplier", {
+  id: id(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  notes: text("notes"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+// ─── ERP v1: órdenes de venta y de compra (paso 25) ────────────────────────────────────────────
+
+export const SALE_ORDER_STATUSES = ["borrador", "confirmada", "entregada", "cancelada"] as const;
+export const PURCHASE_ORDER_STATUSES = ["borrador", "confirmada", "recibida", "cancelada"] as const;
+
+export const saleOrder = pgTable(
+  "sale_order",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    clientId: uuid("client_id").references(() => client.id, { onDelete: "set null" }),
+    dealId: uuid("deal_id").references(() => deal.id, { onDelete: "set null" }),
+    status: text("status", { enum: SALE_ORDER_STATUSES }).notNull().default("borrador"),
+    totalCents: bigint("total_cents", { mode: "number" }).notNull().default(0),
+    currency: text("currency").notNull().default("mxn"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("sale_order_status_check", sql`${t.status} in ('borrador','confirmada','entregada','cancelada')`),
+    check("sale_order_total_nonneg", sql`${t.totalCents} >= 0`),
+    uniqueIndex("uq_sale_order_org_number").on(t.orgId, t.number),
+  ],
+);
+
+export const saleOrderLine = pgTable(
+  "sale_order_line",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    saleOrderId: uuid("sale_order_id")
+      .notNull()
+      .references(() => saleOrder.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull(),
+    unitPriceCents: bigint("unit_price_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    check("sale_order_line_quantity_pos", sql`${t.quantity} > 0`),
+    check("sale_order_line_price_nonneg", sql`${t.unitPriceCents} >= 0`),
+  ],
+);
+
+export const purchaseOrder = pgTable(
+  "purchase_order",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => supplier.id, { onDelete: "restrict" }),
+    status: text("status", { enum: PURCHASE_ORDER_STATUSES }).notNull().default("borrador"),
+    totalCents: bigint("total_cents", { mode: "number" }).notNull().default(0),
+    currency: text("currency").notNull().default("mxn"),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("purchase_order_status_check", sql`${t.status} in ('borrador','confirmada','recibida','cancelada')`),
+    check("purchase_order_total_nonneg", sql`${t.totalCents} >= 0`),
+    uniqueIndex("uq_purchase_order_org_number").on(t.orgId, t.number),
+  ],
+);
+
+export const purchaseOrderLine = pgTable(
+  "purchase_order_line",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrder.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull(),
+    unitCostCents: bigint("unit_cost_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    check("purchase_order_line_quantity_pos", sql`${t.quantity} > 0`),
+    check("purchase_order_line_cost_nonneg", sql`${t.unitCostCents} >= 0`),
+  ],
+);
+
+export const stockMove = pgTable(
+  "stock_move",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => product.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: STOCK_MOVE_KINDS }).notNull(),
+    // Con signo: entrada > 0, salida < 0, ajuste ≠ 0. La existencia es la suma.
+    quantity: integer("quantity").notNull(),
+    note: text("note"),
+    saleOrderId: uuid("sale_order_id").references(() => saleOrder.id, { onDelete: "set null" }),
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrder.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => profile.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("stock_move_kind_check", sql`${t.kind} in ('entrada','salida','ajuste')`),
+    check(
+      "stock_move_sign_check",
+      sql`(${t.kind} = 'entrada' and ${t.quantity} > 0) or (${t.kind} = 'salida' and ${t.quantity} < 0) or (${t.kind} = 'ajuste' and ${t.quantity} <> 0)`,
+    ),
+    index("idx_stock_move_product").on(t.productId),
+  ],
+);
+
+// ─── Agenda: eventos, conexión con Google y reservas públicas ───────────────────────────────────
+// La agenda es personal: cada quien ve lo suyo, ni el dueño lee la de otro (RLS en agenda_rls).
+
+export const CALENDAR_EVENT_KINDS = ["tarea", "evento", "bloqueo"] as const;
+export const CALENDAR_EVENT_STATUSES = ["pendiente", "hecho"] as const;
+export const CALENDAR_EVENT_SOURCES = ["improvement", "google", "reserva"] as const;
+export const CALENDAR_CONNECTION_STATUSES = ["activa", "revocada", "error"] as const;
+export const BOOKING_STATUSES = ["confirmada", "cancelada"] as const;
+
+export const calendarEvent = pgTable(
+  "calendar_event",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    kind: text("kind", { enum: CALENDAR_EVENT_KINDS }).notNull(),
+    status: text("status", { enum: CALENDAR_EVENT_STATUSES }).notNull().default("pendiente"),
+    source: text("source", { enum: CALENDAR_EVENT_SOURCES }).notNull().default("improvement"),
+    googleEventId: text("google_event_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("calendar_event_kind_check", sql`${t.kind} in ('tarea','evento','bloqueo')`),
+    check("calendar_event_status_check", sql`${t.status} in ('pendiente','hecho')`),
+    check("calendar_event_source_check", sql`${t.source} in ('improvement','google','reserva')`),
+    check("calendar_event_range_check", sql`${t.endsAt} > ${t.startsAt}`),
+    uniqueIndex("uq_calendar_event_google").on(t.userId, t.googleEventId).where(sql`${t.googleEventId} is not null`),
+    index("idx_calendar_event_user_starts").on(t.userId, t.startsAt),
+  ],
+);
+
+export const calendarConnection = pgTable(
+  "calendar_connection",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .unique()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    providerEmail: text("provider_email"),
+    calendarId: text("calendar_id").notNull().default("primary"),
+    // Cifrado con server/calendar/crypto.ts; `authenticated` no tiene grant sobre esta columna.
+    refreshTokenEnc: text("refresh_token_enc").notNull(),
+    syncToken: text("sync_token"),
+    status: text("status", { enum: CALENDAR_CONNECTION_STATUSES }).notNull().default("activa"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("calendar_connection_status_check", sql`${t.status} in ('activa','revocada','error')`)],
+);
+
+export const bookingPage = pgTable(
+  "booking_page",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => profile.id, { onDelete: "cascade" }),
+    // Único global: es una URL pública (/agenda/<slug>).
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    durationMinutes: integer("duration_minutes").notNull().default(30),
+    weeklyHours: jsonb("weekly_hours").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("booking_page_duration_check", sql`${t.durationMinutes} between 15 and 240`),
+    check("booking_page_slug_format", sql`${t.slug} ~ '^[a-z0-9-]{3,40}$'`),
+  ],
+);
+
+export const booking = pgTable(
+  "booking",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    bookingPageId: uuid("booking_page_id")
+      .notNull()
+      .references(() => bookingPage.id, { onDelete: "cascade" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    guestName: text("guest_name").notNull(),
+    guestEmail: text("guest_email").notNull(),
+    status: text("status", { enum: BOOKING_STATUSES }).notNull().default("confirmada"),
+    cancelToken: text("cancel_token").notNull().unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("booking_status_check", sql`${t.status} in ('confirmada','cancelada')`),
+    // La base impide la doble reserva del mismo horario.
+    uniqueIndex("uq_booking_page_slot").on(t.bookingPageId, t.startsAt).where(sql`status = 'confirmada'`),
+  ],
+);
+
+// ─── Butacas: mapas de recinto, funciones y apartados ───────────────────────────────────────────
+// `seat` es el Accountability Chart y no se toca: los lugares de un recinto son `venue_seat`.
+
+export const VENUE_KINDS = ["teatro", "restaurante", "antro", "bodas", "eventos", "lotes"] as const;
+export const VENUE_SEAT_KINDS = ["butaca", "mesa", "lugar", "lote"] as const;
+export const VENUE_SESSION_STATUSES = ["borrador", "a_la_venta", "cerrada"] as const;
+export const SEAT_BOOKING_STATUSES = ["held", "sold", "released"] as const;
+export const SEAT_BOOKING_CHANNELS = ["web", "taquilla"] as const;
+
+export const venueMap = pgTable(
+  "venue_map",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: VENUE_KINDS }).notNull(),
+    // Los parámetros del generador (server/seats/templates.ts), no la lista de lugares.
+    layout: jsonb("layout").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("venue_map_kind_check", sql`${t.kind} in ('teatro','restaurante','antro','bodas','eventos','lotes')`)],
+);
+
+export const venueSeat = pgTable(
+  "venue_seat",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => venueMap.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    section: text("section"),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    kind: text("kind", { enum: VENUE_SEAT_KINDS }).notNull(),
+    capacity: integer("capacity").notNull().default(1),
+  },
+  (t) => [
+    check("venue_seat_kind_check", sql`${t.kind} in ('butaca','mesa','lugar','lote')`),
+    check("venue_seat_capacity_check", sql`${t.capacity} >= 1`),
+    uniqueIndex("uq_venue_seat_map_label").on(t.mapId, t.label),
+  ],
+);
+
+export const venueSession = pgTable(
+  "venue_session",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => venueMap.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    status: text("status", { enum: VENUE_SESSION_STATUSES }).notNull().default("borrador"),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("venue_session_status_check", sql`${t.status} in ('borrador','a_la_venta','cerrada')`),
+    check("venue_session_price_check", sql`${t.priceCents} >= 0`),
+  ],
+);
+
+export const seatBooking = pgTable(
+  "seat_booking",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => venueSession.id, { onDelete: "cascade" }),
+    seatId: uuid("seat_id")
+      .notNull()
+      .references(() => venueSeat.id, { onDelete: "cascade" }),
+    status: text("status", { enum: SEAT_BOOKING_STATUSES }).notNull(),
+    holdToken: uuid("hold_token"),
+    holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
+    priceCents: bigint("price_cents", { mode: "number" }).notNull(),
+    buyerName: text("buyer_name"),
+    buyerEmail: text("buyer_email"),
+    channel: text("channel", { enum: SEAT_BOOKING_CHANNELS }).notNull(),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // Una fila por lugar y función; se re-aparta con upsert (solo holdSeats escribe `held`).
+    unique("uq_seat_booking_session_seat").on(t.sessionId, t.seatId),
+    check("seat_booking_status_check", sql`${t.status} in ('held','sold','released')`),
+    check("seat_booking_channel_check", sql`${t.channel} in ('web','taquilla')`),
+    check("seat_booking_price_check", sql`${t.priceCents} >= 0`),
+    check("seat_booking_hold_check", sql`${t.status} <> 'held' or (${t.holdToken} is not null and ${t.holdExpiresAt} is not null)`),
+    index("idx_seat_booking_hold_token").on(t.holdToken),
+  ],
 );
 
 // ─── Personas: 1-a-1 y check-in semanal ─────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+<!-- FUSIÓN (blueprints/oficinas-digitales §19.2): AGENTS.md de summum-improvement (blob 9dd3d95b) + Oficinas digitales; reemplaza el de la raíz. -->
 # Improvement (jotapuntoce monorepo) — agent instructions
 
 Constructor de empresas digitales de JotaPuntoCe. Monorepo Turborepo: `apps/admin` (panel interno,
@@ -41,5 +42,13 @@ JS), `apps/improvement` (producto del cliente, TS), `packages/db` (Drizzle/Postg
 - Pruebas de `apps/summum`: `pnpm --filter @jotapuntoce/summum test tests/<archivo>.test.ts` · E2E: `pnpm --filter @jotapuntoce/summum test:e2e`.
 - `org_kpi` solo crece por `KPI_SOURCES` + su check; Pacto, check-ins y People Analyzer los lee solo su dueño.
 - Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
+
+## Oficinas digitales
+
+- Blueprint: `blueprints/oficinas-digitales/blueprint.md`; reglas de área: `.claude/rules/oficinas-digitales.md`.
+- Worker de agentes (`apps/agentes`): `node apps/agentes/src/main.ts --version` · pruebas: `pnpm --filter @jotapuntoce/agentes test`. No importa ningún paquete del monorepo ni tiene credenciales de base o de IA.
+- `seat` es el Accountability Chart; las butacas son `venue_seat`. El cobro de butacas es cargo directo en la cuenta conectada del org (`stripeAccount`), sin comisión.
+- La IA de la oficina solo propone un borrador desde fotos del bucket privado `espacios`; nunca reconoce rostros y nada cambia sin que el dueño confirme.
+- `SUPABASE_SERVICE_ROLE_KEY` nunca en `apps/improvement` ni en `apps/agentes`.
 
 Arquitectura completa, boundaries y sistema de diseño: ver `CLAUDE.md` en este mismo directorio.

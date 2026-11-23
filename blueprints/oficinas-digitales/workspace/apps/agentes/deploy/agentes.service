@@ -1,0 +1,20 @@
+# Unidad systemd del worker de agentes (blueprint oficinas-digitales §12). Se instala a mano en el VPS:
+#   sudo cp apps/agentes/deploy/agentes.service /etc/systemd/system/agentes.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now agentes
+# /etc/agentes.env lleva solo IMPROVEMENT_API_URL y AGENTS_API_SECRET (chmod 600, dueño root).
+[Unit]
+Description=Worker de agentes de Improvement
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentes
+WorkingDirectory=/opt/jotapuntoce/apps/agentes
+EnvironmentFile=/etc/agentes.env
+ExecStart=/usr/bin/node src/main.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

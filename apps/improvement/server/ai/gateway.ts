@@ -2,7 +2,7 @@
 // verificado por grep en el Verify de esta tarea). Model id resuelto vía la skill claude-api antes
 // de escribir esta llamada (blueprint §17) — vive en MODEL_ID, nunca inline en el call site.
 import Anthropic from "@anthropic-ai/sdk";
-import { and, eq, gte, isNotNull } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@jotapuntoce/db";
 import { area, objective, orgNeed, client, aiSuggestion, llmCalls } from "@jotapuntoce/db/schema";
@@ -26,6 +26,20 @@ const MODEL_ID = "claude-opus-5-5";
 const PRICING_USD_PER_MTOK = { input: 4.0, output: 20.0 };
 const MAX_SUGGESTIONS_PER_HOUR = 10;
 const MAX_OUTPUT_TOKENS = 1024;
+export const MAX_IMAGES_PER_CALL = 6;
+export const MAX_CALLS_PER_ORG_PER_DAY = 100;
+
+/** Una imagen en base64 para el proveedor (fotos del espacio). */
+export interface GatewayImage {
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+  data: string;
+}
+
+export interface CompleteOptions {
+  attachment?: Attachment;
+  images?: readonly GatewayImage[];
+  maxTokens?: number;
+}
 
 export class ProviderRateLimitError extends Error {
   readonly retryable = true as const;
@@ -62,7 +76,7 @@ export interface SuggestionCompletion {
  * (criterios #1 y #3, "proveedor simulado en el test").
  */
 export interface SuggestionProvider {
-  complete(system: string, prompt: string, opts?: { attachment?: Attachment; maxTokens?: number }): Promise<SuggestionCompletion>;
+  complete(system: string, prompt: string, opts?: CompleteOptions): Promise<SuggestionCompletion>;
 }
 
 /** Un archivo que el modelo lee junto con el prompt (importación de PDF o foto). */
@@ -84,17 +98,20 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async complete(system: string, prompt: string, opts: { attachment?: Attachment; maxTokens?: number } = {}): Promise<SuggestionCompletion> {
-    const { attachment } = opts;
-    // El adjunto va antes del texto (forma documentada en la skill claude-api).
-    const content: Anthropic.Beta.BetaContentBlockParam[] = attachment
-      ? [
-          attachment.mediaType === "application/pdf"
-            ? { type: "document", source: { type: "base64", media_type: attachment.mediaType, data: attachment.base64 } }
-            : { type: "image", source: { type: "base64", media_type: attachment.mediaType, data: attachment.base64 } },
-          { type: "text", text: prompt },
-        ]
-      : [{ type: "text", text: prompt }];
+  async complete(system: string, prompt: string, opts: CompleteOptions = {}): Promise<SuggestionCompletion> {
+    const { attachment, images = [] } = opts;
+    // Adjunto e imágenes van antes del texto (forma documentada en la skill claude-api).
+    const content: Anthropic.Beta.BetaContentBlockParam[] = [
+      ...(attachment
+        ? [
+            attachment.mediaType === "application/pdf"
+              ? { type: "document" as const, source: { type: "base64" as const, media_type: attachment.mediaType, data: attachment.base64 } }
+              : { type: "image" as const, source: { type: "base64" as const, media_type: attachment.mediaType, data: attachment.base64 } },
+          ]
+        : []),
+      ...images.map((i) => ({ type: "image" as const, source: { type: "base64" as const, media_type: i.mediaType, data: i.data } })),
+      { type: "text", text: prompt },
+    ];
     let response: Anthropic.Beta.BetaMessage;
     try {
       // Fallback del lado del servidor: si un clasificador declina, la API reintenta en otro modelo
@@ -170,6 +187,16 @@ async function hasReachedHourlyLimit(orgId: string, purpose = "suggestion"): Pro
       ),
     );
   return rows.length >= MAX_SUGGESTIONS_PER_HOUR;
+}
+
+/** WHEN el org ya hizo 100 llamadas de IA (de cualquier propósito) en 24 h THE SYSTEM SHALL frenar. */
+async function hasReachedDailyLimit(orgId: string): Promise<boolean> {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [row] = await db
+    .select({ n: count() })
+    .from(llmCalls)
+    .where(and(eq(llmCalls.orgId, orgId), gte(llmCalls.createdAt, dayAgo)));
+  return (row?.n ?? 0) >= MAX_CALLS_PER_ORG_PER_DAY;
 }
 
 /**
@@ -299,6 +326,7 @@ async function callStructured<T>(args: {
   prompt: string;
   schema: z.ZodType<T>;
   attachment?: Attachment;
+  images?: readonly GatewayImage[];
   maxTokens?: number;
   provider?: SuggestionProvider;
 }): Promise<{ ok: true; completion: SuggestionCompletion; parsed: T; latencyMs: number } | GatewayError> {
@@ -306,6 +334,15 @@ async function callStructured<T>(args: {
     return {
       ok: false,
       error: { code: "RATE_LIMITED", retryable: false, message: "Este org ya hizo 10 solicitudes de este tipo en la última hora." },
+    };
+  }
+  if ((args.images?.length ?? 0) > MAX_IMAGES_PER_CALL) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", retryable: false, message: "Máximo 6 imágenes por análisis." } };
+  }
+  if (await hasReachedDailyLimit(args.orgId)) {
+    return {
+      ok: false,
+      error: { code: "RATE_LIMITED", retryable: false, message: "Tope diario de IA alcanzado para esta empresa." },
     };
   }
 
@@ -319,7 +356,7 @@ async function callStructured<T>(args: {
       return { ok: false, error: { code: "INTERNAL", retryable: false, message: "La IA no está configurada." } };
     }
   }
-  const opts = args.attachment || args.maxTokens ? { attachment: args.attachment, maxTokens: args.maxTokens } : undefined;
+  const opts = args.attachment || args.images?.length || args.maxTokens ? { attachment: args.attachment, images: args.images, maxTokens: args.maxTokens } : undefined;
   const startedAt = Date.now();
   let completion: SuggestionCompletion | null = null;
   let parsed: T | null = null;
@@ -391,13 +428,15 @@ export type StructuredResult<T> = { ok: true; data: { suggestion: AiSuggestionRo
 
 export async function generateStructured<T>(args: {
   orgId: string;
-  purpose: "atencion_cliente" | "siguiente_movimiento" | "alerta";
-  category: "servicio_cliente" | "siguiente_movimiento" | "alerta";
+  purpose: "atencion_cliente" | "siguiente_movimiento" | "alerta" | "oficina" | "agente" | "reporte";
+  category: "servicio_cliente" | "siguiente_movimiento" | "alerta" | "oficina" | "agente";
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
   toText: (parsed: T) => string;
   basedOn: Record<string, string[]>;
+  images?: readonly GatewayImage[];
+  maxTokens?: number;
   provider?: SuggestionProvider;
 }): Promise<StructuredResult<T>> {
   const call = await callStructured(args);

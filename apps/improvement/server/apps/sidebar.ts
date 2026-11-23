@@ -5,6 +5,7 @@ import { db } from "@jotapuntoce/db";
 import { appGroup, appModel, membership, organization, permissionType } from "@jotapuntoce/db/schema";
 import { assertMembership } from "../auth/guard.ts";
 import { loadVisibleSections } from "../permissions/loadSections.ts";
+import { OFICINAS_SLUGS, sectionBySlug } from "../permissions/sections.ts";
 import { ensureOrgApps } from "./catalog.ts";
 
 export interface SidebarApp { key: string; name: string; icon: string | null; href: string }
@@ -34,16 +35,24 @@ export async function loadSidebar(userId: string, orgId: string, previewGrants: 
   ]);
   const allowed = new Set<string>(visible.map((s) => s.slug));
   const canSee = (section: string) => allowed.has(section) && (!previewGrants || (previewGrants[section] ?? "ninguno") !== "ninguno");
+  // Oficinas digitales viven en sus propias rutas (/[org]/<slug>), no en el catálogo de apps.
+  const oficinas: SidebarApp[] = OFICINAS_SLUGS.filter(canSee).map((slug) => ({
+    key: slug,
+    name: sectionBySlug(slug)?.label ?? slug,
+    icon: null,
+    href: `/${orgId}/${slug}`,
+  }));
+  if (me.role === "owner" && !previewGrants) oficinas.push({ key: "marca", name: "Marca", icon: null, href: `/${orgId}/marca` });
   return {
     orgs,
-    groups: groups
+    groups: [...groups
       .map((g) => ({
         name: g.name,
         apps: apps
           .filter((a) => a.groupId === g.id && canSee(a.section))
           .map((a) => ({ key: a.key, name: a.name, icon: a.icon, href: `/${orgId}/a/${a.key}` })),
       }))
-      .filter((g) => g.apps.length > 0),
+      .filter((g) => g.apps.length > 0), ...(oficinas.length > 0 ? [{ name: "Oficinas digitales", apps: oficinas }] : [])],
     permissionTypes: types,
   };
 }

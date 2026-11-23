@@ -1,0 +1,54 @@
+<!-- FUSIÓN (blueprints/oficinas-digitales §19.2): AGENTS.md de summum-improvement (blob 9dd3d95b) + Oficinas digitales; reemplaza el de la raíz. -->
+# Improvement (jotapuntoce monorepo) — agent instructions
+
+Constructor de empresas digitales de JotaPuntoCe. Monorepo Turborepo: `apps/admin` (panel interno,
+JS), `apps/improvement` (producto del cliente, TS), `packages/db` (Drizzle/Postgres), `packages/ui`
+(tokens de diseño compartidos).
+
+## Commands
+
+| Task | Command |
+|---|---|
+| Install | `pnpm install` |
+| Dev — admin / improvement | `pnpm dev:admin` (puerto 3100) / `pnpm dev:improvement` (puerto 3200) |
+| Build | `pnpm build` |
+| Lint | `pnpm lint` |
+| Typecheck | `pnpm typecheck` |
+| Test | `pnpm test` · E2E: `pnpm --filter improvement test:e2e` |
+| DB | `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed` |
+
+## Non-negotiable
+
+1. Ninguna tabla org-scoped nueva se crea sin su política RLS en la misma migración.
+2. El motor genérico (`packages/db`, `apps/*/server/**`) nunca referencia un org, empresa o empleado
+   por id o nombre literal — solo por parámetro.
+3. `SUPABASE_SERVICE_ROLE_KEY` solo se importa en código server-only de `apps/admin`.
+4. Un empleado nunca puede leer el `responsibility_level` de otro empleado.
+5. Nunca commitear secretos ni salida de build generada.
+6. Nunca editar a mano un archivo bajo `packages/db/migrations/`.
+7. Nunca marcar una tarea hecha con un comando de gate en rojo.
+
+## Dirección (V/TO, Scorecard, Issues, Junta L10)
+
+- Rutas bajo `/[org]/direccion`. Cada módulo es una sección (`vision`, `scorecard`, `issues`, `junta`)
+  que el dueño concede por tipo de permiso; toda página empieza con `requireSection(orgId, slug)`.
+- Issues son filas de `org_need`; un pendiente es un `objective` creado por `createObjective()`.
+- `org_kpi` (Indicadores) no se toca: el Scorecard semanal es `org_measurable` + `measurable_value`.
+- Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
+
+## Summum + Improvement (operación, red y Sello)
+
+- Blueprint: `blueprints/summum-improvement/blueprint.md`; reglas de área: `.claude/rules/summum-improvement.md`.
+- Pruebas de `apps/summum`: `pnpm --filter @jotapuntoce/summum test tests/<archivo>.test.ts` · E2E: `pnpm --filter @jotapuntoce/summum test:e2e`.
+- `org_kpi` solo crece por `KPI_SOURCES` + su check; Pacto, check-ins y People Analyzer los lee solo su dueño.
+- Nunca corras `pnpm db:migrate` sin un "sí" explícito de Jose Carlos para esa migración.
+
+## Oficinas digitales
+
+- Blueprint: `blueprints/oficinas-digitales/blueprint.md`; reglas de área: `.claude/rules/oficinas-digitales.md`.
+- Worker de agentes (`apps/agentes`): `node apps/agentes/src/main.ts --version` · pruebas: `pnpm --filter @jotapuntoce/agentes test`. No importa ningún paquete del monorepo ni tiene credenciales de base o de IA.
+- `seat` es el Accountability Chart; las butacas son `venue_seat`. El cobro de butacas es cargo directo en la cuenta conectada del org (`stripeAccount`), sin comisión.
+- La IA de la oficina solo propone un borrador desde fotos del bucket privado `espacios`; nunca reconoce rostros y nada cambia sin que el dueño confirme.
+- `SUPABASE_SERVICE_ROLE_KEY` nunca en `apps/improvement` ni en `apps/agentes`.
+
+Arquitectura completa, boundaries y sistema de diseño: ver `CLAUDE.md` en este mismo directorio.

@@ -1,0 +1,21 @@
+{
+  "name": "@jotapuntoce/agentes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.19.0"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "eslint": "^9",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

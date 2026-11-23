@@ -57,7 +57,14 @@
       "Bash(git switch -c summum-improvement direccion-jaime)",
       "Bash(cp blueprints/summum-improvement/workspace/:*)",
       "Bash(pnpm --filter @jotapuntoce/summum test:*)",
-      "Bash(pnpm --filter @jotapuntoce/summum test:e2e:*)"
+      "Bash(pnpm --filter @jotapuntoce/summum test:e2e:*)",
+      "Bash(git switch oficinas-digitales)",
+      "Bash(git switch -c oficinas-digitales summum-improvement)",
+      "Bash(cp blueprints/oficinas-digitales/workspace/:*)",
+      "Bash(pnpm --filter @jotapuntoce/agentes test:*)",
+      "Bash(pnpm --filter @jotapuntoce/agentes typecheck:*)",
+      "Bash(node apps/agentes/src/main.ts:*)",
+      "Bash(pnpm --filter improvement add stripe@23.0.0 --save-exact)"
     ],
     "ask": [
       "Bash(pnpm db:migrate:*)"

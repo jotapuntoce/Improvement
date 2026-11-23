@@ -4,7 +4,7 @@
 //
 // El glyph depende de `industry` (uno de los ids de INDUSTRIES, industries.ts) — cada giro tiene su
 // propio ícono; null o un valor fuera de la lista usa la cuadrícula original (default, nunca lanza).
-import type { Industry } from "./industries.ts";
+import { baseIndustry, type Industry } from "./industries.ts";
 
 export interface AppIconLargeProps {
   label: string;
@@ -28,7 +28,7 @@ const glyphProps = {
 // la marquesina: el giro de la empresa se ve en los tres lugares o no se ve en ninguno, y tenerlo
 // escrito tres veces garantizaba que un giro nuevo apareciera solo en uno.
 export function IndustryGlyph({ industry }: { industry?: Industry | string | null }) {
-  switch (industry) {
+  switch (baseIndustry(industry)) {
     case "restaurante":
       return (
         <>

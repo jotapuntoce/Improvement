@@ -10,7 +10,7 @@
 // nota (rótulo, marco, puertas, marquesina).
 //
 // Los hex viven en packages/ui/src/tokens.css, no aquí — esto solo dice qué token le toca a quién.
-import { isIndustry, type Industry } from "./industries.ts";
+import { baseIndustry, type BaseIndustry } from "./industries.ts";
 
 export interface BuildingPalette {
   /** Rótulo, marco de la fachada, puertas, marquesina, circuito de áreas. */
@@ -23,7 +23,7 @@ export interface BuildingPalette {
   signGlow: string;
 }
 
-function tokens(giro: Industry | "construccion"): BuildingPalette {
+function tokens(giro: BaseIndustry): BuildingPalette {
   return {
     accent: `var(--pal-${giro}-accent)`,
     facade: `var(--pal-${giro}-facade)`,
@@ -33,7 +33,7 @@ function tokens(giro: Industry | "construccion"): BuildingPalette {
 }
 
 /** "otro" (y cualquier giro desconocido o nulo) usa la fachada dorada con la que nació la escena. */
-const PALETTES: Record<Industry, BuildingPalette> = {
+const PALETTES: Record<BaseIndustry, BuildingPalette> = {
   restaurante: tokens("restaurante"),
   retail: tokens("retail"),
   servicios: tokens("servicios"),
@@ -48,7 +48,7 @@ export function buildingPalette(
   industry: string | null | undefined,
   accentColor?: string | null,
 ): BuildingPalette {
-  const base = PALETTES[isIndustry(industry) ? industry : "otro"];
+  const base = PALETTES[baseIndustry(industry)];
   return accentColor ? { ...base, accent: accentColor } : base;
 }
 

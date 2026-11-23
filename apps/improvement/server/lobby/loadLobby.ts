@@ -38,6 +38,8 @@ const ZONA_DE_SECCION: Record<string, LobbyZona> = {
 };
 
 const DIRECCION: ReadonlySet<string> = new Set(DIRECCION_SLUGS);
+// Oficinas digitales: sus secciones navegan por OFICINAS_SLUGS en el layout de [org], no por el Lobby.
+const OFICINAS_DIGITALES: ReadonlySet<string> = new Set(["oficina", "canal", "erp", "agenda", "butacas"]);
 
 /** El color del marco de un retrato: cómo va esa persona con sus objetivos. */
 const COLOR_DE_ESTADO: Record<string, string> = {
@@ -122,6 +124,7 @@ export async function loadLobby(userId: string, orgId: string): Promise<LobbyGra
   for (const s of secciones) {
     // Dirección no tiene ruta suelta (/[org]/vision no existe): vive bajo /[org]/direccion.
     if (DIRECCION.has(s.slug)) continue;
+    if (OFICINAS_DIGITALES.has(s.slug)) continue;
     const zona = ZONA_DE_SECCION[s.slug];
     if (zona) puertas.push({ zona, slug: s.slug, label: s.label });
     else sueltas.push({ slug: s.slug, label: s.label });

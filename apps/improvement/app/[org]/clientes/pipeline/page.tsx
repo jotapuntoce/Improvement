@@ -1,11 +1,14 @@
-// Pipeline de ventas: los tratos por etapa (server/crm/deals.ts). Lo ve quien tenga la sección
-// `clientes`; crear y mover lo valida el server (dueño o `clientes: empresa`).
+// Pipeline de ventas como tablero (lenguaje Flozzy): una columna por etapa con conteo y monto, tarjetas
+// compactas y la tasa de cierre arriba. Lo ve quien tenga la sección `clientes`; crear y mover lo valida
+// el server (server/crm/deals.ts, sin cambios): dueño o `clientes: empresa`.
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
 import { createDeal, listPipeline, moveDeal } from "@/server/crm/deals.ts";
+import { pipelineSummary } from "@/server/crm/pipeline.ts";
 import { listClients } from "@/server/clients/mutations.ts";
+import { listTeammates } from "@/server/employees/teammates.ts";
 
 const STAGE_LABEL: Record<string, string> = {
   prospecto: "Prospecto",
@@ -38,9 +41,14 @@ export default async function PipelinePage({
 
   const { membership, scope } = await requireSection(orgId, "clientes");
   const userId = membership.userId;
-  const pipeline = await listPipeline(userId, orgId);
   const canWrite = scope === "empresa";
-  const clients = canWrite ? (await listClients(userId, orgId, { limit: 100 })).data.clients : [];
+  const [pipeline, teammates, clients] = await Promise.all([
+    listPipeline(userId, orgId),
+    listTeammates(userId, orgId),
+    canWrite ? listClients(userId, orgId, { limit: 100 }).then((r) => r.data.clients) : Promise.resolve([]),
+  ]);
+  const nombres = new Map(teammates.map((t) => [t.userId, t.fullName]));
+  const resumen = pipelineSummary(pipeline.flatMap((g) => g.deals.map((d) => ({ stage: g.stage, amountCents: d.amountCents }))));
   const pagina = `/${orgId}/clientes/pipeline`;
 
   async function nuevo(formData: FormData) {
@@ -67,12 +75,29 @@ export default async function PipelinePage({
   }
 
   return (
-    <main className="config-page">
+    <main className="config-page" style={{ maxWidth: "80rem" }}>
       <h1 className="config-title">Pipeline de ventas</h1>
       <p className="config-hint">
         <Link href={`/${orgId}/clientes`}>Volver a clientes</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
+
+      <section className="config-card" aria-label="Resumen del pipeline">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {resumen.stages.map((s) => (
+            <div key={s.stage}>
+              <dt className="config-hint">{STAGE_LABEL[s.stage] ?? s.stage}</dt>
+              <dd className="config-amount m-0">
+                {s.count} · {MXN.format(s.amountCents / 100)}
+              </dd>
+            </div>
+          ))}
+          <div>
+            <dt className="config-hint">Tasa de cierre</dt>
+            <dd className="config-amount m-0">{resumen.winRate === null ? "—" : `${Math.round(resumen.winRate * 100)}%`}</dd>
+          </div>
+        </dl>
+      </section>
 
       {canWrite && (
         <form action={nuevo} className="config-form config-card" aria-label="Nuevo trato">
@@ -104,39 +129,52 @@ export default async function PipelinePage({
         </form>
       )}
 
-      {pipeline.map((group) => (
-        <section key={group.stage} className="config-card" aria-labelledby={`etapa-${group.stage}`}>
-          <h2 id={`etapa-${group.stage}`} className="config-card-title">
-            {STAGE_LABEL[group.stage] ?? group.stage}
-          </h2>
-          {group.deals.length === 0 && <p className="config-hint">Sin tratos.</p>}
-          <ul className="equipo-list">
-            {group.deals.map((d) => (
-              <li key={d.id}>
-                <p>
-                  <strong>{d.title}</strong> · <Link href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</Link> ·{" "}
-                  {MXN.format(d.amountCents / 100)}
-                </p>
-                {canWrite && (
-                  <form action={mover} className="permiso-actions">
-                    <input type="hidden" name="dealId" value={d.id} />
-                    <select name="stage" defaultValue={group.stage} className="config-input" aria-label={`Etapa de ${d.title}`}>
-                      {Object.entries(STAGE_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="submit" className="panel-btn-ghost">
-                      Mover
-                    </button>
-                  </form>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {/* Una columna por etapa; en móvil se apilan. */}
+      <div className="grid gap-3 md:grid-cols-5">
+        {pipeline.map((group) => {
+          const total = group.deals.reduce((s, d) => s + d.amountCents, 0);
+          return (
+            <section key={group.stage} className="config-card" aria-labelledby={`etapa-${group.stage}`}>
+              <h2 id={`etapa-${group.stage}`} className="config-card-title">
+                {STAGE_LABEL[group.stage] ?? group.stage}
+              </h2>
+              <p className="config-hint config-amount m-0">
+                {group.deals.length} · {MXN.format(total / 100)}
+              </p>
+              {group.deals.length === 0 && <p className="config-hint">Sin tratos.</p>}
+              <ul className="equipo-list">
+                {group.deals.map((d) => (
+                  <li key={d.id} className="space-y-1 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+                    <p className="m-0 font-semibold">{d.title}</p>
+                    <p className="m-0">
+                      <Link href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</Link>
+                    </p>
+                    <p className="config-amount m-0">{MXN.format(d.amountCents / 100)}</p>
+                    <p className="config-hint m-0">
+                      {d.ownerProfileId ? (nombres.get(d.ownerProfileId) ?? "Con responsable") : "Sin responsable"}
+                    </p>
+                    {canWrite && (
+                      <form action={mover} className="permiso-actions">
+                        <input type="hidden" name="dealId" value={d.id} />
+                        <select name="stage" defaultValue={group.stage} className="config-input" aria-label={`Etapa de ${d.title}`}>
+                          {Object.entries(STAGE_LABEL).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="submit" className="panel-btn-ghost">
+                          Mover
+                        </button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
     </main>
   );
 }
