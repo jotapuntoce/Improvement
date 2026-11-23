@@ -103,35 +103,10 @@ test("WHEN AxeBuilder analiza la oficina del dueño THE SYSTEM SHALL reportar 0 
   expect(results.violations).toEqual([]);
 });
 
-// Paso 14: la oficina convive con el Lobby. Sin plano confirmado, la recepción es exactamente la de antes.
-let orgSinPlano: string | undefined;
-test.afterAll(async () => {
-  if (orgSinPlano) await db.delete(organization).where(eq(organization.id, orgSinPlano));
-});
-
-test("WHEN el dueño entra a la recepción de un org sin plano THE SYSTEM SHALL mostrar las mismas puertas de antes", async ({ page, context, baseURL }) => {
-  const [org] = await db
-    .insert(organization)
-    .values({ name: "Recepcion Sin Plano E2E", slug: `recepcion-sin-plano-${stamp}` })
-    .returning();
-  orgSinPlano = org!.id;
-  await db.insert(membership).values({ userId: ids.owner, orgId: orgSinPlano, role: "owner", acceptedAt: new Date() });
-
-  await as(context, tokens.owner, baseURL);
-  await page.goto(`/empresas/${orgSinPlano}`);
-  await page.getByRole("button", { name: "Entrar a Recepcion Sin Plano E2E" }).click();
-  await expect(page.locator(".jpc-reception-door").first()).toBeVisible();
-  const hrefs = await page.locator(".jpc-reception-door").evaluateAll((els) => els.map((e) => e.getAttribute("href")));
-  expect(new Set(hrefs)).toEqual(
-    new Set(["mapa", "cobros", "proyectos", "postventa", "direccion", "necesidades", "improvement"].map((s) => `/${orgSinPlano}/${s}`)),
-  );
-  await expect(page.locator("[data-zone]")).toHaveCount(0);
-});
-
+// Paso 14: la recepción del edificio salió con la integración de main; el plano confirmado se ve en /[org]/oficina.
 test("WHEN un miembro entra a un org con plano confirmado THE SYSTEM SHALL mostrar el svg de la oficina", async ({ page, context, baseURL }) => {
   await as(context, tokens.conPermiso, baseURL);
-  await page.goto(`/empresas/${orgId}`);
-  await page.getByRole("button", { name: "Entrar a Oficina E2E" }).click();
-  await expect(page.getByRole("img", { name: "Oficina de Oficina E2E" })).toBeVisible();
+  await page.goto(`/${orgId}/oficina`);
+  await expect(page.getByRole("img", { name: "Oficina de tu empresa" })).toBeVisible();
   await expect(page.locator("[data-zone]")).toHaveCount(5);
 });

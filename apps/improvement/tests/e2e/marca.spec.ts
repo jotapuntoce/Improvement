@@ -53,7 +53,8 @@ async function as(context: BrowserContext, token: string, baseURL: string | unde
   await context.addCookies([{ name: "imp-access-token", value: token, url: baseURL ?? "http://localhost:3200" }]);
 }
 
-test("WHEN el dueño guarda un tema válido THE SYSTEM SHALL aplicar --accent-1 en el contenedor del layout", async ({ page, context, baseURL }) => {
+// Desde la integración con main la marca del shell (org_brand) manda: el tema se guarda en datos sin aplicarse.
+test("WHEN el dueño guarda un tema válido THE SYSTEM SHALL guardarlo y mostrarlo al volver", async ({ page, context, baseURL }) => {
   await as(context, ownerToken, baseURL);
   expect((await page.goto(`/${orgId}/marca`))?.status()).toBe(200);
   await page.getByLabel("Fondo").fill(VERDE.bg);
@@ -62,11 +63,8 @@ test("WHEN el dueño guarda un tema válido THE SYSTEM SHALL aplicar --accent-1 
   await page.getByLabel("Acento 2").fill(VERDE.accent2);
   await page.getByRole("button", { name: "Guardar tema" }).click();
   await page.waitForURL(`**/${orgId}/marca`);
-  const accent = await page
-    .locator('div[style*="--accent-1"]')
-    .first()
-    .evaluate((el) => (el as HTMLElement).style.getPropertyValue("--accent-1"));
-  expect(accent).toBe(VERDE.accent1);
+  await page.reload();
+  await expect(page.getByLabel("Acento 1")).toHaveValue(VERDE.accent1, { timeout: 20_000 });
 });
 
 test("WHEN el dueño guarda textPrimary #6b7386 sobre #05060b THE SYSTEM SHALL mostrar la alerta con 4.26 sin cambiar el tema", async ({ page, context, baseURL }) => {

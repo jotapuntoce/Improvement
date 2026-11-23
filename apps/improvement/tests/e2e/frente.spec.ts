@@ -56,7 +56,7 @@ test("WHEN el dueño entra a su negocio THE SYSTEM SHALL mostrar la barra con Ve
 
 test("WHEN abre Ventas en lista y en kanban THE SYSTEM SHALL mostrar Boda García con su total", async ({ page, context, baseURL }) => {
   await as(context, baseURL);
-  await page.goto(`/${orgId}/a/ventas`);
+  await page.goto(`/${orgId}/a/ventas?vista=lista`);
   await expect(page.getByRole("link", { name: "Boda García" })).toBeVisible();
   await expect(page.getByText("$80,000.00").first()).toBeVisible();
   await page.goto(`/${orgId}/a/ventas?vista=kanban`);

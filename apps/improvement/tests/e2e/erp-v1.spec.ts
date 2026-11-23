@@ -64,7 +64,7 @@ test("WHEN el dueño da de alta, mete 10 y confirma una venta de 3 THE SYSTEM SH
   await page.getByRole("button", { name: "Registrar" }).click();
   await expect(stockDe(page, "Harina")).toHaveText("10", LENTO);
 
-  await page.getByRole("link", { name: "Ventas" }).click();
+  await page.getByLabel("ERP", { exact: true }).getByRole("link", { name: "Ventas" }).click();
   await page.getByLabel("Producto de la línea 1").selectOption({ label: "Harina ($25.00)" });
   await page.getByLabel("Cantidad de la línea 1").fill("3");
   await page.getByRole("button", { name: "Crear orden de venta" }).click();

@@ -50,7 +50,7 @@ test("WHEN el dueño sube un CSV a Clientes THE SYSTEM SHALL mostrar el mapeo y 
   const [clientes] = await db.select({ id: appModel.id }).from(appModel).where(and(eq(appModel.orgId, orgId), eq(appModel.key, "clientes")));
   await db.insert(appField).values({ orgId, appId: clientes!.id, key: "telefono", label: "Teléfono", type: "texto" });
 
-  await page.getByRole("link", { name: "Importar" }).click();
+  await page.getByRole("link", { name: "Importar", exact: true }).click();
   await expect(page).toHaveURL(/\/a\/clientes\/importar$/);
   await noSerious(page);
   await page.getByLabel("Archivo", { exact: true }).setInputFiles(CSV);
