@@ -20,10 +20,10 @@ import {
   REVIEW_SYSTEM_PROMPT,
 } from "./prompts/review.ts";
 
-// claude-opus-5, confirmado vigente vía la skill claude-api el 2026-08-31 — $5.00 / $25.00 por
+// claude-opus-5-5, confirmado vigente vía la skill claude-api el 2026-10-30 — $4.00 / $20.00 por
 // 1M tokens input/output (PRICING_USD_PER_MTOK abajo). Nunca hardcodear un id de memoria.
-const MODEL_ID = "claude-opus-5";
-const PRICING_USD_PER_MTOK = { input: 5.0, output: 25.0 };
+const MODEL_ID = "claude-opus-5-5";
+const PRICING_USD_PER_MTOK = { input: 4.0, output: 20.0 };
 const MAX_SUGGESTIONS_PER_HOUR = 10;
 const MAX_OUTPUT_TOKENS = 1024;
 export const MAX_IMAGES_PER_CALL = 6;
@@ -36,6 +36,7 @@ export interface GatewayImage {
 }
 
 export interface CompleteOptions {
+  attachment?: Attachment;
   images?: readonly GatewayImage[];
   maxTokens?: number;
 }
@@ -75,7 +76,13 @@ export interface SuggestionCompletion {
  * (criterios #1 y #3, "proveedor simulado en el test").
  */
 export interface SuggestionProvider {
-  complete(system: string, prompt: string, options?: CompleteOptions): Promise<SuggestionCompletion>;
+  complete(system: string, prompt: string, opts?: CompleteOptions): Promise<SuggestionCompletion>;
+}
+
+/** Un archivo que el modelo lee junto con el prompt (importación de PDF o foto). */
+export interface Attachment {
+  mediaType: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+  base64: string;
 }
 
 /**
@@ -91,24 +98,34 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async complete(system: string, prompt: string, options?: CompleteOptions): Promise<SuggestionCompletion> {
-    const images = options?.images ?? [];
-    const content: Anthropic.MessageParam["content"] = images.length
-      ? [
-          ...images.map((i) => ({
-            type: "image" as const,
-            source: { type: "base64" as const, media_type: i.mediaType, data: i.data },
-          })),
-          { type: "text" as const, text: prompt },
-        ]
-      : prompt;
-    let response: Anthropic.Message;
+  async complete(system: string, prompt: string, opts: CompleteOptions = {}): Promise<SuggestionCompletion> {
+    const { attachment, images = [] } = opts;
+    // Adjunto e imágenes van antes del texto (forma documentada en la skill claude-api).
+    const content: Anthropic.Beta.BetaContentBlockParam[] = [
+      ...(attachment
+        ? [
+            attachment.mediaType === "application/pdf"
+              ? { type: "document" as const, source: { type: "base64" as const, media_type: attachment.mediaType, data: attachment.base64 } }
+              : { type: "image" as const, source: { type: "base64" as const, media_type: attachment.mediaType, data: attachment.base64 } },
+          ]
+        : []),
+      ...images.map((i) => ({ type: "image" as const, source: { type: "base64" as const, media_type: i.mediaType, data: i.data } })),
+      { type: "text", text: prompt },
+    ];
+    let response: Anthropic.Beta.BetaMessage;
     try {
-      response = await this.client.messages.create({
+      // Fallback del lado del servidor: si un clasificador declina, la API reintenta en otro modelo
+      // dentro de la misma llamada. Si toda la cadena declina, stop_reason "refusal" deja el texto
+      // vacío y el esquema zod lo rechaza como cualquier respuesta inválida.
+      response = await this.client.beta.messages.create({
         model: MODEL_ID,
-        max_tokens: options?.maxTokens ?? MAX_OUTPUT_TOKENS,
-        system,
+        max_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
+        // En caché: los prompts que llevan el conocimiento de Improvement (server/ai/knowledge.ts) son
+        // largos y casi idénticos en cada llamada. Uno corto que no llega al mínimo simplemente no se cachea.
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content }],
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
       });
     } catch (err) {
       if (err instanceof Anthropic.RateLimitError) throw new ProviderRateLimitError();
@@ -117,7 +134,7 @@ export class AnthropicSuggestionProvider implements SuggestionProvider {
     }
 
     const textBlock = response.content.find(
-      (block): block is Anthropic.TextBlock => block.type === "text",
+      (block): block is Anthropic.Beta.BetaTextBlock => block.type === "text",
     );
     return {
       text: textBlock?.text ?? "",
@@ -299,24 +316,20 @@ export async function generateSuggestion(
 // llm_calls. Es interna: la llaman funciones de server/** que ya autorizaron a quien pide.
 
 type AiSuggestionRow = typeof aiSuggestion.$inferSelect;
+type GatewayError = { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
 
-export type StructuredResult<T> =
-  | { ok: true; data: { suggestion: AiSuggestionRow; parsed: T } }
-  | { ok: false; error: { code: GatewayErrorCode; retryable: boolean; message: string } };
-
-export async function generateStructured<T>(args: {
+/** Tope por hora antes del proveedor, una llamada y un solo reintento si no cumple el esquema. */
+async function callStructured<T>(args: {
   orgId: string;
-  purpose: "atencion_cliente" | "siguiente_movimiento" | "oficina" | "agente" | "reporte";
-  category: "servicio_cliente" | "siguiente_movimiento" | "oficina" | "agente";
+  purpose: string;
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
-  toText: (parsed: T) => string;
-  basedOn: Record<string, string[]>;
+  attachment?: Attachment;
   images?: readonly GatewayImage[];
-  maxOutputTokens?: number;
+  maxTokens?: number;
   provider?: SuggestionProvider;
-}): Promise<StructuredResult<T>> {
+}): Promise<{ ok: true; completion: SuggestionCompletion; parsed: T; latencyMs: number } | GatewayError> {
   if (await hasReachedHourlyLimit(args.orgId, args.purpose)) {
     return {
       ok: false,
@@ -333,7 +346,17 @@ export async function generateStructured<T>(args: {
     };
   }
 
-  const resolvedProvider = args.provider ?? new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+  let resolvedProvider = args.provider;
+  if (!resolvedProvider) {
+    // Sin llave (local, o antes de conectar la API en vivo) es un error tipado, no una excepción que
+    // tumbe la página: quien llama ya sabe seguir sin IA.
+    try {
+      resolvedProvider = new AnthropicSuggestionProvider(requireEnv("ANTHROPIC_API_KEY"));
+    } catch {
+      return { ok: false, error: { code: "INTERNAL", retryable: false, message: "La IA no está configurada." } };
+    }
+  }
+  const opts = args.attachment || args.images?.length || args.maxTokens ? { attachment: args.attachment, images: args.images, maxTokens: args.maxTokens } : undefined;
   const startedAt = Date.now();
   let completion: SuggestionCompletion | null = null;
   let parsed: T | null = null;
@@ -341,10 +364,7 @@ export async function generateStructured<T>(args: {
   // Un solo reintento en fallo de validación (regla ia-gateway.md), después falla explícito.
   for (let attempt = 0; attempt < 2 && parsed === null; attempt++) {
     try {
-      completion = await resolvedProvider.complete(args.system, args.prompt, {
-        images: args.images,
-        maxTokens: args.maxOutputTokens,
-      });
+      completion = opts ? await resolvedProvider.complete(args.system, args.prompt, opts) : await resolvedProvider.complete(args.system, args.prompt);
     } catch (err) {
       if (err instanceof ProviderRateLimitError) {
         return { ok: false, error: { code: "PROVIDER_RATE_LIMIT", retryable: true, message: err.message } };
@@ -363,29 +383,72 @@ export async function generateStructured<T>(args: {
       error: { code: "VALIDATION_ERROR", retryable: false, message: "La respuesta del modelo no cumplió el esquema esperado tras un reintento." },
     };
   }
+  return { ok: true, completion, parsed, latencyMs: Date.now() - startedAt };
+}
 
-  const usage = completion.usage;
-  const finishReason = completion.finishReason;
-  const latencyMs = Date.now() - startedAt;
-  const result = parsed;
+async function logCall(orgId: string, purpose: string, completion: SuggestionCompletion, latencyMs: number, tx: Pick<typeof db, "insert"> = db) {
+  const { usage } = completion;
+  await tx.insert(llmCalls).values({
+    orgId,
+    purpose,
+    modelId: MODEL_ID,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheReadTokens: usage.cacheReadTokens,
+    cacheWriteTokens: usage.cacheWriteTokens,
+    latencyMs,
+    finishReason: completion.finishReason,
+    costUsd: estimateCostUsd(usage).toFixed(6),
+  });
+}
+
+/**
+ * Extracción sin sugerencia: el resultado no es un consejo para el dueño sino datos para otro
+ * módulo (leer la tabla de un PDF o foto, proponer un mapeo de columnas), así que no escribe en
+ * ai_suggestion. Mismas reglas de tope, reintento y uso real en llm_calls. Interna: la llaman
+ * funciones de server/** que ya autorizaron a quien pide.
+ */
+export async function extractStructured<T>(args: {
+  orgId: string;
+  purpose: "importacion_lectura" | "importacion_mapeo" | "tarea_plan" | "conversacion" | "diagnostico";
+  system: string;
+  prompt: string;
+  schema: z.ZodType<T>;
+  attachment?: Attachment;
+  maxTokens: number;
+  provider?: SuggestionProvider;
+}): Promise<{ ok: true; data: { parsed: T } } | GatewayError> {
+  const call = await callStructured(args);
+  if (!call.ok) return call;
+  await logCall(args.orgId, args.purpose, call.completion, call.latencyMs);
+  return { ok: true, data: { parsed: call.parsed } };
+}
+
+export type StructuredResult<T> = { ok: true; data: { suggestion: AiSuggestionRow; parsed: T } } | GatewayError;
+
+export async function generateStructured<T>(args: {
+  orgId: string;
+  purpose: "atencion_cliente" | "siguiente_movimiento" | "alerta" | "oficina" | "agente" | "reporte";
+  category: "servicio_cliente" | "siguiente_movimiento" | "alerta" | "oficina" | "agente";
+  system: string;
+  prompt: string;
+  schema: z.ZodType<T>;
+  toText: (parsed: T) => string;
+  basedOn: Record<string, string[]>;
+  images?: readonly GatewayImage[];
+  maxTokens?: number;
+  provider?: SuggestionProvider;
+}): Promise<StructuredResult<T>> {
+  const call = await callStructured(args);
+  if (!call.ok) return call;
+  const { completion, latencyMs, parsed: result } = call;
   const suggestion = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(aiSuggestion)
       .values({ orgId: args.orgId, category: args.category, suggestionText: args.toText(result), basedOn: args.basedOn })
       .returning();
     if (!row) throw new Error("insert de ai_suggestion no devolvió fila");
-    await tx.insert(llmCalls).values({
-      orgId: args.orgId,
-      purpose: args.purpose,
-      modelId: MODEL_ID,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadTokens: usage.cacheReadTokens,
-      cacheWriteTokens: usage.cacheWriteTokens,
-      latencyMs,
-      finishReason,
-      costUsd: estimateCostUsd(usage).toFixed(6),
-    });
+    await logCall(args.orgId, args.purpose, completion, latencyMs, tx);
     return row;
   });
 

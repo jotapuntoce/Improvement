@@ -22,6 +22,7 @@ export interface MyProfile {
   email: string;
   fullName: string | null;
   ownerLabel: string | null;
+  phone: string | null;
   /** Ya resuelta a URL pública — la columna guarda solo la ruta dentro del bucket. */
   avatarUrl: string | null;
 }
@@ -33,6 +34,7 @@ export async function getMyProfile(userId: string): Promise<MyProfile | null> {
       email: profile.email,
       fullName: profile.fullName,
       ownerLabel: profile.ownerLabel,
+      phone: profile.phone,
       avatarPath: profile.avatarPath,
     })
     .from(profile)
@@ -78,6 +80,20 @@ export async function updateMyOwnerLabel(userId: string, ownerLabel: string) {
   }
 
   return writeProfile(userId, { ownerLabel });
+}
+
+/**
+ * WHEN el teléfono trae menos de 7 dígitos THE SYSTEM SHALL rechazarlo sin escribir. Vacío lo borra.
+ */
+export async function updateMyPhone(userId: string, phone: string) {
+  const trimmed = phone.trim();
+  if (trimmed && trimmed.replace(/\D/g, "").length < 7) {
+    return {
+      ok: false as const,
+      error: { code: "VALIDATION_ERROR" as const, message: "Escribe un teléfono completo." },
+    };
+  }
+  return writeProfile(userId, { phone: trimmed || null });
 }
 
 /** La ruta dentro del bucket ya subida por server/storage/avatar.ts — aquí solo se persiste. */

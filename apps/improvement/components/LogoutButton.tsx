@@ -8,7 +8,15 @@
 // recuperable en una computadora compartida, así que se limpia antes de enviar el form.
 const SUPABASE_STORAGE_PREFIX = "sb-";
 
-export function LogoutButton({ action }: { action: () => Promise<void> }) {
+export function LogoutButton({
+  action,
+  label = "Salir",
+  className = "jpc-back-link jpc-back-link--fixed",
+}: {
+  action: () => Promise<void>;
+  label?: string;
+  className?: string;
+}) {
   function clearSupabaseStorage() {
     try {
       for (const key of Object.keys(localStorage)) {
@@ -22,8 +30,8 @@ export function LogoutButton({ action }: { action: () => Promise<void> }) {
 
   return (
     <form action={action}>
-      <button type="submit" className="jpc-back-link jpc-back-link--fixed" onClick={clearSupabaseStorage}>
-        Salir
+      <button type="submit" className={className} onClick={clearSupabaseStorage}>
+        {label}
       </button>
     </form>
   );

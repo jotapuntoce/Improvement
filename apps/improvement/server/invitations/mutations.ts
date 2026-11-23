@@ -8,7 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@jotapuntoce/db";
-import { area, invitation, membership, permissionType, profile } from "@jotapuntoce/db/schema";
+import { agente, area, invitation, membership, permissionType, profile } from "@jotapuntoce/db/schema";
 import { findOwnerMembership } from "../auth/guard.ts";
 import { belongsToOrg } from "../db/belongsToOrg.ts";
 
@@ -174,6 +174,10 @@ export async function acceptInvitation(
         .onConflictDoNothing()
         .returning({ userId: membership.userId });
       if (!insertedMembership) throw new Error("ALREADY_MEMBER");
+
+      // Si el dueño le armó su agente en el arranque, desde ahora es suyo (server/equipo/agentes.ts).
+      await tx.update(agente).set({ userId: sessionUser.id, updatedAt: new Date() })
+        .where(and(eq(agente.orgId, inv.orgId), eq(agente.email, inv.email.toLowerCase()), isNull(agente.userId)));
 
       return { ok: true as const, data: { orgId: inv.orgId } };
     });

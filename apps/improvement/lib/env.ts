@@ -32,6 +32,10 @@ const schema = z.object({
   TOKEN_ENCRYPTION_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 36 — cifrado de refresh tokens
   STRIPE_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 43 — Checkout de butacas
   STRIPE_SEATS_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().min(1).optional()), // paso 44 — webhook de butacas
+  // Importar desde Google Drive (Fase 3 de improvement-odoo). Sin las tres, el botón de Drive no aparece.
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  NEXT_PUBLIC_GOOGLE_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  NEXT_PUBLIC_GOOGLE_APP_ID: z.preprocess(emptyToUndefined, z.string().regex(/^\d+$/).optional()),
 });
 
 export const env = schema.parse(process.env);

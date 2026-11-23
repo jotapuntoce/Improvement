@@ -1,6 +1,7 @@
 // Pipeline de ventas como tablero (lenguaje Flozzy): una columna por etapa con conteo y monto, tarjetas
 // compactas y la tasa de cierre arriba. Lo ve quien tenga la sección `clientes`; crear y mover lo valida
 // el server (server/crm/deals.ts, sin cambios): dueño o `clientes: empresa`.
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, requireSection } from "@/server/auth/guard.ts";
@@ -77,7 +78,7 @@ export default async function PipelinePage({
     <main className="config-page" style={{ maxWidth: "80rem" }}>
       <h1 className="config-title">Pipeline de ventas</h1>
       <p className="config-hint">
-        <a href={`/${orgId}/clientes`}>Volver a clientes</a>
+        <Link href={`/${orgId}/clientes`}>Volver a clientes</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
 
@@ -146,7 +147,7 @@ export default async function PipelinePage({
                   <li key={d.id} className="space-y-1 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
                     <p className="m-0 font-semibold">{d.title}</p>
                     <p className="m-0">
-                      <a href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</a>
+                      <Link href={`/${orgId}/clientes/${d.clientId}`}>{d.clientName}</Link>
                     </p>
                     <p className="config-amount m-0">{MXN.format(d.amountCents / 100)}</p>
                     <p className="config-hint m-0">

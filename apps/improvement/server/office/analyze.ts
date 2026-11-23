@@ -47,7 +47,7 @@ export async function analyzeSpace(
     toText: (p) => `Propuesta de oficina con ${p.areas.length} áreas`,
     basedOn: { fotos: paths },
     images: photos.data,
-    maxOutputTokens: 2048,
+    maxTokens: 2048,
     provider: deps.provider,
   });
   if (!result.ok) return result;

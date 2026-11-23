@@ -280,9 +280,9 @@ test.describe("Junta", () => {
     }
   });
 
-  test("WHEN no hay junta cerrada esta semana THE SYSTEM SHALL mostrar Junta pendiente en el edificio", async ({ page, context, baseURL }) => {
+  test("WHEN no hay junta cerrada esta semana THE SYSTEM SHALL mostrar Junta pendiente en el inicio del negocio", async ({ page, context, baseURL }) => {
     await as(context, ownerToken, baseURL);
-    await page.goto(`/empresas/${orgId}`);
+    await page.goto(`/${orgId}`);
     const aside = page.getByRole("complementary", { name: "Junta pendiente" });
     await expect(aside).toContainText("Junta pendiente");
     await expect(aside.getByRole("link")).toHaveAttribute("href", junta());
@@ -310,7 +310,7 @@ test.describe("Junta", () => {
     await page.waitForURL(`**/direccion/junta?id=${meetingId}`);
     await expect(page.getByText("Promedio 9.0")).toBeVisible();
 
-    await page.goto(`/empresas/${orgId}`);
+    await page.goto(`/${orgId}`);
     await expect(page.getByRole("complementary", { name: "Junta pendiente" })).toHaveCount(0);
   });
 
@@ -343,7 +343,7 @@ test.describe("Hub y navegación", () => {
   test("WHEN el dueño abre /[org]/objetivos THE SYSTEM SHALL mostrar el nav Dirección con su enlace", async ({ page, context, baseURL }) => {
     await as(context, ownerToken, baseURL);
     await page.goto(`/${orgId}/objetivos`);
-    const nav = page.getByRole("navigation", { name: "Dirección" });
+    const nav = page.getByRole("navigation", { name: "Aplicaciones" });
     await expect(nav.getByRole("link", { name: "Dirección" })).toHaveAttribute("href", `/${orgId}/direccion`);
   });
 });

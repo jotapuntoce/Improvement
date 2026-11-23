@@ -74,7 +74,7 @@ export default async function FichaClientePage({
     <main className="config-page" style={{ maxWidth: "72rem" }}>
       <h1 className="config-title">{cliente.name}</h1>
       <p className="config-hint">
-        <a href={`/${orgId}/clientes`}>Volver a clientes</a> · <a href={`/${orgId}/clientes/pipeline`}>Pipeline de ventas</a>
+        <Link href={`/${orgId}/clientes`}>Volver a clientes</Link> · <Link href={`/${orgId}/clientes/pipeline`}>Pipeline de ventas</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
       {preference?.unmetFlaggedAt && (

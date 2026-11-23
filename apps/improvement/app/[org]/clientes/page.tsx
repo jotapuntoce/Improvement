@@ -1,6 +1,7 @@
 // CRM ligero — lista cursor-paginada con filtro por health_status. Sin ningún "use client": los
 // forms nativos con Server Action ya funcionan sin JS (crear, cambiar health_status, eliminar), así
 // que no hay hoja interactiva que envolver — a diferencia de /[org]/objetivos y /[org]/powerups.
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { requireOrgMembership, requireSection } from "@/server/auth/guard";
 import {
@@ -80,9 +81,9 @@ export default async function ClientesPage({
       }}
     >
       <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>Clientes</h1>
-      <a href={`/${orgId}/clientes/pipeline`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
+      <Link href={`/${orgId}/clientes/pipeline`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
         Pipeline de ventas
-      </a>
+      </Link>
 
       <form action={create} style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <input name="name" placeholder="Nombre del cliente" required style={inputStyle} />
@@ -112,17 +113,17 @@ export default async function ClientesPage({
       </form>
 
       <nav style={{ display: "flex", gap: "8px", fontSize: "13px" }}>
-        <a href={`/${orgId}/clientes`} style={{ color: healthFilter ? "var(--text-secondary)" : "var(--accent-2)" }}>
+        <Link href={`/${orgId}/clientes`} style={{ color: healthFilter ? "var(--text-secondary)" : "var(--accent-2)" }}>
           Todos
-        </a>
+        </Link>
         {HEALTH_OPTIONS.map((h) => (
-          <a
+          <Link
             key={h}
             href={`/${orgId}/clientes?health=${h}`}
             style={{ color: healthFilter === h ? "var(--accent-2)" : "var(--text-secondary)" }}
           >
             {HEALTH_LABEL[h]}
-          </a>
+          </Link>
         ))}
       </nav>
 
@@ -161,9 +162,9 @@ export default async function ClientesPage({
             >
               <div>
                 <p style={{ fontWeight: 600, margin: 0 }}>{c.name}</p>
-                <a href={`/${orgId}/clientes/${c.id}`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
+                <Link href={`/${orgId}/clientes/${c.id}`} style={{ color: "var(--accent-2)", fontSize: "13px" }}>
                   Ficha
-                </a>
+                </Link>
                 {c.notes && (
                   <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "4px 0 0" }}>{c.notes}</p>
                 )}
@@ -196,12 +197,12 @@ export default async function ClientesPage({
       </ul>
 
       {data.nextCursor && (
-        <a
+        <Link
           href={`/${orgId}/clientes?cursor=${encodeURIComponent(data.nextCursor)}${healthFilter ? `&health=${healthFilter}` : ""}`}
           style={{ color: "var(--accent-2)", fontSize: "13px", textDecoration: "none" }}
         >
           Siguiente página →
-        </a>
+        </Link>
       )}
     </main>
   );

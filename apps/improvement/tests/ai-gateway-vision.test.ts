@@ -53,7 +53,7 @@ function analizar(orgId: string, images: GatewayImage[], provider: SuggestionPro
     toText: (p) => p.resumen,
     basedOn: {},
     images,
-    maxOutputTokens: 2048,
+    maxTokens: 2048,
     provider,
   });
 }

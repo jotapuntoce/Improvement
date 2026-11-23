@@ -1,0 +1,2 @@
+ALTER TABLE "ai_suggestion" DROP CONSTRAINT "ai_suggestion_category_check";--> statement-breakpoint
+ALTER TABLE "ai_suggestion" ADD CONSTRAINT "ai_suggestion_category_check" CHECK ("ai_suggestion"."category" in ('upgrade','servicio_cliente','siguiente_movimiento','alerta','oficina','agente'));

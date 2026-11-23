@@ -2,9 +2,9 @@
 // toca datos de un org empieza llamando requireOrgMembership() (.claude/rules). RLS en Postgres es
 // la segunda capa, nunca la única (misma regla).
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { membership, organization, permissionType, profile } from "@jotapuntoce/db/schema";
 import { env } from "../../lib/env.ts";
@@ -25,7 +25,7 @@ export async function findMembership(userId: string, orgId: string) {
 
 /**
  * Resuelve el usuario autenticado a partir de la cookie de sesión de Supabase Auth. Devuelve `null`
- * si no hay sesión — nunca lanza, para que requireOrgMembership decida el 404 en un solo lugar.
+ * si no hay sesión — nunca lanza, para que requireOrgMembership decida /login o 404 en un solo lugar.
  */
 export async function getSessionUserId(): Promise<string | null> {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
@@ -64,13 +64,14 @@ export async function assertMembership(userId: string, orgId: string) {
 }
 
 /**
- * Guard de tenencia: WHEN no hay sesión, o la sesión no tiene membership en `orgId`, THE SYSTEM
- * SHALL responder 404 (nunca 403 — un 403 confirma que el org existe a alguien que no debería
- * saberlo). Retorna la fila de membership cuando sí pertenece.
+ * Guard de tenencia: WHEN no hay sesión (o caducó) THE SYSTEM SHALL mandar a /login — eso no revela
+ * nada, pasa igual con cualquier org. WHEN la sesión no tiene membership en `orgId` THE SYSTEM SHALL
+ * responder 404 (nunca 403 — un 403 confirma que el org existe a alguien que no debería saberlo).
+ * Retorna la fila de membership cuando sí pertenece.
  */
 export async function requireOrgMembership(orgId: string) {
   const userId = await getSessionUserId();
-  if (!userId) notFound();
+  if (!userId) redirect("/login");
 
   return assertMembership(userId, orgId);
 }
@@ -96,13 +97,13 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
 
 /**
  * Guard de tenencia para rutas exclusivas de platform admin dentro de apps/improvement (ej.
- * /empresas/clientes/[clientUserId]) — mismo criterio 404-nunca-403 que requireOrgMembership: WHEN
- * no hay sesión, o la sesión no es platform admin, THE SYSTEM SHALL responder 404. Devuelve el
- * userId cuando sí lo es.
+ * /empresas/clientes/[clientUserId]) — mismo criterio que requireOrgMembership: sin sesión, /login;
+ * WHEN la sesión no es platform admin THE SYSTEM SHALL responder 404. Devuelve el userId cuando sí
+ * lo es.
  */
 export async function requirePlatformAdminSession(): Promise<string> {
   const userId = await getSessionUserId();
-  if (!userId) notFound();
+  if (!userId) redirect("/login");
 
   const admin = await fetchIsPlatformAdmin(userId);
   if (!admin) notFound();
@@ -166,5 +167,44 @@ export async function requireSection(orgId: string, section: SectionSlug) {
   const row = await requireOrgMembership(orgId);
   const resolved = await resolveSection(row.userId, orgId, section);
   if (resolved.scope === "ninguno") notFound();
-  return resolved;
+  // Vista previa del dueño: la página se dibuja con el alcance del tipo elegido, nunca más amplio.
+  const preview = row.role === "owner" ? await getPreviewGrants(orgId) : null;
+  if (!preview) return resolved;
+  const scope = scopeFor("employee", preview, section);
+  if (scope === "ninguno") notFound();
+  return { ...resolved, scope };
+}
+
+/** Cookie de "Vista previa como" (server/auth/preview.ts la escribe): `<orgId>:<permissionTypeId>`. */
+export const PREVIEW_COOKIE = "imp-preview-as";
+
+/**
+ * "Vista previa como": los grants del tipo de permiso que el dueño eligió para ver su Improvement como
+ * lo vería ese tipo. Solo reduce lo visible en páginas y barra; las Server Actions usan el rol real.
+ * Null si no hay vista previa, si la cookie es de otro org o si quien la trae no es el dueño.
+ */
+export async function getPreviewGrants(orgId: string): Promise<Record<string, string> | null> {
+  const raw = (await cookies()).get(PREVIEW_COOKIE)?.value;
+  const [cookieOrg, typeId] = raw?.split(":") ?? [];
+  if (cookieOrg !== orgId || !typeId || !/^[0-9a-f-]{36}$/i.test(typeId)) return null;
+  const userId = await getSessionUserId();
+  const row = userId ? await findMembership(userId, orgId) : null;
+  if (row?.role !== "owner") return null;
+  const [type] = await db
+    .select({ grants: permissionType.grants })
+    .from(permissionType)
+    .where(and(eq(permissionType.id, typeId), eq(permissionType.orgId, orgId)));
+  return (type?.grants as Record<string, string> | undefined) ?? null;
+}
+
+/** La primera empresa (por nombre) donde la persona ya aceptó su membresía; null si no tiene ninguna. */
+export async function firstOrgOf(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ orgId: membership.orgId })
+    .from(membership)
+    .innerJoin(organization, eq(organization.id, membership.orgId))
+    .where(and(eq(membership.userId, userId), isNotNull(membership.acceptedAt)))
+    .orderBy(asc(organization.name))
+    .limit(1);
+  return row?.orgId ?? null;
 }

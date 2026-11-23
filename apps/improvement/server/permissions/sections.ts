@@ -27,6 +27,7 @@ export const SECTION_SLUGS = [
   "erp",
   "agenda",
   "butacas",
+  "aplicaciones",
 ] as const;
 export type SectionSlug = (typeof SECTION_SLUGS)[number];
 
@@ -66,6 +67,7 @@ export const SECTIONS: Section[] = [
   { slug: "erp", label: "ERP", hint: "Inventario, ventas y compras.", scopes: ["empresa"] },
   { slug: "agenda", label: "Agenda", hint: "Tu calendario, tus pendientes y tu página de reservas.", scopes: ["propio"] },
   { slug: "butacas", label: "Butacas", hint: "Mapas de lugares, funciones y taquilla.", scopes: ["empresa"] },
+  { slug: "aplicaciones", label: "Aplicaciones propias", hint: "Las apps que creó el dueño", scopes: ["empresa"] },
 ];
 
 export function sectionBySlug(slug: string): Section | undefined {

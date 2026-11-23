@@ -1,5 +1,6 @@
 // Lealtad: funciones del programa, niveles VIP, experiencias entregadas y el enlace al monedero de cada
 // cliente (server/crm/loyalty.ts y wallet.ts). Lo ve quien tenga `clientes`; escribe quien la tenga en `empresa`.
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { env } from "@/lib/env";
@@ -93,7 +94,7 @@ export default async function LealtadPage({
     <main className="config-page">
       <h1 className="config-title">Lealtad</h1>
       <p className="config-hint">
-        <a href={`/${orgId}/clientes`}>Volver a clientes</a>
+        <Link href={`/${orgId}/clientes`}>Volver a clientes</Link>
       </p>
       {error && <p className="invite-error">{error}</p>}
 

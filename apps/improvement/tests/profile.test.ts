@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@jotapuntoce/db";
 import { profile } from "@jotapuntoce/db/schema";
-import { getMyProfile, updateMyFullName } from "../server/profile/mutations.ts";
+import { getMyProfile, updateMyFullName, updateMyPhone } from "../server/profile/mutations.ts";
 
 const createdProfileIds: string[] = [];
 
@@ -45,5 +45,21 @@ describe("updateMyFullName", () => {
     const result = await updateMyFullName(crypto.randomUUID(), "Nadie");
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("updateMyPhone", () => {
+  it("WHEN el teléfono trae menos de 7 dígitos THE SYSTEM SHALL rechazarlo sin escribir", async () => {
+    const userId = await makeProfile();
+    expect((await updateMyPhone(userId, "55-12")).ok).toBe(false);
+    expect((await getMyProfile(userId))?.phone).toBeNull();
+  });
+
+  it("WHEN el teléfono es completo THE SYSTEM SHALL guardarlo, y vacío lo borra", async () => {
+    const userId = await makeProfile();
+    await updateMyPhone(userId, " 55 1234 5678 ");
+    expect((await getMyProfile(userId))?.phone).toBe("55 1234 5678");
+    await updateMyPhone(userId, "");
+    expect((await getMyProfile(userId))?.phone).toBeNull();
   });
 });
