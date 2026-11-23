@@ -27,7 +27,8 @@ describe("loadSidebar", () => {
     await db.insert(membership).values([{ userId: owner, orgId: a, role: "owner", acceptedAt: new Date() }, { userId: owner, orgId: b, role: "owner", acceptedAt: new Date() }]);
     const s = await loadSidebar(owner, a);
     expect(s.orgs.map((o) => o.name).sort()).toEqual(["Camibel", "Segunda"]);
-    expect(s.groups.map((g) => g.name)).toEqual(["Ventas", "Operación"]);
+    expect(s.groups.map((g) => g.name)).toEqual(["Ventas", "Operación", "Oficinas digitales"]);
+    expect(s.groups.at(-1)?.apps.map((x) => x.href)).toContain(`/${a}/oficina`);
     expect(s.groups.flatMap((g) => g.apps.map((x) => x.href))).toContain(`/${a}/a/ventas`);
     expect(s.permissionTypes).toEqual([]);
   });

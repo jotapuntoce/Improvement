@@ -28,7 +28,7 @@ describe("loadLobby con Oficinas digitales", () => {
     await db.insert(membership).values({ userId: ownerId, orgId: org.id, role: "owner", acceptedAt: new Date() });
 
     const lobby = await loadLobby(ownerId, org.id);
-    expect(lobby.sueltas.map((s) => s.slug).sort()).toEqual(["cobros", "direccion", "mapa", "postventa", "proyectos"]);
+    expect(lobby.sueltas.map((s) => s.slug).sort()).toEqual(["aplicaciones", "cobros", "direccion", "mapa", "postventa", "proyectos"]);
     expect(lobby.puertas.map((p) => p.slug).sort()).toEqual(["clientes", "equipo", "objetivos", "powerups"]);
   });
 });
